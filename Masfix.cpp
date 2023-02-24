@@ -6,30 +6,62 @@
 #include <locale>
 #include <vector>
 #include <fstream>
-#include <assert.h>
+#include <math.h>
 using namespace std;
 
 // helpers ---------------------------------
- std::string &ltrim(std::string &s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(),
-            std::not1(std::ptr_fun<int, int>(std::isspace))));
-    return s;
+string &ltrim(string &s) {
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+			std::not1(std::ptr_fun<int, int>(std::isspace))));
+	return s;
 }
-std::string &rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(),
-            std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-    return s;
+string &rtrim(string &s) {
+	s.erase(std::find_if(s.rbegin(), s.rend(),
+			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+	return s;
 }
-std::string &trim(std::string &s) {
-    return ltrim(rtrim(s));
+string trim(string &s) {
+	return ltrim(rtrim(s));
+}
+vector<string> splitOnWhitespace(string &s) {
+	vector<string> splits;
+	int start = 0;
+	for (int i = 0; i < s.size(); ++i) {
+		if (std::isspace(s.at(i))) {
+			string chunk = s.substr(start, i - start);
+			if (chunk.size()) splits.push_back(chunk);
+			start = i+1;
+		}
+	}
+	if (start < s.size()) {
+		string chunk = s.substr(start);
+		if (chunk.size()) splits.push_back(chunk);
+	}
+	return splits;
+}
+string deleteWhitespace(string s) {
+	for (int i = 0; i < s.size();) {
+		if (std::isspace(s.at(i)))
+			s.erase(i, 1);
+		else i++;
+	}
+	return s;
+}
+
+void check(bool cond, string message) {
+	if (!cond) {
+		cout << "ERROR: " << message << '\n';
+		exit(1);
+	}
 }
 // structs -------------------------------
 struct InstrToken {
-	string instr;
-	bool hasImm;
-	string immediate;
-
-	InstrToken(string instr, bool hasImm, string immediate) {
+	string instr = "";
+	bool hasImm = false;
+	int immediate;
+	
+	InstrToken() {}
+	InstrToken(string instr, bool hasImm, int immediate) {
 		this->instr = instr;
 		this->hasImm = hasImm;
 		this->immediate = immediate;
@@ -37,7 +69,7 @@ struct InstrToken {
 	string toStr() {
 		string s = instr;
 		if (hasImm) {
-			s = s.append(" ").append(immediate);
+			s = s.append(" ").append(to_string(immediate));
 		}
 		return s;
 	}
@@ -51,17 +83,18 @@ vector<InstrToken> tokenize(ifstream& inFile) {
 		line = line.substr(0, line.find(';'));
 		line = trim(line);
 		if (line.size() > 0) {
+			vector<string> splits = splitOnWhitespace(line);
+			check(splits.size() <= 2, "Instruction has too many fields '" + line + "'");
 			
-			bool hasImm = false;
-			string instr = "", imm = "";
-			if (line.find(' ') != string::npos) {
-				hasImm = true;
-				instr = line.substr(0, line.find(' '));
-				imm = line.substr(line.find(' ')+1);
-				assert(imm.find(' ') == string::npos);
-			} else 
-				instr = line;
-			InstrToken token(instr, hasImm, imm);
+			InstrToken token;
+			token.instr = splits[0];
+			token.hasImm = splits.size() == 2;
+			if (token.hasImm) {
+				int imm = stoi(splits[1]);
+				check(to_string(imm) == splits[1], "Invalid instruction immediate '" + splits[1] + "'");
+				check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
+				token.immediate = imm;
+			}
 			tokens.push_back(token);
 		}
 	}
@@ -70,16 +103,14 @@ vector<InstrToken> tokenize(ifstream& inFile) {
 
 void genInstr(ofstream& outFile, InstrToken instr) {	
 	// head pos - rbx, internal r reg - rcx
-	int imm = 0;
-	if (instr.hasImm) imm = stoi(instr.immediate);
 	outFile << "	; " << instr.toStr() << '\n';
 
 	if (instr.instr == "mov") {
-		outFile << "	mov rbx, " << imm << '\n';
+		outFile << "	mov rbx, " << instr.immediate << '\n';
 	} else if (instr.instr == "str") {
-		outFile << "	mov WORD [2*rbx+cells], " << imm << '\n';
+		outFile << "	mov WORD [2*rbx+cells], " << instr.immediate << '\n';
 	} else if (instr.instr == "ld") {
-		outFile << "	mov rcx, " << imm << '\n';
+		outFile << "	mov rcx, " << instr.immediate << '\n';
 	} else if (instr.instr == "outum") {
 		outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
@@ -88,14 +119,13 @@ void genInstr(ofstream& outFile, InstrToken instr) {
 			"	call print_unsigned\n";
 	} else if (instr.instr == "outc") {
 		outFile << 
-			"	mov [stdout_buff], WORD " << imm << "\n"
+			"	mov [stdout_buff], WORD " << instr.immediate << "\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
 	} else {
-		assert(("Unknown instruction", false));
+		check(false, "Unknown instruction: '" + instr.instr + "'");
 	}
-
 }
 
 void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
