@@ -1,33 +1,94 @@
 #include <iostream>
 #include <string>
+#include <algorithm> 
+#include <functional> 
+#include <cctype>
+#include <locale>
 #include <vector>
 #include <fstream>
 #include <assert.h>
 using namespace std;
 
-void genInstr(ofstream& outFile, string instr) {
-	string instrName = instr.substr(0, instr.find(' '));
-	string value = "";
-	if (instrName != instr)
-		value = instr.substr(instr.find(' ') + 1, instr.size());
+// helpers ---------------------------------
+ std::string &ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return s;
+}
+std::string &rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
+}
+std::string &trim(std::string &s) {
+    return ltrim(rtrim(s));
+}
+// structs -------------------------------
+struct InstrToken {
+	string instr;
+	bool hasImm;
+	string immediate;
+
+	InstrToken(string instr, bool hasImm, string immediate) {
+		this->instr = instr;
+		this->hasImm = hasImm;
+		this->immediate = immediate;
+	}
+	string toStr() {
+		string s = instr;
+		if (hasImm) {
+			s = s.append(" ").append(immediate);
+		}
+		return s;
+	}
+};
+
+vector<InstrToken> tokenize(ifstream& inFile) {
+	string line;
+	vector<InstrToken> tokens;
 	
+	while (getline(inFile, line)) {
+		line = line.substr(0, line.find(';'));
+		line = trim(line);
+		if (line.size() > 0) {
+			
+			bool hasImm = false;
+			string instr = "", imm = "";
+			if (line.find(' ') != string::npos) {
+				hasImm = true;
+				instr = line.substr(0, line.find(' '));
+				imm = line.substr(line.find(' ')+1);
+				assert(imm.find(' ') == string::npos);
+			} else 
+				instr = line;
+			InstrToken token(instr, hasImm, imm);
+			tokens.push_back(token);
+		}
+	}
+	return tokens;
+}
+
+void genInstr(ofstream& outFile, InstrToken instr) {	
 	// head pos - rbx, internal r reg - rcx
-	outFile << "	; " << instrName << ' ' << value << '\n';
-	if (instrName == "mov") {
-		outFile << "	mov rbx, " << value << '\n';
-	} else if (instrName == "str") {
-		outFile << "	mov WORD [2*rbx+cells], " << value << '\n';
-	} else if (instrName == "ld") {
-		outFile << "	mov rcx, " << value << '\n';
-	} else if (instrName == "outum") {
+	int imm = 0;
+	if (instr.hasImm) imm = stoi(instr.immediate);
+	outFile << "	; " << instr.toStr() << '\n';
+
+	if (instr.instr == "mov") {
+		outFile << "	mov rbx, " << imm << '\n';
+	} else if (instr.instr == "str") {
+		outFile << "	mov WORD [2*rbx+cells], " << imm << '\n';
+	} else if (instr.instr == "ld") {
+		outFile << "	mov rcx, " << imm << '\n';
+	} else if (instr.instr == "outum") {
 		outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
-	} else if (instrName == "outur") {
+	} else if (instr.instr == "outur") {
 		outFile << "	mov ax, cx\n"
 			"	call print_unsigned\n";
-	} else if (instrName == "outc") {
+	} else if (instr.instr == "outc") {
 		outFile << 
-			"	mov [stdout_buff], WORD " << value << "\n"
+			"	mov [stdout_buff], WORD " << imm << "\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
@@ -37,7 +98,7 @@ void genInstr(ofstream& outFile, string instr) {
 
 }
 
-void generate(vector<string>& instrs, string outFileName="out.asm") {
+void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
 	ofstream outFile;
 	outFile.open(outFileName);
 
@@ -96,7 +157,7 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 	
 
 
-	for (string instr : instrs) {
+	for (InstrToken instr : instrs) {
 		genInstr(outFile, instr);
 	}
 	outFile << 
@@ -116,9 +177,8 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 }
 
 int main() {
-	vector<string> instrs = {"ld 24",
-		"mov 0", "str 1", "mov 1", "str 185", "mov 2", "str 65535", "mov 0", "outum", "outc 10", "mov 1", "outum", "outc 10", "mov 2", "outum", "outc 10", 
-		"outc 72", "outc 101", "outc 108", "outc 108", "outc 111", "outc 32", "outc 119", "outc 111", "outc 114", "outc 108", "outc 100", "outc 33", "outc 10",
-		"outur", "outc 10", "ld 65535", "outur", "outc 10"};
+	ifstream inFile;
+	inFile.open("in.mx");
+	vector<InstrToken> instrs = tokenize(inFile);
 	generate(instrs);
 }
