@@ -11,14 +11,19 @@ void genInstr(ofstream& outFile, string instr) {
 	if (instrName != instr)
 		value = instr.substr(instr.find(' ') + 1, instr.size());
 	
-	// head pos - rbx
+	// head pos - rbx, internal r reg - rcx
 	outFile << "	; " << instrName << ' ' << value << '\n';
 	if (instrName == "mov") {
 		outFile << "	mov rbx, " << value << '\n';
 	} else if (instrName == "str") {
 		outFile << "	mov WORD [2*rbx+cells], " << value << '\n';
+	} else if (instrName == "ld") {
+		outFile << "	mov rcx, " << value << '\n';
 	} else if (instrName == "outum") {
 		outFile << "	mov ax, [2*rbx+cells]\n"
+			"	call print_unsigned\n";
+	} else if (instrName == "outur") {
+		outFile << "	mov ax, cx\n"
 			"	call print_unsigned\n";
 	} else if (instrName == "outc") {
 		outFile << 
@@ -50,6 +55,7 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 		"	mov [stdout_fd], rax\n"
 		"	ret\n"
 		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
+		"	push rcx\n"
 		"	mov rcx, [stdout_fd] ; stdout fd\n"
 		"	push 0 ; number of bytes written var\n"
 		"	mov r9, rsp ; ptr to that var\n"
@@ -58,6 +64,7 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 		"	call WriteFile@20\n"
 		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
 		"	pop rax\n"
+		"	pop rcx\n"
 		"	ret\n"
 		"print_unsigned: ; n - rax\n"
 		"	xor r8, r8 ; char count\n"
@@ -75,14 +82,17 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 		"	cmp rax, 0\n"
 		"	jne print_unsigned_loop\n"
 		"	\n"
-		"	; TODO: save regs - not needed bcoz rbx is safe\n"
 		"	mov rdx, r9 ; buff addr\n"
 		"	call stdout_write\n"
 		"	ret\n"
 		"\n"
 		"global _start\n"
 		"_start:\n"
-		"	call get_std_fds\n";
+		"	; initialization\n"
+		"	call get_std_fds\n"
+		"	xor rbx, rbx\n"
+		"	xor rcx, rcx\n"
+		"\n";
 	
 
 
@@ -106,8 +116,9 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 }
 
 int main() {
-	vector<string> instrs = 
-		{"mov 0", "str 1", "mov 1", "str 185", "mov 2", "str 65535", "mov 0", "outum", "outc 10", "mov 1", "outum", "outc 10", "mov 2", "outum", "outc 10", 
-		"outc 72", "outc 101", "outc 108", "outc 108", "outc 111", "outc 32", "outc 119", "outc 111", "outc 114", "outc 108", "outc 100", "outc 33", "outc 10"};
+	vector<string> instrs = {"ld 24",
+		"mov 0", "str 1", "mov 1", "str 185", "mov 2", "str 65535", "mov 0", "outum", "outc 10", "mov 1", "outum", "outc 10", "mov 2", "outum", "outc 10", 
+		"outc 72", "outc 101", "outc 108", "outc 108", "outc 111", "outc 32", "outc 119", "outc 111", "outc 114", "outc 108", "outc 100", "outc 33", "outc 10",
+		"outur", "outc 10", "ld 65535", "outur", "outc 10"};
 	generate(instrs);
 }
