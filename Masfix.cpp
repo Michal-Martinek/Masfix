@@ -20,6 +20,12 @@ void genInstr(ofstream& outFile, string instr) {
 	} else if (instrName == "outum") {
 		outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
+	} else if (instrName == "outc") {
+		outFile << 
+			"	mov [stdout_buff], WORD " << value << "\n"
+			"	mov rdx, stdout_buff\n"
+			"	mov r8, 1\n"
+			"	call stdout_write\n";
 	} else {
 		assert(("Unknown instruction", false));
 	}
@@ -100,6 +106,8 @@ void generate(vector<string>& instrs, string outFileName="out.asm") {
 }
 
 int main() {
-	vector<string> instrs = {"mov 0", "str 1", "mov 1", "str 65536", "mov 2", "str 65535", "mov 0", "outum", "mov 1", "outum", "mov 2", "outum"};
+	vector<string> instrs = 
+		{"mov 0", "str 1", "mov 1", "str 185", "mov 2", "str 65535", "mov 0", "outum", "outc 10", "mov 1", "outum", "outc 10", "mov 2", "outum", "outc 10", 
+		"outc 72", "outc 101", "outc 108", "outc 108", "outc 111", "outc 32", "outc 119", "outc 111", "outc 114", "outc 108", "outc 100", "outc 33", "outc 10"};
 	generate(instrs);
 }
