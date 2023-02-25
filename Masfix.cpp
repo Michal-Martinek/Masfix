@@ -103,6 +103,7 @@ vector<InstrToken> tokenize(ifstream& inFile) {
 
 void genAssembly(ofstream& outFile, InstrToken instr) {	
 	// head pos - rbx, internal r reg - rcx
+	// TODO: instrs using immediate should check if the instr hasImm
 	if (instr.instr == "mov") {
 		outFile << "	mov rbx, " << instr.immediate << '\n';
 	} else if (instr.instr == "str") {
@@ -116,11 +117,13 @@ void genAssembly(ofstream& outFile, InstrToken instr) {
 		outFile << "	mov ax, cx\n"
 			"	call print_unsigned\n";
 	} else if (instr.instr == "outc") {
-		outFile << 
+		outFile << // TODO: outc should use a BYTE inst of WORD, and should check the value to be < 256
 			"	mov [stdout_buff], WORD " << instr.immediate << "\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
+	} else if (instr.instr == "jmp") { // add guards to jmp so we don't jump somewhere which DNE
+		outFile << "	jmp [instruction_offsets+8*" << instr.immediate << "]\n";
 	} else {
 		check(false, "Unknown instruction: '" + instr.instr + "'");
 	}
