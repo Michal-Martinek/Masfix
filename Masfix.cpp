@@ -109,8 +109,8 @@ struct Instr {
 		for (SuffixNames suff : suffixes) {
 			s.push_back(SuffixToChar[suff]);
 		}
-		s.push_back(' ');
 		if (hasImm) {
+			s.push_back(' ');
 			s.append(to_string(immediate));
 		}
 		return s;
@@ -125,7 +125,7 @@ vector<SuffixNames> parseSuffixes(string s) {
 	char suff = s.at(0);
 
 	map<char, SuffixNames> m {{'m', Sm}, {'r', Sr}};
-	check(m.count(suff) == 1, "Unknown suffix '" + s + "'\n");
+	check(m.count(suff) == 1, "Unknown suffix '" + s + "'\n"); // TODO: print whole instr
 	out.push_back(m[suff]);
 	return out;
 }
@@ -144,7 +144,7 @@ Instr parseInstrOpcode(string parsing) {
 	check(false, "Unknown instruction: '" + parsing + "'");
 	return instr; // so the compiler doesn't yell at us
 }
-int parseInstrImmediate(string s) {
+int parseInstrImmediate(string s) { // TODO: on ERROR print whole instr
 	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
 	int imm = stoi(s);
 	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
@@ -177,38 +177,50 @@ vector<Instr> tokenize(ifstream& inFile) {
 	return instrs;
 }
 // assembly generation ------------------------------------------
-void genAssembly(ofstream& outFile, Instr instr) {	
-	// head pos - rbx, internal r reg - rcx
-	static_assert(InstructionCount == 6, "Exhaustive genAssembly definition");
-	static_assert(SuffixCount == 2, "Exhaustive genAssembly definition");
-	// TODO: instrs using immediate should check if the instr hasImm
+void genArgumentFetch(ofstream& outFile, Instr instr) {
+	static_assert(SuffixCount == 2, "Exhaustive genArgumentFetch definition");
+	check(instr.hasImm ^ instr.suffixes.size() == 1, "Instrs must have only imm, or 1 reg for now: '" + instr.toStr() + "'\n");
+	if (instr.hasImm) {
+		outFile << "	mov rax, " << instr.immediate << '\n';
+		return;
+	}
+	SuffixNames suff = instr.suffixes[0];
+	if (suff == Sm) {
+		outFile << "	xor rax, rax\n"
+			"	mov ax, [2*rbx+cells]\n";
+	} else if (suff == Sr) {
+		outFile << "	xor rax, rax\n"
+			"	mov ax, cx\n";
+	} else {
+		unreachable();
+	}
+}
+void genInstrBody(ofstream& outFile, Instr instr) {
+	static_assert(InstructionCount == 6, "Exhaustive genInstrBody definition");
 	if (instr.instr == Imov) {
-		outFile << "	mov rbx, " << instr.immediate << '\n';
+		outFile << "	mov rbx, rax\n";
 	} else if (instr.instr == Istr) {
-		outFile << "	mov WORD [2*rbx+cells], " << instr.immediate << '\n';
+		outFile << "	mov [2*rbx+cells], ax\n";
 	} else if (instr.instr == Ild) {
-		outFile << "	mov rcx, " << instr.immediate << '\n';
+		outFile << "	mov rcx, rax\n";
 	} else if (instr.instr == Ioutu) {
-		if (instr.suffixes[0] == Sm) {
-			outFile << "	mov ax, [2*rbx+cells]\n"
-			"	call print_unsigned\n";
-		} else if (instr.suffixes[0] == Sr) {
-			outFile << "	mov ax, cx\n"
-						"	call print_unsigned\n";
-		} else {
-			unreachable();
-		}		
+		outFile << "	call print_unsigned\n";
 	} else if (instr.instr == Ioutc) {
-		outFile << // TODO: outc should use a BYTE inst of WORD, and should check the value to be < 256
-			"	mov [stdout_buff], WORD " << instr.immediate << "\n"
+		outFile <<
+			"	mov [stdout_buff], al\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
 	} else if (instr.instr == Ijmp) { // TODO: add guards to jmp so we don't jump somewhere which DNE
-		outFile << "	jmp [instruction_offsets+8*" << instr.immediate << "]\n";
+		outFile << "	jmp [instruction_offsets+8*ax]\n";
 	} else {
 		unreachable();
 	}
+}
+void genAssembly(ofstream& outFile, Instr instr) {	
+	// head pos - rbx, internal r reg - rcx
+	genArgumentFetch(outFile, instr); // loads instr argument in ax, responsible for 16-bit clamping
+	genInstrBody(outFile, instr); // executes the instr body, given instr val in ax, responsible for clamping the destination
 }
 
 void generate(vector<Instr>& instrs, string outFileName="out.asm") {
@@ -221,7 +233,7 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"extern WriteFile@20\n"
 		"\n"
 		"section .text\n"
-		"get_std_fds: ; prepares all std fds\n"
+		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
 		"	mov rcx, -11 ; stdout fd\n"
 		"	sub rsp, 32 ; call with shadow space\n"
 		"	call GetStdHandle@4\n"
@@ -274,7 +286,9 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		outFile << "instr_" << i << ":\n";
 		outFile << "	; " << instr.toStr() << '\n';
 		genAssembly(outFile, instr);
-	}
+	} 
+	// TODO: label to jump to end of file
+	// TODO: if the file is empty "error: symbol `instr_0' not defined"
 	outFile << 
 		"\n"
 		"	; exit(0)\n"
