@@ -145,6 +145,7 @@ Instr parseInstrOpcode(string parsing) {
 	return instr; // so the compiler doesn't yell at us
 }
 int parseInstrImmediate(string s) {
+	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
 	int imm = stoi(s);
 	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
 	check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
