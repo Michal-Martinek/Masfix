@@ -101,10 +101,8 @@ vector<InstrToken> tokenize(ifstream& inFile) {
 	return tokens;
 }
 
-void genInstr(ofstream& outFile, InstrToken instr) {	
+void genAssembly(ofstream& outFile, InstrToken instr) {	
 	// head pos - rbx, internal r reg - rcx
-	outFile << "	; " << instr.toStr() << '\n';
-
 	if (instr.instr == "mov") {
 		outFile << "	mov rbx, " << instr.immediate << '\n';
 	} else if (instr.instr == "str") {
@@ -185,10 +183,12 @@ void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
 		"	xor rcx, rcx\n"
 		"\n";
 	
-
-
-	for (InstrToken instr : instrs) {
-		genInstr(outFile, instr);
+	InstrToken instr;
+	for (int i = 0; i < instrs.size(); ++i) {
+		instr = instrs[i];
+		outFile << "instr_" << i << ":\n";
+		outFile << "	; " << instr.toStr() << '\n';
+		genAssembly(outFile, instr);
 	}
 	outFile << 
 		"\n"
@@ -201,8 +201,18 @@ void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
 		"section .bss\n"
 		"	cells: resw 1024\n"
 		"	stdout_fd: resq 1\n"
-		"	stdout_buff: resb 256\n";
+		"	stdout_buff: resb 256\n"
+		"\n"
+		"section .data\n"
+		"	instruction_number: EQU " << instrs.size() << "\n"
+		"	instruction_offsets: dq ";
 	
+	outFile << "instr_0";
+	for (int i = 1; i < instrs.size(); ++i) {
+		outFile << ",instr_" << i;
+	}
+	
+	outFile << "\n";
 	outFile.close();
 }
 
