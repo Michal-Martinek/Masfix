@@ -52,6 +52,7 @@ string deleteWhitespace(string s) {
 	return s;
 }
 
+#define unreachable() assert(("Unreachable", false));
 void check(bool cond, string message) {
 	if (!cond) {
 		cout << "ERROR: " << message << '\n';
@@ -65,25 +66,24 @@ enum InstrNames {
 	Ild ,
 	Ijmp,
 
-	Ioutum,
-	Ioutur,
+	Ioutu,
 	Ioutc,
 	InstructionCount
 };
-static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
+static_assert(InstructionCount == 6, "Exhaustive InstrToStr definition");
 map<InstrNames, string> InstrToStr {
 {Imov, "mov"},
 {Istr, "str"},
 {Ild , "ld" },
 {Ijmp, "jmp"},
 
-{Ioutum, "outum"}, // temporary
-{Ioutur, "outur"},
+{Ioutu, "outu"},
 {Ioutc, "outc"},
 };
 // structs -------------------------------
 struct Instr {
 	InstrNames instr;
+	string suffixes;
 	bool hasImm;
 	int immediate;
 	
@@ -95,6 +95,7 @@ struct Instr {
 	}
 	string toStr() {
 		string s = InstrToStr[instr];
+		s += suffixes;
 		if (hasImm) {
 			s = s.append(" ").append(to_string(immediate));
 		}
@@ -102,26 +103,33 @@ struct Instr {
 	}
 };
 // tokenization ----------------------------------
-InstrNames parseInstrOpcode(string s) {
-	static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
+Instr parseInstrOpcode(string parsing) {
+	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
+	Instr instr;
 	for (pair<InstrNames, string> p : InstrToStr) {
-		if (p.second == s) {
-			return p.first;
-		} 
+		string substr = parsing.substr(0, p.second.size());
+		if (substr == p.second) {
+			instr.instr = p.first;
+			instr.suffixes = parsing.substr(p.second.size());
+			return instr;
+		}
 	}
-	check(false, "Unknown instruction: '" + s + "'");
-	return Imov; // so the compiler doesn't yell at us
+	check(false, "Unknown instruction: '" + parsing + "'");
+	return instr; // so the compiler doesn't yell at us
+}
+int parseInstrImmediate(string s) {
+	int imm = stoi(s);
+	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
+	check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
+	return imm;
 }
 Instr parseInstrFields(vector<string> &fields) {
-	InstrNames instr = parseInstrOpcode(fields[0]);
-	bool hasImm = fields.size() == 2;
-	int imm = 0;
-	if (hasImm) {
-		imm = stoi(fields[1]);
-		check(to_string(imm) == fields[1], "Invalid instruction immediate '" + fields[1] + "'");
-		check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
+	Instr instr = parseInstrOpcode(fields[0]);
+	instr.hasImm = fields.size() == 2;
+	if (instr.hasImm) {
+		instr.immediate = parseInstrImmediate(fields[1]);
 	}
-	return Instr(instr, hasImm, imm);
+	return instr;
 }
 vector<Instr> tokenize(ifstream& inFile) {
 	string line;
@@ -143,7 +151,7 @@ vector<Instr> tokenize(ifstream& inFile) {
 // assembly generation ------------------------------------------
 void genAssembly(ofstream& outFile, Instr instr) {	
 	// head pos - rbx, internal r reg - rcx
-	static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
+	static_assert(InstructionCount == 6, "Exhaustive genAssembly definition");
 	// TODO: instrs using immediate should check if the instr hasImm
 	if (instr.instr == Imov) {
 		outFile << "	mov rbx, " << instr.immediate << '\n';
@@ -151,12 +159,16 @@ void genAssembly(ofstream& outFile, Instr instr) {
 		outFile << "	mov WORD [2*rbx+cells], " << instr.immediate << '\n';
 	} else if (instr.instr == Ild) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
-	} else if (instr.instr == Ioutum) {
-		outFile << "	mov ax, [2*rbx+cells]\n"
+	} else if (instr.instr == Ioutu) {
+		if (instr.suffixes == "m") {
+			outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
-	} else if (instr.instr == Ioutur) {
-		outFile << "	mov ax, cx\n"
-			"	call print_unsigned\n";
+		} else if (instr.suffixes == "r") {
+			outFile << "	mov ax, cx\n"
+						"	call print_unsigned\n";
+		} else {
+			unreachable();
+		}		
 	} else if (instr.instr == Ioutc) {
 		outFile << // TODO: outc should use a BYTE inst of WORD, and should check the value to be < 256
 			"	mov [stdout_buff], WORD " << instr.immediate << "\n"
@@ -166,7 +178,7 @@ void genAssembly(ofstream& outFile, Instr instr) {
 	} else if (instr.instr == Ijmp) { // TODO: add guards to jmp so we don't jump somewhere which DNE
 		outFile << "	jmp [instruction_offsets+8*" << instr.immediate << "]\n";
 	} else {
-		assert(("Unreachable", false));
+		unreachable();
 	}
 }
 
