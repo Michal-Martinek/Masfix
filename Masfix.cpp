@@ -1,12 +1,16 @@
 #include <iostream>
+#include <fstream>
+
 #include <string>
-#include <algorithm> 
+#include <map>
+#include <vector>
+
+#include <algorithm>
+#include <math.h>
+#include <assert.h>
 #include <functional> 
 #include <cctype>
 #include <locale>
-#include <vector>
-#include <fstream>
-#include <math.h>
 using namespace std;
 
 // helpers ---------------------------------
@@ -54,30 +58,74 @@ void check(bool cond, string message) {
 		exit(1);
 	}
 }
+// enums --------------------------------
+enum InstrNames {
+	Imov,
+	Istr,
+	Ild ,
+	Ijmp,
+
+	Ioutum,
+	Ioutur,
+	Ioutc,
+	InstructionCount
+};
+static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
+map<InstrNames, string> InstrToStr {
+{Imov, "mov"},
+{Istr, "str"},
+{Ild , "ld" },
+{Ijmp, "jmp"},
+
+{Ioutum, "outum"}, // temporary
+{Ioutur, "outur"},
+{Ioutc, "outc"},
+};
 // structs -------------------------------
-struct InstrToken {
-	string instr = "";
-	bool hasImm = false;
+struct Instr {
+	InstrNames instr;
+	bool hasImm;
 	int immediate;
 	
-	InstrToken() {}
-	InstrToken(string instr, bool hasImm, int immediate) {
+	Instr() {}
+	Instr(InstrNames instr, bool hasImm, int immediate) {
 		this->instr = instr;
 		this->hasImm = hasImm;
 		this->immediate = immediate;
 	}
 	string toStr() {
-		string s = instr;
+		string s = InstrToStr[instr];
 		if (hasImm) {
 			s = s.append(" ").append(to_string(immediate));
 		}
 		return s;
 	}
 };
-
-vector<InstrToken> tokenize(ifstream& inFile) {
+// tokenization ----------------------------------
+InstrNames parseInstrOpcode(string s) {
+	static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
+	for (pair<InstrNames, string> p : InstrToStr) {
+		if (p.second == s) {
+			return p.first;
+		} 
+	}
+	check(false, "Unknown instruction: '" + s + "'");
+	return Imov; // so the compiler doesn't yell at us
+}
+Instr parseInstrFields(vector<string> &fields) {
+	InstrNames instr = parseInstrOpcode(fields[0]);
+	bool hasImm = fields.size() == 2;
+	int imm = 0;
+	if (hasImm) {
+		imm = stoi(fields[1]);
+		check(to_string(imm) == fields[1], "Invalid instruction immediate '" + fields[1] + "'");
+		check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
+	}
+	return Instr(instr, hasImm, imm);
+}
+vector<Instr> tokenize(ifstream& inFile) {
 	string line;
-	vector<InstrToken> tokens;
+	vector<Instr> instrs;
 	
 	while (getline(inFile, line)) {
 		line = line.substr(0, line.find(';'));
@@ -86,50 +134,43 @@ vector<InstrToken> tokenize(ifstream& inFile) {
 			vector<string> splits = splitOnWhitespace(line);
 			check(splits.size() <= 2, "Instruction has too many fields '" + line + "'");
 			
-			InstrToken token;
-			token.instr = splits[0];
-			token.hasImm = splits.size() == 2;
-			if (token.hasImm) {
-				int imm = stoi(splits[1]);
-				check(to_string(imm) == splits[1], "Invalid instruction immediate '" + splits[1] + "'");
-				check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
-				token.immediate = imm;
-			}
-			tokens.push_back(token);
+			Instr instr = parseInstrFields(splits);
+			instrs.push_back(instr);
 		}
 	}
-	return tokens;
+	return instrs;
 }
-
-void genAssembly(ofstream& outFile, InstrToken instr) {	
+// assembly generation ------------------------------------------
+void genAssembly(ofstream& outFile, Instr instr) {	
 	// head pos - rbx, internal r reg - rcx
+	static_assert(InstructionCount == 7, "Exhaustive InstrToStr definition");
 	// TODO: instrs using immediate should check if the instr hasImm
-	if (instr.instr == "mov") {
+	if (instr.instr == Imov) {
 		outFile << "	mov rbx, " << instr.immediate << '\n';
-	} else if (instr.instr == "str") {
+	} else if (instr.instr == Istr) {
 		outFile << "	mov WORD [2*rbx+cells], " << instr.immediate << '\n';
-	} else if (instr.instr == "ld") {
+	} else if (instr.instr == Ild) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
-	} else if (instr.instr == "outum") {
+	} else if (instr.instr == Ioutum) {
 		outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
-	} else if (instr.instr == "outur") {
+	} else if (instr.instr == Ioutur) {
 		outFile << "	mov ax, cx\n"
 			"	call print_unsigned\n";
-	} else if (instr.instr == "outc") {
+	} else if (instr.instr == Ioutc) {
 		outFile << // TODO: outc should use a BYTE inst of WORD, and should check the value to be < 256
 			"	mov [stdout_buff], WORD " << instr.immediate << "\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
-	} else if (instr.instr == "jmp") { // add guards to jmp so we don't jump somewhere which DNE
+	} else if (instr.instr == Ijmp) { // TODO: add guards to jmp so we don't jump somewhere which DNE
 		outFile << "	jmp [instruction_offsets+8*" << instr.immediate << "]\n";
 	} else {
-		check(false, "Unknown instruction: '" + instr.instr + "'");
+		assert(("Unreachable", false));
 	}
 }
 
-void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
+void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 	ofstream outFile;
 	outFile.open(outFileName);
 
@@ -186,7 +227,7 @@ void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
 		"	xor rcx, rcx\n"
 		"\n";
 	
-	InstrToken instr;
+	Instr instr;
 	for (int i = 0; i < instrs.size(); ++i) {
 		instr = instrs[i];
 		outFile << "instr_" << i << ":\n";
@@ -222,6 +263,6 @@ void generate(vector<InstrToken>& instrs, string outFileName="out.asm") {
 int main() {
 	ifstream inFile;
 	inFile.open("in.mx");
-	vector<InstrToken> instrs = tokenize(inFile);
+	vector<Instr> instrs = tokenize(inFile);
 	generate(instrs);
 }
