@@ -80,10 +80,21 @@ map<InstrNames, string> InstrToStr {
 {Ioutu, "outu"},
 {Ioutc, "outc"},
 };
+
+enum SuffixNames {
+	Sm,
+	Sr,
+	SuffixCount
+};
+static_assert(SuffixCount == 2, "Exhaustive SuffixToChar definition");
+map<SuffixNames, char> SuffixToChar {
+{Sm, 'm'},
+{Sr, 'r'},
+};
 // structs -------------------------------
 struct Instr {
 	InstrNames instr;
-	string suffixes;
+	vector<SuffixNames> suffixes;
 	bool hasImm;
 	int immediate;
 	
@@ -95,14 +106,29 @@ struct Instr {
 	}
 	string toStr() {
 		string s = InstrToStr[instr];
-		s += suffixes;
+		for (SuffixNames suff : suffixes) {
+			s.push_back(SuffixToChar[suff]);
+		}
+		s.push_back(' ');
 		if (hasImm) {
-			s = s.append(" ").append(to_string(immediate));
+			s.append(to_string(immediate));
 		}
 		return s;
 	}
 };
 // tokenization ----------------------------------
+vector<SuffixNames> parseSuffixes(string s) {
+	static_assert(SuffixCount == 2, "Exhaustive parseSuffixes definition");
+	check(s.size() <= 1, "Only one letter suffixes are supported for now: '" + s + "'");
+	vector<SuffixNames> out;
+	if (s.size() == 0) return out;
+	char suff = s.at(0);
+
+	map<char, SuffixNames> m {{'m', Sm}, {'r', Sr}};
+	check(m.count(suff) == 1, "Unknown suffix '" + s + "'\n");
+	out.push_back(m[suff]);
+	return out;
+}
 Instr parseInstrOpcode(string parsing) {
 	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
 	Instr instr;
@@ -110,7 +136,8 @@ Instr parseInstrOpcode(string parsing) {
 		string substr = parsing.substr(0, p.second.size());
 		if (substr == p.second) {
 			instr.instr = p.first;
-			instr.suffixes = parsing.substr(p.second.size());
+			string suffix = parsing.substr(p.second.size());
+			instr.suffixes = parseSuffixes(suffix);
 			return instr;
 		}
 	}
@@ -152,6 +179,7 @@ vector<Instr> tokenize(ifstream& inFile) {
 void genAssembly(ofstream& outFile, Instr instr) {	
 	// head pos - rbx, internal r reg - rcx
 	static_assert(InstructionCount == 6, "Exhaustive genAssembly definition");
+	static_assert(SuffixCount == 2, "Exhaustive genAssembly definition");
 	// TODO: instrs using immediate should check if the instr hasImm
 	if (instr.instr == Imov) {
 		outFile << "	mov rbx, " << instr.immediate << '\n';
@@ -160,10 +188,10 @@ void genAssembly(ofstream& outFile, Instr instr) {
 	} else if (instr.instr == Ild) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
 	} else if (instr.instr == Ioutu) {
-		if (instr.suffixes == "m") {
+		if (instr.suffixes[0] == Sm) {
 			outFile << "	mov ax, [2*rbx+cells]\n"
 			"	call print_unsigned\n";
-		} else if (instr.suffixes == "r") {
+		} else if (instr.suffixes[0] == Sr) {
 			outFile << "	mov ax, cx\n"
 						"	call print_unsigned\n";
 		} else {
