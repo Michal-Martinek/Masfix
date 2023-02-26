@@ -15,7 +15,8 @@ using namespace std;
 
 // constants -------------------------------
 #define STDOUT_BUFF_SIZE 256
-#define CELLS 65536
+#define WORD_MAX_VAL 65535
+#define CELLS WORD_MAX_VAL+1
 
 // helpers ---------------------------------
 string &ltrim(string &s) {
@@ -152,7 +153,7 @@ int parseInstrImmediate(string s) { // TODO: on ERROR print whole instr
 	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
 	int imm = stoi(s);
 	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
-	check(0 <= imm && imm < (int)exp2(16), "Value of the immediate '" + to_string(imm) + "' is out of bounds");
+	check(0 <= imm && imm <= WORD_MAX_VAL, "Value of the immediate '" + to_string(imm) + "' is out of bounds");
 	return imm;
 }
 Instr parseInstrFields(vector<string> &fields) {
@@ -199,7 +200,7 @@ void genArgumentFetch(ofstream& outFile, Instr instr) {
 		unreachable();
 	}
 }
-void genInstrBody(ofstream& outFile, Instr instr) {
+void genInstrBody(ofstream& outFile, Instr instr, int instrNum) {
 	static_assert(InstructionCount == 6, "Exhaustive genInstrBody definition");
 	if (instr.instr == Imov) {
 		outFile << "	mov rbx, rax\n";
@@ -215,16 +216,20 @@ void genInstrBody(ofstream& outFile, Instr instr) {
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
-	} else if (instr.instr == Ijmp) { // TODO: add guards to jmp so we don't jump somewhere which DNE
-		outFile << "	jmp [instruction_offsets+8*ax]\n";
+	} else if (instr.instr == Ijmp) {
+		outFile <<
+		"	mov rsi, " << instrNum << "\n"
+		"	cmp rax, instruction_count\n"
+		"	ja jmp_error\n"
+		"	jmp [instruction_offsets+8*rax]\n";
 	} else {
 		unreachable();
 	}
 }
-void genAssembly(ofstream& outFile, Instr instr) {	
+void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
 	// head pos - rbx, internal r reg - rcx
 	genArgumentFetch(outFile, instr); // loads instr argument in ax, responsible for 16-bit clamping
-	genInstrBody(outFile, instr); // executes the instr body, given instr val in ax, responsible for clamping the destination
+	genInstrBody(outFile, instr, instrNum); // executes the instr body, given instr val in ax, responsible for clamping the destination
 }
 
 void generate(vector<Instr>& instrs, string outFileName="out.asm") {
@@ -242,6 +247,28 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	sub rsp, 32\n"
 		"	call ExitProcess@4\n"
 		"	hlt\n"
+		"error: ; prints ERROR template, instr number: rsi, message: rdx, r8, errorneous value: rax, exit(1)\n"
+		"	push rax\n"
+		"	push r8\n"
+		"	push rdx\n"
+		"	push rsi\n"
+		"	mov rdx, ERROR_template\n"
+		"	mov r8, ERROR_template_len\n"
+		"	call stdout_write\n"
+		"	pop rax ; print instr number\n"
+		"	call print_unsigned\n"
+		"	pop rdx ; error message\n"
+		"	pop r8\n"
+		"	call stdout_write\n"
+		"	pop rax ; errorneous value\n"
+		"	call print_unsigned\n"
+		"	mov BYTE [stdout_buff], 10 ; '\\n'\n"
+		"	mov rdx, stdout_buff\n"
+		"	mov r8, 1\n"
+		"	call stdout_write\n"
+		"	mov rax, 1 ; exit(1)\n"
+		"	call exit\n"
+		"\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
 		"	mov rcx, -11 ; stdout fd\n"
 		"	sub rsp, 32 ; call with shadow space\n"
@@ -294,10 +321,17 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		instr = instrs[i];
 		outFile << "instr_" << i << ":\n";
 		outFile << "	; " << instr.toStr() << '\n';
-		genAssembly(outFile, instr);
+		genAssembly(outFile, instr, i);
 	} 
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
+		"	jmp end\n"
+		"\n"
+		"; runtime errors, expect instr number in rsi, errorneous value in rax\n"
+		"jmp_error:\n"
+		"	mov rdx, jmp_error_message\n"
+		"	mov r8, jmp_error_message_len\n"
+		"	call error\n"
 		"\n"
 		"end:\n"
 		"	; exit(0)\n"
@@ -310,9 +344,17 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	stdout_buff: resb " << STDOUT_BUFF_SIZE << "\n"
 		"\n"
 		"section .data\n"
+		"	; error messages\n"
+		"	ERROR_template: db 10,\"ERROR: instr_\"\n"
+		"	ERROR_template_len: EQU $-ERROR_template\n"
+		"	jmp_error_message: db \": jmp destination out of bounds: \"\n"
+		"	jmp_error_message_len: EQU $-jmp_error_message\n"
+		"\n"
+		"	; instruction addresses\n"
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
+	check(instrs.size() < CELLS, "The instruction count " + to_string(instrs.size()) + "exceeds maximum word value");
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
