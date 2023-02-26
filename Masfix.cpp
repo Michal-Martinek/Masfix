@@ -92,55 +92,68 @@ enum InstrNames {
 	Ioutc,
 	InstructionCount
 };
-static_assert(InstructionCount == 6, "Exhaustive InstrToStr definition");
-map<InstrNames, string> InstrToStr {
-{Imov, "mov"},
-{Istr, "str"},
-{Ild , "ld" },
-{Ijmp, "jmp"},
+static_assert(InstructionCount == 6, "Exhaustive StrToInstr definition");
+map<string, InstrNames> StrToInstr {
+{"mov", Imov},
+{"str", Istr},
+{"ld" , Ild },
+{"jmp", Ijmp},
 
-{Ioutu, "outu"},
-{Ioutc, "outc"},
+{"outu", Ioutu},
+{"outc", Ioutc},
 };
 
 enum SuffixNames {
-	Sm,
-	Sr,
+	Rm, // registers
+	Rr,
+
+	Oa, // operations
+	Os,
+
+	Sno, // no reg or op
 	SuffixCount
 };
-static_assert(SuffixCount == 2, "Exhaustive SuffixToChar definition");
-map<SuffixNames, char> SuffixToChar {
-{Sm, 'm'},
-{Sr, 'r'},
+static_assert(SuffixCount == 5, "Exhaustive CharToSuffix definition");
+map<char, SuffixNames> CharToSuffix {
+{'m', Rm},
+{'r', Rr},
+
+{'a', Oa}, // TODO: add +, - as suffixes
+{'s', Os},
 };
 // structs -------------------------------
+struct Suffix {
+	// dest ?<operation>= <reg>/<imm>
+	SuffixNames modifier;
+	SuffixNames reg;
+
+	Suffix() {
+		modifier = Sno;
+		reg = Sno;
+	}
+};
 struct Instr {
 	InstrNames instr;
-	vector<SuffixNames> suffixes;
+	Suffix suffixes;
 	bool hasImm;
 	int immediate;
+
+	// TODO: add loc, original string
 	
-	Instr() {}
-	Instr(InstrNames instr, bool hasImm, int immediate) {
-		this->instr = instr;
-		this->hasImm = hasImm;
-		this->immediate = immediate;
+	Instr() {
+		this->instr = InstructionCount; // invalid
+		this->suffixes = Suffix();
+		this->hasImm = false;
 	}
+	bool hasMod() { return suffixes.modifier != Sno; }
+	bool hasReg() { return suffixes.reg != Sno; }
 	string toStr() {
-		string s = InstrToStr[instr];
-		for (SuffixNames suff : suffixes) {
-			s.push_back(SuffixToChar[suff]);
-		}
-		if (hasImm) {
-			s.push_back(' ');
-			s.append(to_string(immediate));
-		}
-		return s;
+		return "no string";
 	}
 };
 struct Label {
 	string name;
-	int addr;
+	int addr; // TODO: add loc
 	Label() {}
 	Label(string name, int addr) {
 		this->name = name;
@@ -148,32 +161,35 @@ struct Label {
 	}
 };
 // tokenization ----------------------------------
-vector<SuffixNames> parseSuffixes(string s) {
-	static_assert(SuffixCount == 2, "Exhaustive parseSuffixes definition");
-	check(s.size() <= 1, "Only one letter suffixes are supported for now: '" + s + "'");
-	vector<SuffixNames> out;
-	if (s.size() == 0) return out;
-	char suff = s.at(0);
-
-	map<char, SuffixNames> m {{'m', Sm}, {'r', Sr}};
-	check(m.count(suff) == 1, "Unknown suffix '" + s + "'\n"); // TODO: print whole instr
-	out.push_back(m[suff]);
-	return out;
+void parseSuffixes(Instr& instr, string s) { // TODO: print whole instr
+	static_assert(SuffixCount == 5, "Exhaustive parseSuffixes definition");
+	check(s.size() <= 2, "Max two letter suffixes are supported for now: '" + s + "'");
+	if (s.size() == 1) {
+		SuffixNames suff = CharToSuffix[s.at(0)];
+		if (suff == Rm || suff == Rr) 
+			instr.suffixes.reg = suff;
+		else
+			instr.suffixes.modifier = suff;
+	} else if (s.size() == 2) {
+		SuffixNames suff1 = CharToSuffix[s.at(0)], suff2 = CharToSuffix[s.at(1)];
+		check(suff1 == Oa || suff1 == Os, "The first suffix must be an operation '" + s + "'\n");
+		check(suff2 == Rm || suff2 == Rr, "The second suffix must be a register '" + s + "'\n");
+		instr.suffixes.modifier = suff1;
+		instr.suffixes.reg = suff2;
+	}
 }
-Instr parseInstrOpcode(string parsing) {
+void parseInstrOpcode(Instr& instr, string parsing) {
 	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
-	Instr instr;
-	for (pair<InstrNames, string> p : InstrToStr) {
-		string substr = parsing.substr(0, p.second.size());
-		if (substr == p.second) {
-			instr.instr = p.first;
-			string suffix = parsing.substr(p.second.size());
-			instr.suffixes = parseSuffixes(suffix);
-			return instr;
+	for (int checkedLen = 2; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
+		string substr = parsing.substr(0, checkedLen);
+		if (StrToInstr.count(substr) == 1) {
+			instr.instr = StrToInstr[substr];
+			string suffix = parsing.substr(checkedLen);
+			parseSuffixes(instr, suffix);
+			return;
 		}
 	}
 	check(false, "Unknown instruction: '" + parsing + "'");
-	return instr; // so the compiler doesn't yell at us
 }
 int parseInstrImmediate(string s, map<string, Label> &stringToLabel) { // TODO: on ERROR print whole instr
 	if (stringToLabel.count(s) > 0) {
@@ -185,8 +201,8 @@ int parseInstrImmediate(string s, map<string, Label> &stringToLabel) { // TODO: 
 	check(0 <= imm && imm <= WORD_MAX_VAL, "Value of the immediate '" + to_string(imm) + "' is out of bounds");
 	return imm;
 }
-Instr parseInstrFields(vector<string> &fields, map<string, Label> &stringToLabel) {
-	Instr instr = parseInstrOpcode(fields[0]);
+Instr parseInstrFields(Instr& instr, vector<string> &fields, map<string, Label> &stringToLabel) {
+	parseInstrOpcode(instr, fields[0]);
 	instr.hasImm = fields.size() == 2;
 	if (instr.hasImm) {
 		instr.immediate = parseInstrImmediate(fields[1], stringToLabel);
@@ -219,28 +235,56 @@ vector<Instr> tokenize(ifstream& inFile) {
 	}
 	strToLabel["end"].addr = instrsFields.size();
 	for (vector<string> splits : instrsFields) {
-		Instr instr = parseInstrFields(splits, strToLabel);
+		Instr instr;
+		parseInstrFields(instr, splits, strToLabel);
 		instrs.push_back(instr);
 	}
 	return instrs;
 }
 // assembly generation ------------------------------------------
+void checkValidity(Instr instr) {
+	static_assert(sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	if (instr.instr == InstructionCount) unreachable();
+	check(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now: '" + instr.toStr() + "'\n");
+}
 void genArgumentFetch(ofstream& outFile, Instr instr) {
-	static_assert(SuffixCount == 2, "Exhaustive genArgumentFetch definition");
-	check(instr.hasImm ^ instr.suffixes.size() == 1, "Instrs must have only imm, or 1 reg for now: '" + instr.toStr() + "'\n");
+	static_assert(SuffixCount == 5, "Exhaustive genArgumentFetch definition");
 	if (instr.hasImm) {
 		outFile << "	mov rax, " << instr.immediate << '\n';
 		return;
 	}
-	SuffixNames suff = instr.suffixes[0];
-	if (suff == Sm) {
+	SuffixNames suff = instr.suffixes.reg;
+	if (suff == Rm) {
 		outFile << "	xor rax, rax\n"
 			"	mov ax, [2*rbx+cells]\n";
-	} else if (suff == Sr) {
-		outFile << "	xor rax, rax\n"
-			"	mov ax, cx\n";
+	} else if (suff == Rr) {
+		outFile << "	mov rax, rcx\n";
 	} else {
 		unreachable();
+	}
+}
+void genDestFetch(ofstream& outFile, Instr instr, int instrNum) {
+	static_assert(InstructionCount == 6, "Exhaustive genDestFetch definition");
+	if (instr.instr == Imov) {
+		outFile << "	mov rdx, rbx\n";
+	} else if (instr.instr == Istr) {
+		outFile << "xor rdx, rdx\n"
+			"	mov dx, [2*rbx+cells]\n";
+	} else if (instr.instr == Ild) {
+		outFile << "	mov rdx, rcx\n";
+	} else if (instr.instr == Ijmp) {
+		outFile << "mov rdx, " << instrNum << "\n";
+	} else {
+		check(false, "This instruction can not have a modifier '" + instr.toStr() + "'\n");
+	}
+}
+void genOperation(ofstream& outFile, SuffixNames op) {
+	static_assert(SuffixCount == 5, "Exhaustive genOperation definition");
+	if (op == Oa) {
+		outFile << "	add ax, dx\n"; // TODO test
+	}
+	if (op == Os) {
+		outFile << "	sub ax, dx\n";
 	}
 }
 void genInstrBody(ofstream& outFile, Instr instr, int instrNum) {
@@ -270,9 +314,15 @@ void genInstrBody(ofstream& outFile, Instr instr, int instrNum) {
 	}
 }
 void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
-	// head pos - rbx, internal r reg - rcx
+	// head pos - bx, internal r reg - cx
+	// intermeiate values - ax, first op arg - dx // TODO: rdx is not the best pick
+	checkValidity(instr); // checks if the instr has correct combination of suffixes and immediates
 	genArgumentFetch(outFile, instr); // loads instr argument in ax, responsible for 16-bit clamping
-	genInstrBody(outFile, instr, instrNum); // executes the instr body, given instr val in ax, responsible for clamping the destination
+	if (instr.hasMod()) {
+		genDestFetch(outFile, instr, instrNum); // loads instr destination in dx, responsible for 16-bit clamping
+		genOperation(outFile, instr.suffixes.modifier); // generates operation body (dx op ax) -> ax, expects rax < 65536, responsible for 16-bit clamping
+	}
+	genInstrBody(outFile, instr, instrNum); // generates the instr body, given instr val in ax, responsible for clamping the destination
 }
 
 void generate(vector<Instr>& instrs, string outFileName="out.asm") {
