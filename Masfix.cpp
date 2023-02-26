@@ -32,12 +32,32 @@ string &rtrim(string &s) {
 string trim(string &s) {
 	return ltrim(rtrim(s));
 }
-vector<string> splitOnWhitespace(string &s) {
+string deleteWhitespace(string s) {
+	for (int i = 0; i < s.size();) {
+		if (std::isspace(s.at(i)))
+			s.erase(i, 1);
+		else i++;
+	}
+	return s;
+}
+/// @brief splits the string into fields on any non-alphanumeric character except '_', ignores whitespace
+/// @param s string to split
+/// @return vector of fields
+vector<string> splitDeleteWhitespace(string &s) {
 	vector<string> splits;
 	int start = 0;
 	for (int i = 0; i < s.size(); ++i) {
-		if (std::isspace(s.at(i))) {
+		// TODO: make '-' between two letters not split
+		// NOTE: notice the ambiguity
+		// :first
+		// :second
+		// :first-second ; OK - labels are just identifier unless explicit operation is in them ('()')
+		// jmp first-second ; BAD obvious here
+		if (!(isalnum(s.at(i)) || s.at(i) == '_')) {
 			string chunk = s.substr(start, i - start);
+			if (chunk.size()) splits.push_back(chunk);
+			chunk = s.substr(i, 1); // this char stands alone, split it
+			chunk = deleteWhitespace(chunk);
 			if (chunk.size()) splits.push_back(chunk);
 			start = i+1;
 		}
@@ -48,13 +68,10 @@ vector<string> splitOnWhitespace(string &s) {
 	}
 	return splits;
 }
-string deleteWhitespace(string s) {
-	for (int i = 0; i < s.size();) {
-		if (std::isspace(s.at(i)))
-			s.erase(i, 1);
-		else i++;
-	}
-	return s;
+bool _isalnumChar(char c) { return isalnum(c); }
+bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
+	// TODO: add reason for invalid identifier
+	return s.size() > 0 && find_if_not(s.begin(), s.end(), _isalnumChar) == s.end() && isalpha(s.at(0));
 }
 
 #define unreachable() assert(("Unreachable", false));
@@ -121,6 +138,15 @@ struct Instr {
 		return s;
 	}
 };
+struct Label {
+	string name;
+	int addr;
+	Label() {}
+	Label(string name, int addr) {
+		this->name = name;
+		this->addr = addr;
+	}
+};
 // tokenization ----------------------------------
 vector<SuffixNames> parseSuffixes(string s) {
 	static_assert(SuffixCount == 2, "Exhaustive parseSuffixes definition");
@@ -149,35 +175,52 @@ Instr parseInstrOpcode(string parsing) {
 	check(false, "Unknown instruction: '" + parsing + "'");
 	return instr; // so the compiler doesn't yell at us
 }
-int parseInstrImmediate(string s) { // TODO: on ERROR print whole instr
+int parseInstrImmediate(string s, map<string, Label> &stringToLabel) { // TODO: on ERROR print whole instr
+	if (stringToLabel.count(s) > 0) {
+		return stringToLabel[s].addr;
+	}
 	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
 	int imm = stoi(s);
 	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
 	check(0 <= imm && imm <= WORD_MAX_VAL, "Value of the immediate '" + to_string(imm) + "' is out of bounds");
 	return imm;
 }
-Instr parseInstrFields(vector<string> &fields) {
+Instr parseInstrFields(vector<string> &fields, map<string, Label> &stringToLabel) {
 	Instr instr = parseInstrOpcode(fields[0]);
 	instr.hasImm = fields.size() == 2;
 	if (instr.hasImm) {
-		instr.immediate = parseInstrImmediate(fields[1]);
+		instr.immediate = parseInstrImmediate(fields[1], stringToLabel);
 	}
 	return instr;
 }
 vector<Instr> tokenize(ifstream& inFile) {
 	string line;
+	vector<vector<string>> instrsFields;
+
 	vector<Instr> instrs;
-	
+	map<string, Label> strToLabel = {{"begin", Label("begin", 0)}, {"end", Label("end", 0)}};
+
 	while (getline(inFile, line)) {
 		line = line.substr(0, line.find(';'));
 		line = trim(line);
 		if (line.size() > 0) {
-			vector<string> splits = splitOnWhitespace(line);
-			check(splits.size() <= 2, "Instruction has too many fields '" + line + "'");
-			
-			Instr instr = parseInstrFields(splits);
-			instrs.push_back(instr);
+			vector<string> splits = splitDeleteWhitespace(line);
+			check(splits.size() <= 2, "This line has too many fields '" + line + "'");
+			if (splits[0] == ":") {
+				check(splits.size() == 2, "Label name expected '" + line + "'");
+				string ident = splits[1];
+				check(isValidIdentifier(ident), "Invalid label name '" + line + "'");
+				check(strToLabel.count(ident) == 0, "Label redefinition '" + line + "'");
+				strToLabel.insert(pair<string, Label>(ident, Label(ident, instrsFields.size())));
+			} else {
+				instrsFields.push_back(splits);
+			}
 		}
+	}
+	strToLabel["end"].addr = instrsFields.size();
+	for (vector<string> splits : instrsFields) {
+		Instr instr = parseInstrFields(splits, strToLabel);
+		instrs.push_back(instr);
 	}
 	return instrs;
 }
