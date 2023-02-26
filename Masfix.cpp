@@ -13,6 +13,10 @@
 #include <locale>
 using namespace std;
 
+// constants -------------------------------
+#define STDOUT_BUFF_SIZE 256
+#define CELLS 65536
+
 // helpers ---------------------------------
 string &ltrim(string &s) {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
@@ -233,6 +237,11 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"extern WriteFile@20\n"
 		"\n"
 		"section .text\n"
+		"exit: ; exits the program with code in rax\n"
+		"	mov rcx, rax\n"
+		"	sub rsp, 32\n"
+		"	call ExitProcess@4\n"
+		"	hlt\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
 		"	mov rcx, -11 ; stdout fd\n"
 		"	sub rsp, 32 ; call with shadow space\n"
@@ -254,7 +263,7 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	ret\n"
 		"print_unsigned: ; n - rax\n"
 		"	xor r8, r8 ; char count\n"
-		"	mov r9, stdout_buff+255 ; curr buff pos\n"
+		"	mov r9, stdout_buff+" << STDOUT_BUFF_SIZE-1 << " ; curr buff pos\n"
 		"	mov r10, 10 ; base\n"
 		"print_unsigned_loop:\n"
 		"	xor rdx, rdx\n"
@@ -287,27 +296,25 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		outFile << "	; " << instr.toStr() << '\n';
 		genAssembly(outFile, instr);
 	} 
-	// TODO: label to jump to end of file
-	// TODO: if the file is empty "error: symbol `instr_0' not defined"
-	outFile << 
+	outFile <<
+		"instr_"<< instrs.size() << ":\n"
 		"\n"
+		"end:\n"
 		"	; exit(0)\n"
-		"	mov rcx, 0\n"
-		"	sub rsp, 32\n"
-		"	call ExitProcess@4\n"
-		"	hlt\n"
+		"	mov rax, 0\n"
+		"	call exit\n"
 		"\n"
 		"section .bss\n"
-		"	cells: resw 1024\n"
+		"	cells: resw " << CELLS << "\n"
 		"	stdout_fd: resq 1\n"
-		"	stdout_buff: resb 256\n"
+		"	stdout_buff: resb " << STDOUT_BUFF_SIZE << "\n"
 		"\n"
 		"section .data\n"
-		"	instruction_number: EQU " << instrs.size() << "\n"
+		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
 	outFile << "instr_0";
-	for (int i = 1; i < instrs.size(); ++i) {
+	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
 	}
 	
