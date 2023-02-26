@@ -68,10 +68,10 @@ vector<string> splitDeleteWhitespace(string &s) {
 	}
 	return splits;
 }
-bool _isalnumChar(char c) { return isalnum(c); }
+bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
 	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), _isalnumChar) == s.end() && isalpha(s.at(0));
+	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
 }
 
 #define unreachable() assert(("Unreachable", false));
