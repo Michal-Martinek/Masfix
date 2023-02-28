@@ -161,9 +161,13 @@ struct Label {
 	}
 };
 // tokenization ----------------------------------
+bool _isSuffixKnown(char c) {
+	return CharToSuffix.count(c) == 1;
+}
 void parseSuffixes(Instr& instr, string s) { // TODO: print whole instr
 	static_assert(SuffixCount == 5, "Exhaustive parseSuffixes definition");
 	check(s.size() <= 2, "Max two letter suffixes are supported for now: '" + s + "'");
+	check(all_of(s.begin(), s.end(), _isSuffixKnown), "Unknown suffixes '" + s + "'\n");
 	if (s.size() == 1) {
 		SuffixNames suff = CharToSuffix[s.at(0)];
 		if (suff == Rm || suff == Rr) 
@@ -273,7 +277,7 @@ void genDestFetch(ofstream& outFile, Instr instr, int instrNum) {
 	} else if (instr.instr == Ild) {
 		outFile << "	mov rdx, rcx\n";
 	} else if (instr.instr == Ijmp) {
-		outFile << "mov rdx, " << instrNum << "\n";
+		outFile << "	mov rdx, " << instrNum << "\n";
 	} else {
 		check(false, "This instruction can not have a modifier '" + instr.toStr() + "'\n");
 	}
