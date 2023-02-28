@@ -122,6 +122,16 @@ map<char, SuffixNames> CharToSuffix {
 {'s', Os},
 };
 // structs -------------------------------
+struct Loc {
+	int row;
+	int col;
+
+	Loc() {}
+	Loc(int row, int col) {
+		this->row = row;
+		this->col = col;
+	}
+};
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
 	SuffixNames modifier;
@@ -138,26 +148,36 @@ struct Instr {
 	bool hasImm;
 	int immediate;
 
-	// TODO: add loc, original string
+	Loc loc;
+	vector<string> fields;
 	
-	Instr() {
+	Instr() {}
+	Instr(Loc loc, vector<string> fields) {
 		this->instr = InstructionCount; // invalid
 		this->suffixes = Suffix();
 		this->hasImm = false;
+		this->loc = loc;
+		this->fields = fields;
 	}
 	bool hasMod() { return suffixes.modifier != Sno; }
 	bool hasReg() { return suffixes.reg != Sno; }
 	string toStr() {
-		return "no string";
+		if (fields.size() == 1) return fields[0];
+		string s = fields[0];
+		s.push_back(' ');
+		s.append(fields[1]);
+		return s;
 	}
 };
 struct Label {
 	string name;
-	int addr; // TODO: add loc
+	int addr;
+	Loc loc;
 	Label() {}
-	Label(string name, int addr) {
+	Label(string name, int addr, Loc loc) {
 		this->name = name;
 		this->addr = addr;
+		this->loc = loc;
 	}
 };
 // tokenization ----------------------------------
@@ -182,8 +202,9 @@ void parseSuffixes(Instr& instr, string s) { // TODO: print whole instr
 		instr.suffixes.reg = suff2;
 	}
 }
-void parseInstrOpcode(Instr& instr, string parsing) {
+void parseInstrOpcode(Instr& instr) {
 	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
+	string parsing = instr.fields[0];
 	for (int checkedLen = 2; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
 		string substr = parsing.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
@@ -195,53 +216,54 @@ void parseInstrOpcode(Instr& instr, string parsing) {
 	}
 	check(false, "Unknown instruction: '" + parsing + "'");
 }
-int parseInstrImmediate(string s, map<string, Label> &stringToLabel) { // TODO: on ERROR print whole instr
+void parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) { // TODO: on ERROR print whole instr
+	string s = instr.fields[1];
 	if (stringToLabel.count(s) > 0) {
-		return stringToLabel[s].addr;
+		instr.immediate = stringToLabel[s].addr;
+		return;
 	}
 	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
-	int imm = stoi(s);
-	check(to_string(imm) == s, "Invalid instruction immediate '" + s + "'");
-	check(0 <= imm && imm <= WORD_MAX_VAL, "Value of the immediate '" + to_string(imm) + "' is out of bounds");
-	return imm;
+	instr.immediate = stoi(s);
+	check(to_string(instr.immediate) == s, "Invalid instruction immediate '" + s + "'");
+	check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate '" + to_string(instr.immediate) + "' is out of bounds");
 }
-Instr parseInstrFields(Instr& instr, vector<string> &fields, map<string, Label> &stringToLabel) {
-	parseInstrOpcode(instr, fields[0]);
-	instr.hasImm = fields.size() == 2;
+void parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
+	parseInstrOpcode(instr);
+	instr.hasImm = instr.fields.size() == 2;
 	if (instr.hasImm) {
-		instr.immediate = parseInstrImmediate(fields[1], stringToLabel);
+		parseInstrImmediate(instr, stringToLabel);
 	}
-	return instr;
 }
 vector<Instr> tokenize(ifstream& inFile) {
 	string line;
-	vector<vector<string>> instrsFields;
 
 	vector<Instr> instrs;
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0)}, {"end", Label("end", 0)}};
+	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(1, 1))}, {"end", Label("end", 0, Loc(1, 1))}};
 
-	while (getline(inFile, line)) {
+	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		line = line.substr(0, line.find(';'));
-		line = trim(line);
-		if (line.size() > 0) {
+		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+		if (line.size() >= lineStartCol) {
 			vector<string> splits = splitDeleteWhitespace(line);
 			check(splits.size() <= 2, "This line has too many fields '" + line + "'");
+			Loc loc = Loc(lineNum, lineStartCol);
 			if (splits[0] == ":") {
 				check(splits.size() == 2, "Label name expected '" + line + "'");
 				string ident = splits[1];
 				check(isValidIdentifier(ident), "Invalid label name '" + line + "'");
 				check(strToLabel.count(ident) == 0, "Label redefinition '" + line + "'");
-				strToLabel.insert(pair<string, Label>(ident, Label(ident, instrsFields.size())));
+				strToLabel.insert(pair<string, Label>(ident, Label(ident, instrs.size(), loc)));
 			} else {
-				instrsFields.push_back(splits);
+				Instr instr(loc, splits);
+				instrs.push_back(instr);
 			}
 		}
 	}
-	strToLabel["end"].addr = instrsFields.size();
-	for (vector<string> splits : instrsFields) {
-		Instr instr;
-		parseInstrFields(instr, splits, strToLabel);
-		instrs.push_back(instr);
+	strToLabel["end"].addr = instrs.size();
+	for (int i = 0; i < instrs.size(); ++i) {
+		Instr instr = instrs[i];
+		parseInstrFields(instr, strToLabel);
+		instrs[i] = instr;
 	}
 	return instrs;
 }
