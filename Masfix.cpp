@@ -18,69 +18,6 @@ using namespace std;
 #define WORD_MAX_VAL 65535
 #define CELLS WORD_MAX_VAL+1
 
-// helpers ---------------------------------
-string &ltrim(string &s) {
-	s.erase(s.begin(), std::find_if(s.begin(), s.end(),
-			std::not1(std::ptr_fun<int, int>(std::isspace))));
-	return s;
-}
-string &rtrim(string &s) {
-	s.erase(std::find_if(s.rbegin(), s.rend(),
-			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-	return s;
-}
-string trim(string &s) {
-	return ltrim(rtrim(s));
-}
-string deleteWhitespace(string s) {
-	for (int i = 0; i < s.size();) {
-		if (std::isspace(s.at(i)))
-			s.erase(i, 1);
-		else i++;
-	}
-	return s;
-}
-/// @brief splits the string into fields on any non-alphanumeric character except '_', ignores whitespace
-/// @param s string to split
-/// @return vector of fields
-vector<string> splitDeleteWhitespace(string &s) {
-	vector<string> splits;
-	int start = 0;
-	for (int i = 0; i < s.size(); ++i) {
-		// TODO: make '-' between two letters not split
-		// NOTE: notice the ambiguity
-		// :first
-		// :second
-		// :first-second ; OK - labels are just identifier unless explicit operation is in them ('()')
-		// jmp first-second ; BAD obvious here
-		if (!(isalnum(s.at(i)) || s.at(i) == '_')) {
-			string chunk = s.substr(start, i - start);
-			if (chunk.size()) splits.push_back(chunk);
-			chunk = s.substr(i, 1); // this char stands alone, split it
-			chunk = deleteWhitespace(chunk);
-			if (chunk.size()) splits.push_back(chunk);
-			start = i+1;
-		}
-	}
-	if (start < s.size()) {
-		string chunk = s.substr(start);
-		if (chunk.size()) splits.push_back(chunk);
-	}
-	return splits;
-}
-bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
-bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
-	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
-}
-
-#define unreachable() assert(("Unreachable", false));
-void check(bool cond, string message) {
-	if (!cond) {
-		cout << "ERROR: " << message << '\n';
-		exit(1);
-	}
-}
 // enums --------------------------------
 enum InstrNames {
 	Imov,
@@ -125,11 +62,15 @@ map<char, SuffixNames> CharToSuffix {
 struct Loc {
 	int row;
 	int col;
+	string file = "in.mx";
 
 	Loc() {}
 	Loc(int row, int col) {
 		this->row = row;
 		this->col = col;
+	}
+	string toStr() {
+		return file + ":" + to_string(row) + ":" + to_string(col);
 	}
 };
 struct Suffix {
@@ -149,7 +90,7 @@ struct Instr {
 	int immediate;
 
 	Loc loc;
-	vector<string> fields;
+	vector<string> fields; // TODO loc for each field, suffixes
 	
 	Instr() {}
 	Instr(Loc loc, vector<string> fields) {
@@ -179,15 +120,80 @@ struct Label {
 		this->addr = addr;
 		this->loc = loc;
 	}
+	string toStr() {
+		return ":" + name;
+	}
 };
+// helpers ---------------------------------
+string deleteWhitespace(string s) {
+	for (int i = 0; i < s.size();) {
+		if (std::isspace(s.at(i)))
+			s.erase(i, 1);
+		else i++;
+	}
+	return s;
+}
+/// @brief splits the string into fields on any non-alphanumeric character except '_', ignores whitespace
+/// @param s string to split
+/// @return vector of fields
+vector<string> splitDeleteWhitespace(string &s) {
+	vector<string> splits;
+	int start = 0;
+	for (int i = 0; i < s.size(); ++i) {
+		// TODO: make '-' between two letters not split
+		// NOTE: notice the ambiguity
+		// :first
+		// :second
+		// :first-second ; OK - labels are just identifier unless explicit operation is in them ('()')
+		// jmp first-second ; BAD obvious here
+		if (!(isalnum(s.at(i)) || s.at(i) == '_')) {
+			string chunk = s.substr(start, i - start);
+			if (chunk.size()) splits.push_back(chunk);
+			chunk = s.substr(i, 1); // this char stands alone, split it
+			chunk = deleteWhitespace(chunk);
+			if (chunk.size()) splits.push_back(chunk);
+			start = i+1;
+		}
+	}
+	if (start < s.size()) {
+		string chunk = s.substr(start);
+		if (chunk.size()) splits.push_back(chunk);
+	}
+	return splits;
+}
+bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
+bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
+	// TODO: add reason for invalid identifier
+	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
+}
+
+#define unreachable() assert(("Unreachable", false));
+void check(bool cond, string message, Instr instr) {
+	if (!cond) {
+		cout << instr.loc.toStr() << " ERROR: " << message << " '" << instr.toStr() << "'\n";
+		exit(1);
+	}
+}
+void check(bool cond, string message, Label label) {
+	if (!cond) {
+		cout << label.loc.toStr() << " ERROR: " << message << " '" << label.toStr() << "'\n";
+		exit(1);
+	}
+}
+void check(bool cond, string message, Loc loc) {
+	if (!cond) {
+		cout << loc.toStr() << " ERROR: " << message << "\n";
+		exit(1);
+	}
+}
 // tokenization ----------------------------------
 bool _isSuffixKnown(char c) {
 	return CharToSuffix.count(c) == 1;
 }
-void parseSuffixes(Instr& instr, string s) { // TODO: print whole instr
+void parseSuffixes(Instr& instr, string s) {
 	static_assert(SuffixCount == 5, "Exhaustive parseSuffixes definition");
-	check(s.size() <= 2, "Max two letter suffixes are supported for now: '" + s + "'");
-	check(all_of(s.begin(), s.end(), _isSuffixKnown), "Unknown suffixes '" + s + "'\n");
+	check(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
+	check(all_of(s.begin(), s.end(), _isSuffixKnown), "Unknown suffixes", instr);
 	if (s.size() == 1) {
 		SuffixNames suff = CharToSuffix[s.at(0)];
 		if (suff == Rm || suff == Rr) 
@@ -196,8 +202,8 @@ void parseSuffixes(Instr& instr, string s) { // TODO: print whole instr
 			instr.suffixes.modifier = suff;
 	} else if (s.size() == 2) {
 		SuffixNames suff1 = CharToSuffix[s.at(0)], suff2 = CharToSuffix[s.at(1)];
-		check(suff1 == Oa || suff1 == Os, "The first suffix must be an operation '" + s + "'\n");
-		check(suff2 == Rm || suff2 == Rr, "The second suffix must be a register '" + s + "'\n");
+		check(suff1 == Oa || suff1 == Os, "The first suffix must be an operation", instr);
+		check(suff2 == Rm || suff2 == Rr, "The second suffix must be a register", instr);
 		instr.suffixes.modifier = suff1;
 		instr.suffixes.reg = suff2;
 	}
@@ -214,18 +220,18 @@ void parseInstrOpcode(Instr& instr) {
 			return;
 		}
 	}
-	check(false, "Unknown instruction: '" + parsing + "'");
+	check(false, "Unknown instruction", instr);
 }
-void parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) { // TODO: on ERROR print whole instr
+void parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	string s = instr.fields[1];
 	if (stringToLabel.count(s) > 0) {
 		instr.immediate = stringToLabel[s].addr;
 		return;
 	}
-	check(isdigit(s.at(0)), "Invalid instruction immediate '" + s + "'");
+	check(isdigit(s.at(0)), "Invalid instruction immediate", instr);
 	instr.immediate = stoi(s);
-	check(to_string(instr.immediate) == s, "Invalid instruction immediate '" + s + "'");
-	check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate '" + to_string(instr.immediate) + "' is out of bounds");
+	check(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
+	check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 void parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	parseInstrOpcode(instr);
@@ -245,14 +251,14 @@ vector<Instr> tokenize(ifstream& inFile) {
 		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
 		if (line.size() >= lineStartCol) {
 			vector<string> splits = splitDeleteWhitespace(line);
-			check(splits.size() <= 2, "This line has too many fields '" + line + "'");
 			Loc loc = Loc(lineNum, lineStartCol);
+			check(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
 			if (splits[0] == ":") {
-				check(splits.size() == 2, "Label name expected '" + line + "'");
-				string ident = splits[1];
-				check(isValidIdentifier(ident), "Invalid label name '" + line + "'");
-				check(strToLabel.count(ident) == 0, "Label redefinition '" + line + "'");
-				strToLabel.insert(pair<string, Label>(ident, Label(ident, instrs.size(), loc)));
+				check(splits.size() == 2, "Label name expected after ':'", loc);
+				Label label = Label(splits[1], instrs.size(), loc);
+				check(isValidIdentifier(label.name), "Invalid label name", label);
+				check(strToLabel.count(label.name) == 0, "Label redefinition", label);
+				strToLabel.insert(pair<string, Label>(label.name, label));
 			} else {
 				Instr instr(loc, splits);
 				instrs.push_back(instr);
@@ -271,7 +277,7 @@ vector<Instr> tokenize(ifstream& inFile) {
 void checkValidity(Instr instr) {
 	static_assert(sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
-	check(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now: '" + instr.toStr() + "'\n");
+	check(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
 }
 void genArgumentFetch(ofstream& outFile, Instr instr) {
 	static_assert(SuffixCount == 5, "Exhaustive genArgumentFetch definition");
@@ -301,7 +307,7 @@ void genDestFetch(ofstream& outFile, Instr instr, int instrNum) {
 	} else if (instr.instr == Ijmp) {
 		outFile << "	mov rdx, " << instrNum << "\n";
 	} else {
-		check(false, "This instruction can not have a modifier '" + instr.toStr() + "'\n");
+		check(false, "This instruction can not have a modifier", instr);
 	}
 }
 void genOperation(ofstream& outFile, SuffixNames op) {
@@ -473,7 +479,7 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
-	check(instrs.size() < CELLS, "The instruction count " + to_string(instrs.size()) + "exceeds maximum word value");
+	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].loc);
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
