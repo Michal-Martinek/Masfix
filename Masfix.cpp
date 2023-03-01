@@ -319,9 +319,9 @@ void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSeco
 void genOperation(ofstream& outFile, OpNames op) {
 	static_assert(OperationCount == 3, "Exhaustive genOperation definition");
 	if (op == OPa) {
-		outFile << "	add rcx, rbx\n"; // TODO test
+		outFile << "	add cx, bx\n";
 	} else if (op == OPs) {
-		outFile << "	sub rbx, rcx\n"
+		outFile << "	sub bx, cx\n"
 			"	mov rcx, rbx\n";
 	} else {
 		unreachable();
@@ -335,6 +335,12 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 		outFile << "	mov [2*r14+cells], cx\n";
 	} else if (instr == Ild) {
 		outFile << "	mov r15, rcx\n";
+	} else if (instr == Ijmp) {
+		outFile <<
+		"	mov rsi, " << instrNum << "\n"
+		"	cmp rcx, instruction_count\n"
+		"	ja jmp_error\n"
+		"	jmp [instruction_offsets+8*rcx]\n";
 	} else if (instr == Ioutu) {
 		outFile << "	mov rax, rcx\n"
 			"	call print_unsigned\n";
@@ -344,12 +350,6 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
-	} else if (instr == Ijmp) {
-		outFile <<
-		"	mov rsi, " << instrNum << "\n"
-		"	cmp rcx, instruction_count\n"
-		"	ja jmp_error\n"
-		"	jmp [instruction_offsets+8*rcx]\n";
 	} else {
 		unreachable();
 	}
@@ -416,7 +416,6 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	mov [stdout_fd], rax\n"
 		"	ret\n"
 		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	push rcx\n"
 		"	mov rcx, [stdout_fd] ; stdout fd\n"
 		"	push 0 ; number of bytes written var\n"
 		"	mov r9, rsp ; ptr to that var\n"
@@ -425,7 +424,6 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	call WriteFile@20\n"
 		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
 		"	pop rax\n"
-		"	pop rcx\n"
 		"	ret\n"
 		"print_unsigned: ; n - rax\n"
 		"	xor r8, r8 ; char count\n"
