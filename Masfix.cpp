@@ -19,6 +19,34 @@ using namespace std;
 #define CELLS WORD_MAX_VAL+1
 
 // enums --------------------------------
+enum RegNames {
+	Rh,
+	Rm,
+	Rr,
+	Rp,
+
+	Rno,
+	RegisterCount
+};
+static_assert(RegisterCount == 5, "Exhaustive CharToReg definition");
+map<char, RegNames> CharToReg = {
+{'h', Rh},
+{'m', Rm},
+{'r', Rr},
+{'p', Rp},
+};
+enum OpNames {
+	OPa,
+	OPs,
+
+	OPno,
+	OperationCount
+};
+static_assert(OperationCount == 3, "Exhaustive CharToOp definition");
+map<char, OpNames> CharToOp = {
+{'a', OPa}, // TODO: add +, - as suffixes
+{'s', OPs},
+};
 enum InstrNames {
 	Imov,
 	Istr,
@@ -39,24 +67,15 @@ map<string, InstrNames> StrToInstr {
 {"outu", Ioutu},
 {"outc", Ioutc},
 };
+static_assert(InstructionCount == 6 && RegisterCount == 5, "Exhaustive InstrToDestReg definition");
+map<InstrNames, RegNames> InstrToDestReg = {
+	{Imov, Rh},
+	{Istr, Rm},
+	{Ild , Rr},
+	{Ijmp, Rp},
 
-enum SuffixNames {
-	Rm, // registers
-	Rr,
-
-	Oa, // operations
-	Os,
-
-	Sno, // no reg or op
-	SuffixCount
-};
-static_assert(SuffixCount == 5, "Exhaustive CharToSuffix definition");
-map<char, SuffixNames> CharToSuffix {
-{'m', Rm},
-{'r', Rr},
-
-{'a', Oa}, // TODO: add +, - as suffixes
-{'s', Os},
+	{Ioutu, Rno}, // specials have no destination
+	{Ioutc, Rno},
 };
 // structs -------------------------------
 struct Loc {
@@ -75,12 +94,12 @@ struct Loc {
 };
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
-	SuffixNames modifier;
-	SuffixNames reg;
+	OpNames modifier;
+	RegNames reg;
 
 	Suffix() {
-		modifier = Sno;
-		reg = Sno;
+		modifier = OPno;
+		reg = Rno;
 	}
 };
 struct Instr {
@@ -100,8 +119,8 @@ struct Instr {
 		this->loc = loc;
 		this->fields = fields;
 	}
-	bool hasMod() { return suffixes.modifier != Sno; }
-	bool hasReg() { return suffixes.reg != Sno; }
+	bool hasMod() { return suffixes.modifier != OPno; }
+	bool hasReg() { return suffixes.reg != Rno; }
 	string toStr() {
 		if (fields.size() == 1) return fields[0];
 		string s = fields[0];
@@ -187,25 +206,23 @@ void check(bool cond, string message, Loc loc) {
 	}
 }
 // tokenization ----------------------------------
-bool _isSuffixKnown(char c) {
-	return CharToSuffix.count(c) == 1;
-}
 void parseSuffixes(Instr& instr, string s) {
-	static_assert(SuffixCount == 5, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 3, "Exhaustive parseSuffixes definition");
 	check(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
-	check(all_of(s.begin(), s.end(), _isSuffixKnown), "Unknown suffixes", instr);
 	if (s.size() == 1) {
-		SuffixNames suff = CharToSuffix[s.at(0)];
-		if (suff == Rm || suff == Rr) 
-			instr.suffixes.reg = suff;
-		else
-			instr.suffixes.modifier = suff;
+		char c = s.at(0);
+		if (CharToReg.count(c) == 1) {
+			instr.suffixes.reg = CharToReg[c];
+		} else if (CharToOp.count(c) == 1) {
+			instr.suffixes.modifier = CharToOp[c];
+		} else {
+			check(false, "Unknown suffix", instr);
+		}
 	} else if (s.size() == 2) {
-		SuffixNames suff1 = CharToSuffix[s.at(0)], suff2 = CharToSuffix[s.at(1)];
-		check(suff1 == Oa || suff1 == Os, "The first suffix must be an operation", instr);
-		check(suff2 == Rm || suff2 == Rr, "The second suffix must be a register", instr);
-		instr.suffixes.modifier = suff1;
-		instr.suffixes.reg = suff2;
+		check(CharToOp.count(s.at(0)) == 1, "The first suffix must be an operation", instr);
+		check(CharToReg.count(s.at(1)) == 1, "The second suffix must be a register", instr);
+		instr.suffixes.modifier = CharToOp[s.at(0)];
+		instr.suffixes.reg = CharToReg[s.at(1)];
 	}
 }
 void parseInstrOpcode(Instr& instr) {
@@ -275,86 +292,83 @@ vector<Instr> tokenize(ifstream& inFile) {
 }
 // assembly generation ------------------------------------------
 void checkValidity(Instr instr) {
-	static_assert(sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 6 && sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
 	check(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
-}
-void genArgumentFetch(ofstream& outFile, Instr instr) {
-	static_assert(SuffixCount == 5, "Exhaustive genArgumentFetch definition");
-	if (instr.hasImm) {
-		outFile << "	mov rax, " << instr.immediate << '\n';
-		return;
+	if (InstrToDestReg[instr.instr] == Rno) {
+		check(!instr.hasMod(), "Special instructions cannot have a modifier", instr);
 	}
-	SuffixNames suff = instr.suffixes.reg;
-	if (suff == Rm) {
-		outFile << "	xor rax, rax\n"
-			"	mov ax, [2*rbx+cells]\n";
-	} else if (suff == Rr) {
-		outFile << "	mov rax, rcx\n";
+}
+void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
+	static_assert(RegisterCount == 5, "Exhaustive genRegisterFetch definition");
+	string regName = toSecond ? "rcx" : "rbx";
+	string shortReg = toSecond ? "cx" : "bx";
+	if (reg == Rh) {
+		outFile << "	mov " << regName <<", r14\n";
+	} else if (reg == Rm) {
+		outFile << "	xor " << regName << ", " << regName << "\n"
+			"	mov " << shortReg << ", [2*r14+cells]\n";
+	} else if (reg == Rr) {
+		outFile << "	mov " << regName <<", r15\n";
+	} else if (reg == Rp) {
+		outFile << "	mov " << regName << ", " << instrNum << "\n";
 	} else {
 		unreachable();
 	}
 }
-void genDestFetch(ofstream& outFile, Instr instr, int instrNum) {
-	static_assert(InstructionCount == 6, "Exhaustive genDestFetch definition");
-	if (instr.instr == Imov) {
-		outFile << "	mov rdx, rbx\n";
-	} else if (instr.instr == Istr) {
-		outFile << "xor rdx, rdx\n"
-			"	mov dx, [2*rbx+cells]\n";
-	} else if (instr.instr == Ild) {
-		outFile << "	mov rdx, rcx\n";
-	} else if (instr.instr == Ijmp) {
-		outFile << "	mov rdx, " << instrNum << "\n";
+void genOperation(ofstream& outFile, OpNames op) {
+	static_assert(OperationCount == 3, "Exhaustive genOperation definition");
+	if (op == OPa) {
+		outFile << "	add rcx, rbx\n"; // TODO test
+	} else if (op == OPs) {
+		outFile << "	sub rbx, rcx\n"
+			"	mov rcx, rbx\n";
 	} else {
-		check(false, "This instruction can not have a modifier", instr);
+		unreachable();
 	}
 }
-void genOperation(ofstream& outFile, SuffixNames op) {
-	static_assert(SuffixCount == 5, "Exhaustive genOperation definition");
-	if (op == Oa) {
-		outFile << "	add ax, dx\n"; // TODO test
-	}
-	if (op == Os) {
-		outFile << "	sub ax, dx\n";
-	}
-}
-void genInstrBody(ofstream& outFile, Instr instr, int instrNum) {
+void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 	static_assert(InstructionCount == 6, "Exhaustive genInstrBody definition");
-	if (instr.instr == Imov) {
-		outFile << "	mov rbx, rax\n";
-	} else if (instr.instr == Istr) {
-		outFile << "	mov [2*rbx+cells], ax\n";
-	} else if (instr.instr == Ild) {
-		outFile << "	mov rcx, rax\n";
-	} else if (instr.instr == Ioutu) {
-		outFile << "	call print_unsigned\n";
-	} else if (instr.instr == Ioutc) {
+	if (instr == Imov) {
+		outFile << "	mov r14, rcx\n";
+	} else if (instr == Istr) {
+		outFile << "	mov [2*r14+cells], cx\n";
+	} else if (instr == Ild) {
+		outFile << "	mov r15, rcx\n";
+	} else if (instr == Ioutu) {
+		outFile << "	mov rax, rcx\n"
+			"	call print_unsigned\n";
+	} else if (instr == Ioutc) {
 		outFile <<
-			"	mov [stdout_buff], al\n"
+			"	mov [stdout_buff], cl\n"
 			"	mov rdx, stdout_buff\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
-	} else if (instr.instr == Ijmp) {
+	} else if (instr == Ijmp) {
 		outFile <<
 		"	mov rsi, " << instrNum << "\n"
-		"	cmp rax, instruction_count\n"
+		"	cmp rcx, instruction_count\n"
 		"	ja jmp_error\n"
-		"	jmp [instruction_offsets+8*rax]\n";
+		"	jmp [instruction_offsets+8*rcx]\n";
 	} else {
 		unreachable();
 	}
 }
 void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
-	// head pos - bx, internal r reg - cx
-	// intermeiate values - ax, first op arg - dx // TODO: rdx is not the best pick
+	// head pos - r14, internal r reg - r15
+	// intermediate values - first - rbx, second - rcx
+	// TODO specify responsibilities for clamping and register preserving
 	checkValidity(instr); // checks if the instr has correct combination of suffixes and immediates
-	genArgumentFetch(outFile, instr); // loads instr argument in ax, responsible for 16-bit clamping
-	if (instr.hasMod()) {
-		genDestFetch(outFile, instr, instrNum); // loads instr destination in dx, responsible for 16-bit clamping
-		genOperation(outFile, instr.suffixes.modifier); // generates operation body (dx op ax) -> ax, expects rax < 65536, responsible for 16-bit clamping
+	if (instr.hasImm) {
+		outFile << "	mov rcx, " << instr.immediate << '\n';
+	} else {
+		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
 	}
-	genInstrBody(outFile, instr, instrNum); // generates the instr body, given instr val in ax, responsible for clamping the destination
+	if (instr.hasMod()) {
+		genRegisterFetch(outFile, InstrToDestReg[instr.instr], instrNum, false);
+		genOperation(outFile, instr.suffixes.modifier);
+	}
+	genInstrBody(outFile, instr.instr, instrNum);
 }
 
 void generate(vector<Instr>& instrs, string outFileName="out.asm") {
@@ -372,8 +386,8 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	sub rsp, 32\n"
 		"	call ExitProcess@4\n"
 		"	hlt\n"
-		"error: ; prints ERROR template, instr number: rsi, message: rdx, r8, errorneous value: rax, exit(1)\n"
-		"	push rax\n"
+		"error: ; prints ERROR template, instr number: rsi, message: rdx, r8, errorneous value: rcx, exit(1)\n"
+		"	push rcx\n"
 		"	push r8\n"
 		"	push rdx\n"
 		"	push rsi\n"
@@ -437,8 +451,8 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"_start:\n"
 		"	; initialization\n"
 		"	call get_std_fds\n"
-		"	xor rbx, rbx\n"
-		"	xor rcx, rcx\n"
+		"	xor r14, r14\n"
+		"	xor r15, r15\n"
 		"\n";
 	
 	Instr instr;
@@ -452,7 +466,7 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"instr_"<< instrs.size() << ":\n"
 		"	jmp end\n"
 		"\n"
-		"; runtime errors, expect instr number in rsi, errorneous value in rax\n"
+		"; runtime errors, expect instr number in rsi, errorneous value in rcx\n"
 		"jmp_error:\n"
 		"	mov rdx, jmp_error_message\n"
 		"	mov r8, jmp_error_message_len\n"
