@@ -81,12 +81,13 @@ map<InstrNames, RegNames> InstrToDestReg = {
 };
 // structs -------------------------------
 struct Loc {
+	string file;
 	int row;
 	int col;
-	string file = "in.mx";
 
 	Loc() {}
-	Loc(int row, int col) {
+	Loc(string file, int row, int col) {
+		this->file = file;
 		this->row = row;
 		this->col = col;
 	}
@@ -210,6 +211,12 @@ void check(bool cond, string message, Loc loc) {
 		exit(1);
 	}
 }
+void check(bool cond, string message) {
+	if (!cond) {
+		cout << "ERROR: " << message << "\n";
+		exit(1);
+	}
+}
 // tokenization ----------------------------------
 void parseSuffixes(Instr& instr, string s) {
 	static_assert(RegisterCount == 5 && OperationCount == 3, "Exhaustive parseSuffixes definition");
@@ -262,18 +269,19 @@ void parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 		parseInstrImmediate(instr, stringToLabel);
 	}
 }
-vector<Instr> tokenize(ifstream& inFile) {
+vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
+	string file = fileName.lexically_proximate(fs::current_path()).string();
 	string line;
 
 	vector<Instr> instrs;
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(1, 1))}, {"end", Label("end", 0, Loc(1, 1))}};
+	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
 
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		line = line.substr(0, line.find(';'));
 		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), isntSpace));
 		if (line.size() >= lineStartCol) {
 			vector<string> splits = splitDeleteWhitespace(line);
-			Loc loc = Loc(lineNum, lineStartCol);
+			Loc loc = Loc(file, lineNum, lineStartCol);
 			check(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
 			if (splits[0] == ":") {
 				check(splits.size() == 2, "Label name expected after ':'", loc);
@@ -498,7 +506,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
-	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].loc);
+	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL));
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
@@ -529,7 +537,7 @@ vector<string> getLineArgs(int argc, char *argv[]) {
 }
 void genFileNames(string arg) {
 	InputFileName = fs::absolute(arg);
-	OutputFileName = InputFileName; // TODO check if files exist and are reachable
+	OutputFileName = InputFileName;
 	OutputFileName.replace_extension("asm");
 }
 void processLineArgs(int argc, char *argv[]) {
@@ -539,18 +547,21 @@ void processLineArgs(int argc, char *argv[]) {
 }
 ifstream getInputFile() {
 	ifstream inFile;
-	inFile.open(InputFileName); // TODO check correct open
+	check(fs::exists(InputFileName), "The input file '" + InputFileName.string() + "' couldn't be found");
+	inFile.open(InputFileName);
+	check(inFile.good(), "The input file '" + InputFileName.string() + "' couldn't be opened");
 	return inFile;
 }
 ofstream getOutputFile() {
 	ofstream outFile;
 	outFile.open(OutputFileName);
+	check(outFile.good(), "The output file '" + OutputFileName.string() + "' couldn't be opened");
 	return outFile;
 }
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
 	ifstream inFile = getInputFile();
-	vector<Instr> instrs = tokenize(inFile);
+	vector<Instr> instrs = tokenize(inFile, InputFileName);
 	ofstream outFile = getOutputFile();
 	generate(outFile, instrs);
 }
