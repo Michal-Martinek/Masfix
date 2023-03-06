@@ -1,4 +1,3 @@
-Masfix.exe
-out.asm
-out.obj
-out.exe
+*.asm
+*.obj
+*.exe

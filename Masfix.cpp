@@ -378,10 +378,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	genInstrBody(outFile, instr.instr, instrNum);
 }
 
-void generate(vector<Instr>& instrs, string outFileName="out.asm") {
-	ofstream outFile;
-	outFile.open(outFileName);
-
+void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile << 
 		"extern ExitProcess@4\n"
 		"extern GetStdHandle@4\n"
@@ -510,10 +507,50 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 	outFile << "\n";
 	outFile.close();
 }
-
-int main() {
+// IO ---------------------------------------
+void printUsage() {
+	cout << "usage: Masfix <file-name>\n";
+}
+void checkUsage(bool cond, string message) {
+	if (!cond) {
+		cout << "ERROR: " << message << "\n\n";
+		printUsage();
+		exit(1);
+	}
+}
+fs::path InputFileName = "";
+fs::path OutputFileName = "";
+vector<string> getLineArgs(int argc, char *argv[]) {
+	vector<string> args;
+	for (int i = 0; i < argc; ++i) {
+		args.push_back(argv[i]);
+	}
+	return args;
+}
+void genFileNames(string arg) {
+	InputFileName = fs::absolute(arg);
+	OutputFileName = InputFileName; // TODO check if files exist and are reachable
+	OutputFileName.replace_extension("asm");
+}
+void processLineArgs(int argc, char *argv[]) {
+	vector<string> args = getLineArgs(argc, argv);
+	checkUsage(args.size() == 2, "Unexpected number of args");
+	genFileNames(args[1]);
+}
+ifstream getInputFile() {
 	ifstream inFile;
-	inFile.open("in.mx");
+	inFile.open(InputFileName); // TODO check correct open
+	return inFile;
+}
+ofstream getOutputFile() {
+	ofstream outFile;
+	outFile.open(OutputFileName);
+	return outFile;
+}
+int main(int argc, char *argv[]) {
+	processLineArgs(argc, argv);
+	ifstream inFile = getInputFile();
 	vector<Instr> instrs = tokenize(inFile);
-	generate(instrs);
+	ofstream outFile = getOutputFile();
+	generate(outFile, instrs);
 }
