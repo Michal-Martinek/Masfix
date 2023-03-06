@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 #include <string>
 #include <map>
@@ -8,7 +10,7 @@
 #include <algorithm>
 #include <math.h>
 #include <assert.h>
-#include <functional> 
+#include <functional>
 #include <cctype>
 #include <locale>
 using namespace std;
@@ -144,6 +146,9 @@ struct Label {
 	}
 };
 // helpers ---------------------------------
+bool isntSpace(char c) {
+	return !isspace(c);
+}
 string deleteWhitespace(string s) {
 	for (int i = 0; i < s.size();) {
 		if (std::isspace(s.at(i)))
@@ -265,7 +270,7 @@ vector<Instr> tokenize(ifstream& inFile) {
 
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		line = line.substr(0, line.find(';'));
-		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), isntSpace));
 		if (line.size() >= lineStartCol) {
 			vector<string> splits = splitDeleteWhitespace(line);
 			Loc loc = Loc(lineNum, lineStartCol);
@@ -307,7 +312,7 @@ void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSeco
 		outFile << "	mov " << regName <<", r14\n";
 	} else if (reg == Rm) {
 		outFile << "	xor " << regName << ", " << regName << "\n"
-			"	mov " << shortReg << ", [2*r14+cells]\n";
+			"	mov " << shortReg << ", [2*r14+r13]\n";
 	} else if (reg == Rr) {
 		outFile << "	mov " << regName <<", r15\n";
 	} else if (reg == Rp) {
@@ -332,7 +337,7 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
-		outFile << "	mov [2*r14+cells], cx\n";
+		outFile << "	mov [2*r14+r13], cx\n";
 	} else if (instr == Ild) {
 		outFile << "	mov r15, rcx\n";
 	} else if (instr == Ijmp) {
@@ -340,14 +345,15 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 		"	mov rsi, " << instrNum << "\n"
 		"	cmp rcx, instruction_count\n"
 		"	ja jmp_error\n"
-		"	jmp [instruction_offsets+8*rcx]\n";
+		"	mov rbx, instruction_offsets\n"
+		"	jmp [rbx+8*rcx]\n";
 	} else if (instr == Ioutu) {
 		outFile << "	mov rax, rcx\n"
 			"	call print_unsigned\n";
 	} else if (instr == Ioutc) {
 		outFile <<
-			"	mov [stdout_buff], cl\n"
 			"	mov rdx, stdout_buff\n"
+			"	mov [rdx], cl\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
 	} else {
@@ -357,6 +363,7 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
 	// head pos - r14, internal r reg - r15
 	// intermediate values - first - rbx, second - rcx
+	// addr of cells[0] - r13
 	// TODO specify responsibilities for clamping and register preserving
 	checkValidity(instr); // checks if the instr has correct combination of suffixes and immediates
 	if (instr.hasImm) {
@@ -401,8 +408,8 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	call stdout_write\n"
 		"	pop rax ; errorneous value\n"
 		"	call print_unsigned\n"
-		"	mov BYTE [stdout_buff], 10 ; '\\n'\n"
 		"	mov rdx, stdout_buff\n"
+		"	mov BYTE [rdx], 10 ; '\\n'\n"
 		"	mov r8, 1\n"
 		"	call stdout_write\n"
 		"	mov rax, 1 ; exit(1)\n"
@@ -413,10 +420,12 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"	sub rsp, 32 ; call with shadow space\n"
 		"	call GetStdHandle@4\n"
 		"	add rsp, 32\n"
-		"	mov [stdout_fd], rax\n"
+		"	mov rcx, stdout_fd\n"
+		"	mov [rcx], rax\n"
 		"	ret\n"
 		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	mov rcx, [stdout_fd] ; stdout fd\n"
+		"	mov rcx, stdout_fd\n"
+		"	mov rcx, [rcx] ; stdout fd\n"
 		"	push 0 ; number of bytes written var\n"
 		"	mov r9, rsp ; ptr to that var\n"
 		"	push 0 ; OVERLAPPED struct null ptr\n"
@@ -449,6 +458,7 @@ void generate(vector<Instr>& instrs, string outFileName="out.asm") {
 		"_start:\n"
 		"	; initialization\n"
 		"	call get_std_fds\n"
+		"	mov r13, cells\n"
 		"	xor r14, r14\n"
 		"	xor r15, r15\n"
 		"\n";
