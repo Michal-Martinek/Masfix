@@ -558,10 +558,29 @@ ofstream getOutputFile() {
 	check(outFile.good(), "The output file '" + OutputFileName.string() + "' couldn't be opened");
 	return outFile;
 }
+void runCmdEchoed(string command) {
+	cout << "[CMD] " << command << '\n';
+	int returnCode = system(command.c_str());
+	if (returnCode) {
+		exit(returnCode);
+	}
+}
+void compileAndRun(fs::path asmPath) {
+	fs::path objectPath = asmPath;
+	objectPath.replace_extension("obj");
+	fs::path exePath = asmPath;
+	exePath.replace_extension("exe");
+
+	runCmdEchoed("nasm -fwin64 " + asmPath.string());
+	runCmdEchoed("ld C:\\Windows\\System32\\kernel32.dll -e _start -o " + exePath.string() + " " + objectPath.string());
+}
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
 	ifstream inFile = getInputFile();
 	vector<Instr> instrs = tokenize(inFile, InputFileName);
+	inFile.close();
 	ofstream outFile = getOutputFile();
 	generate(outFile, instrs);
+	outFile.close();
+	compileAndRun(OutputFileName);
 }
