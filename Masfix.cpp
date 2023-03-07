@@ -24,6 +24,7 @@ fs::path InputFileName = "";
 fs::path OutputFileName = "";
 
 bool FLAG_silent = false;
+bool FLAG_run = false;
 // enums --------------------------------
 enum RegNames {
 	Rh,
@@ -523,7 +524,8 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 void printUsage() {
 	cout << "usage: Masfix [flags] <file-name>\n"
 			"	flags:\n"
-			"		-s / --silent - supresses all unnecessary stdout messages\n";
+			"		-s / --silent - supresses all unnecessary stdout messages\n"
+			"		-r / --run    - run the executable after compilation\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -551,6 +553,8 @@ void processLineArgs(int argc, char *argv[]) {
 	for (string s : flags) {
 		if (s == "-s" || s == "--silent") {
 			FLAG_silent = true;
+		} else if (s == "-r" || s == "--run") {
+			FLAG_run = true;
 		} else {
 			checkUsage(false, "Unknown command line arg '" + s + "'");
 		}
@@ -587,6 +591,9 @@ void compileAndRun(fs::path asmPath) {
 
 	runCmdEchoed("nasm -fwin64 " + asmPath.string());
 	runCmdEchoed("ld C:\\Windows\\System32\\kernel32.dll -e _start -o " + exePath.string() + " " + objectPath.string());
+	if (FLAG_run) {
+		runCmdEchoed(exePath.string());
+	}
 }
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
