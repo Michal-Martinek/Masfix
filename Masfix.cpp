@@ -19,7 +19,11 @@ using namespace std;
 #define STDOUT_BUFF_SIZE 256
 #define WORD_MAX_VAL 65535
 #define CELLS WORD_MAX_VAL+1
+// globals ---------------------------------
+fs::path InputFileName = "";
+fs::path OutputFileName = "";
 
+bool FLAG_silent = false;
 // enums --------------------------------
 enum RegNames {
 	Rh,
@@ -517,7 +521,9 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 }
 // IO ---------------------------------------
 void printUsage() {
-	cout << "usage: Masfix <file-name>\n";
+	cout << "usage: Masfix [flags] <file-name>\n"
+			"	flags:\n"
+			"		-s / --silent - supresses all unnecessary stdout messages\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -526,8 +532,6 @@ void checkUsage(bool cond, string message) {
 		exit(1);
 	}
 }
-fs::path InputFileName = "";
-fs::path OutputFileName = "";
 vector<string> getLineArgs(int argc, char *argv[]) {
 	vector<string> args;
 	for (int i = 0; i < argc; ++i) {
@@ -542,8 +546,16 @@ void genFileNames(string arg) {
 }
 void processLineArgs(int argc, char *argv[]) {
 	vector<string> args = getLineArgs(argc, argv);
-	checkUsage(args.size() == 2, "Unexpected number of args");
-	genFileNames(args[1]);
+	checkUsage(args.size() >= 2, "Insufficent number of command line args");
+	vector<string> flags = vector<string>(++args.begin(), --args.end());
+	for (string s : flags) {
+		if (s == "-s" || s == "--silent") {
+			FLAG_silent = true;
+		} else {
+			checkUsage(false, "Unknown command line arg '" + s + "'");
+		}
+	}
+	genFileNames(args[args.size()-1]);
 }
 ifstream getInputFile() {
 	ifstream inFile;
@@ -559,7 +571,9 @@ ofstream getOutputFile() {
 	return outFile;
 }
 void runCmdEchoed(string command) {
-	cout << "[CMD] " << command << '\n';
+	if (!FLAG_silent) {
+		cout << "[CMD] " << command << '\n';
+	}
 	int returnCode = system(command.c_str());
 	if (returnCode) {
 		exit(returnCode);
