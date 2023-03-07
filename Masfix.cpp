@@ -25,6 +25,7 @@ fs::path OutputFileName = "";
 
 bool FLAG_silent = false;
 bool FLAG_run = false;
+bool FLAG_keepTempFiles = false;
 // enums --------------------------------
 enum RegNames {
 	Rh,
@@ -525,7 +526,8 @@ void printUsage() {
 	cout << "usage: Masfix [flags] <file-name>\n"
 			"	flags:\n"
 			"		-s / --silent - supresses all unnecessary stdout messages\n"
-			"		-r / --run    - run the executable after compilation\n";
+			"		-r / --run    - run the executable after compilation\n"
+			"		--keep-files  - keep the temporary compilation files\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -555,6 +557,8 @@ void processLineArgs(int argc, char *argv[]) {
 			FLAG_silent = true;
 		} else if (s == "-r" || s == "--run") {
 			FLAG_run = true;
+		} else if (s == "--keep-files") {
+			FLAG_keepTempFiles = true;
 		} else {
 			checkUsage(false, "Unknown command line arg '" + s + "'");
 		}
@@ -583,6 +587,12 @@ void runCmdEchoed(string command) {
 		exit(returnCode);
 	}
 }
+void removeFile(fs::path file) {
+	bool ret = remove(file.string().c_str());
+	if (ret) {
+		cout << "WARNING: error on removing the file '" << file.filename() << "'\n";
+	}
+}
 void compileAndRun(fs::path asmPath) {
 	fs::path objectPath = asmPath;
 	objectPath.replace_extension("obj");
@@ -591,6 +601,10 @@ void compileAndRun(fs::path asmPath) {
 
 	runCmdEchoed("nasm -fwin64 " + asmPath.string());
 	runCmdEchoed("ld C:\\Windows\\System32\\kernel32.dll -e _start -o " + exePath.string() + " " + objectPath.string());
+	if (!FLAG_keepTempFiles) {
+		removeFile(asmPath);
+		removeFile(objectPath);
+	}
 	if (FLAG_run) {
 		runCmdEchoed(exePath.string());
 	}
