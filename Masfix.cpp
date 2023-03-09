@@ -197,6 +197,18 @@ bool isValidIdentifier(string s) { // TODO: check for names too similar to an in
 	// TODO: add reason for invalid identifier
 	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
 }
+fs::path pathFromMasfix(fs::path p) {
+	fs::path out;
+	bool found = false;
+	for (fs::path part : p) {
+		string s = part.string();
+		if (found) out.append(s);
+		if (s == "Masfix") {
+			found = true;
+		}
+	}
+	return found ? out : p;
+}
 // checks
 #define unreachable() assert(("Unreachable", false));
 #define continueOnFalse(cond) if (!(cond)) continue;
@@ -207,7 +219,7 @@ bool isValidIdentifier(string s) { // TODO: check for names too similar to an in
 vector<string> errors;
 void raiseErrors() {
 	for (string s : errors) {
-		cout << s << '\n';
+		cout << s;
 	}
 	if (errors.size())
 		exit(1);
@@ -311,7 +323,7 @@ bool checkValidity(Instr instr) {
 	return true;
 }
 vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
-	string file = fileName.lexically_proximate(fs::current_path()).string();
+	string file = pathFromMasfix(fileName).string();
 	string line;
 
 	vector<Instr> instrs;
