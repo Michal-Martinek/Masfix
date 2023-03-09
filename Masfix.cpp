@@ -26,6 +26,7 @@ fs::path OutputFileName = "";
 bool FLAG_silent = false;
 bool FLAG_run = false;
 bool FLAG_keepTempFiles = false;
+bool FLAG_strictErrors = false;
 // enums --------------------------------
 enum RegNames {
 	Rh,
@@ -226,7 +227,7 @@ void raiseErrors() {
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
-	if (strict)
+	if (strict || FLAG_strictErrors)
 		raiseErrors();
 }
 bool check(bool cond, string message, Instr instr, bool strict=true) {
@@ -561,9 +562,10 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 void printUsage() {
 	cout << "usage: Masfix [flags] <file-name>\n"
 			"	flags:\n"
-			"		-s / --silent - supresses all unnecessary stdout messages\n"
-			"		-r / --run    - run the executable after compilation\n"
-			"		--keep-files  - keep the temporary compilation files\n";
+			"		-s / --silent     - supresses all unnecessary stdout messages\n"
+			"		-r / --run        - run the executable after compilation\n"
+			"		--keep-files      - keep the temporary compilation files\n"
+			"		--strict-errors   - disables many errors\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -595,6 +597,8 @@ void processLineArgs(int argc, char *argv[]) {
 			FLAG_run = true;
 		} else if (s == "--keep-files") {
 			FLAG_keepTempFiles = true;
+		} else if (s == "--strict-errors") {
+			FLAG_strictErrors = true;
 		} else {
 			checkUsage(false, "Unknown command line arg '" + s + "'");
 		}
