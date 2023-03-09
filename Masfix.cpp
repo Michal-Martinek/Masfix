@@ -197,36 +197,58 @@ bool isValidIdentifier(string s) { // TODO: check for names too similar to an in
 	// TODO: add reason for invalid identifier
 	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
 }
-
+// checks
 #define unreachable() assert(("Unreachable", false));
-void check(bool cond, string message, Instr instr) {
-	if (!cond) {
-		cout << instr.loc.toStr() << " ERROR: " << message << " '" << instr.toStr() << "'\n";
-		exit(1);
+#define continueOnFalse(cond) if (!(cond)) continue;
+#define returnOnFalse(cond) if (!(cond)) return false;
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
+
+vector<string> errors;
+void raiseErrors() {
+	for (string s : errors) {
+		cout << s << '\n';
 	}
+	if (errors.size())
+		exit(1);
 }
-void check(bool cond, string message, Label label) {
-	if (!cond) {
-		cout << label.loc.toStr() << " ERROR: " << message << " '" << label.toStr() << "'\n";
-		exit(1);
-	}
+void addError(string message, bool strict=true) {
+	errors.push_back(message);
+	if (strict)
+		raiseErrors();
 }
-void check(bool cond, string message, Loc loc) {
+bool check(bool cond, string message, Instr instr, bool strict=true) {
 	if (!cond) {
-		cout << loc.toStr() << " ERROR: " << message << "\n";
-		exit(1);
+		string err = instr.loc.toStr() + " ERROR: " + message + " '" + instr.toStr() + "'\n";
+		addError(err, strict);
 	}
+	return cond;
 }
-void check(bool cond, string message) {
+bool check(bool cond, string message, Label label, bool strict=true) {
 	if (!cond) {
-		cout << "ERROR: " << message << "\n";
-		exit(1);
+		string err = label.loc.toStr() + " ERROR: " + message + " '" + label.toStr() + "'\n";
+		addError(err, strict);
 	}
+	return cond;
+}
+bool check(bool cond, string message, Loc loc, bool strict=true) {
+	if (!cond) {
+		string err = loc.toStr() + " ERROR: " + message + "\n";
+		addError(err, strict);
+	}
+	return cond;
+}
+bool check(bool cond, string message, bool strict=true) {
+	if (!cond) {
+		string err = "ERROR: " + message + "\n";
+		addError(err, strict);
+	}
+	return cond;
 }
 // tokenization ----------------------------------
-void parseSuffixes(Instr& instr, string s) {
+bool parseSuffixes(Instr& instr, string s) {
 	static_assert(RegisterCount == 5 && OperationCount == 3, "Exhaustive parseSuffixes definition");
-	check(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
+	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
 		char c = s.at(0);
 		if (CharToReg.count(c) == 1) {
@@ -234,16 +256,17 @@ void parseSuffixes(Instr& instr, string s) {
 		} else if (CharToOp.count(c) == 1) {
 			instr.suffixes.modifier = CharToOp[c];
 		} else {
-			check(false, "Unknown suffix", instr);
+			checkReturnOnFail(false, "Unknown suffix", instr);
 		}
 	} else if (s.size() == 2) {
-		check(CharToOp.count(s.at(0)) == 1, "The first suffix must be an operation", instr);
-		check(CharToReg.count(s.at(1)) == 1, "The second suffix must be a register", instr);
+		checkReturnOnFail(CharToOp.count(s.at(0)) == 1, "The first suffix must be an operation", instr);
+		checkReturnOnFail(CharToReg.count(s.at(1)) == 1, "The second suffix must be a register", instr);
 		instr.suffixes.modifier = CharToOp[s.at(0)];
 		instr.suffixes.reg = CharToReg[s.at(1)];
 	}
+	return true;
 }
-void parseInstrOpcode(Instr& instr) {
+bool parseInstrOpcode(Instr& instr) {
 	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
 	for (int checkedLen = 2; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
@@ -251,29 +274,41 @@ void parseInstrOpcode(Instr& instr) {
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
 			string suffix = parsing.substr(checkedLen);
-			parseSuffixes(instr, suffix);
-			return;
+			return parseSuffixes(instr, suffix);
 		}
 	}
-	check(false, "Unknown instruction", instr);
+	checkReturnOnFail(false, "Unknown instruction", instr);
+	return false;
 }
-void parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
+bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	string s = instr.fields[1];
 	if (stringToLabel.count(s) > 0) {
 		instr.immediate = stringToLabel[s].addr;
-		return;
+		return true;
 	}
-	check(isdigit(s.at(0)), "Invalid instruction immediate", instr);
+	checkReturnOnFail(isdigit(s.at(0)), "Invalid instruction immediate", instr);
 	instr.immediate = stoi(s);
-	check(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
-	check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
+	checkReturnOnFail(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
+	checkReturnOnFail(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
+	return true;
 }
-void parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
-	parseInstrOpcode(instr);
+bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
+	returnOnFalse(parseInstrOpcode(instr));
 	instr.hasImm = instr.fields.size() == 2;
 	if (instr.hasImm) {
-		parseInstrImmediate(instr, stringToLabel);
+		returnOnFalse(parseInstrImmediate(instr, stringToLabel));
 	}
+	return true;
+}
+// checks if the instr has correct combination of suffixes and immediates
+bool checkValidity(Instr instr) {
+	static_assert(InstructionCount == 6 && sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	if (instr.instr == InstructionCount) unreachable();
+	checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+	if (InstrToDestReg[instr.instr] == Rno) {
+		checkReturnOnFail(!instr.hasMod(), "Special instructions cannot have a modifier", instr);
+	}
+	return true;
 }
 vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
 	string file = fileName.lexically_proximate(fs::current_path()).string();
@@ -288,36 +323,26 @@ vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
 		if (line.size() >= lineStartCol) {
 			vector<string> splits = splitDeleteWhitespace(line);
 			Loc loc = Loc(file, lineNum, lineStartCol);
-			check(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
+			checkContinueOnFail(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
 			if (splits[0] == ":") {
-				check(splits.size() == 2, "Label name expected after ':'", loc);
+				checkContinueOnFail(splits.size() == 2, "Label name expected after ':'", loc);
 				Label label = Label(splits[1], instrs.size(), loc);
-				check(isValidIdentifier(label.name), "Invalid label name", label);
-				check(strToLabel.count(label.name) == 0, "Label redefinition", label);
+				checkContinueOnFail(isValidIdentifier(label.name), "Invalid label name", label);
+				checkContinueOnFail(strToLabel.count(label.name) == 0, "Label redefinition", label);
 				strToLabel.insert(pair<string, Label>(label.name, label));
 			} else {
 				Instr instr(loc, splits);
+				continueOnFalse(parseInstrFields(instr, strToLabel));
+				continueOnFalse(checkValidity(instr));
 				instrs.push_back(instr);
 			}
 		}
 	}
+	raiseErrors();
 	strToLabel["end"].addr = instrs.size();
-	for (int i = 0; i < instrs.size(); ++i) {
-		Instr instr = instrs[i];
-		parseInstrFields(instr, strToLabel);
-		instrs[i] = instr;
-	}
 	return instrs;
 }
 // assembly generation ------------------------------------------
-void checkValidity(Instr instr) {
-	static_assert(InstructionCount == 6 && sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
-	if (instr.instr == InstructionCount) unreachable();
-	check(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
-	if (InstrToDestReg[instr.instr] == Rno) {
-		check(!instr.hasMod(), "Special instructions cannot have a modifier", instr);
-	}
-}
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
 	static_assert(RegisterCount == 5, "Exhaustive genRegisterFetch definition");
 	string regName = toSecond ? "rcx" : "rbx";
@@ -379,7 +404,6 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// intermediate values - first - rbx, second - rcx
 	// addr of cells[0] - r13
 	// TODO specify responsibilities for clamping and register preserving
-	checkValidity(instr); // checks if the instr has correct combination of suffixes and immediates
 	if (instr.hasImm) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
 	} else {
