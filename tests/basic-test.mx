@@ -1,0 +1,11 @@
+ld 8
+outur
+lda 2
+
+outcr
+
+movr
+mova 5
+outuh
+
+outc 10
