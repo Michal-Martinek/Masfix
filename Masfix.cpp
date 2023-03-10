@@ -345,14 +345,18 @@ vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
 				strToLabel.insert(pair<string, Label>(label.name, label));
 			} else {
 				Instr instr(loc, splits);
-				continueOnFalse(parseInstrFields(instr, strToLabel));
-				continueOnFalse(checkValidity(instr));
 				instrs.push_back(instr);
 			}
 		}
 	}
-	raiseErrors();
 	strToLabel["end"].addr = instrs.size();
+	for (int i = 0; i < instrs.size(); ++i) {
+		Instr instr = instrs[i];
+		continueOnFalse(parseInstrFields(instr, strToLabel));
+		continueOnFalse(checkValidity(instr));
+		instrs[i] = instr;
+	}
+	raiseErrors();
 	return instrs;
 }
 // assembly generation ------------------------------------------
