@@ -44,12 +44,32 @@ def runTests(dir: Path):
 		except TestcaseException:
 			passed = False
 		success = success and passed
+	print()
 	if success:
-		print('\nAll testcases passed')
+		print('All testcases passed')
 	else:
-		print('\nSome testcases failed')
+		print('Some testcases failed')
 		exit(1)
-
+# modes --------------------------------------
+def processFileArg(file) -> Path:
+	# TODO: add quessing (looking into tests\<path>, <path>.mx, tests\<path>.mx, ...)
+	check(os.path.exists(file) or file is None, "File was not found", quoted(file), insideTestcase=False)
+	file = Path(file)
+	check(file.suffix == '.mx', "The file is expected to end with '.mx'", quoted(file), insideTestcase=False)
+	return file
+def modeRun(args):
+	if len(args):
+		file = processFileArg(args[0])
+		print('file:', file)
+		assert False, 'Running a single file not implemented yet'
+	else:
+		runTests('tests')
+def test(args):
+	if args[0] == 'run':
+		modeRun(args[1:])
+	else:
+		checkUsage(False, "Unknown mode", quoted(args[0]))
+# IO ----------------------------------------------
 def compileCompiler():
 	comm = ['g++', '-std=c++17', 'Masfix.cpp', '-o', 'Masfix']
 	print('[CMD]', *comm)
@@ -68,23 +88,13 @@ def checkUsage(cond, *messages):
 		print()
 		usage()
 		exit(1)
-def checkFileArg(file: Path):
-	check(os.path.exists(file) or file is None, "File was not found", quoted(file), insideTestcase=False)
-	check(file.suffix == '.mx', "The file is expected to end with '.mx'", quoted(file.suffix), insideTestcase=False)
-def processLineArgs() -> dict:
-	args = sys.argv[1:]
-	checkUsage(len(args) >= 1, "Mode expected")
-	flags = {'mode': None, 'second': None, 'file': None}
-	if args[0] == 'run':
-		flags['mode'] = 'run'
-	else:
-		checkUsage(False, "Unknown mode", quoted(args[0]))
-	assert flags['mode'] == 'run'
-	return flags
+def getLineArgs() -> list[str]:
+	checkUsage(len(sys.argv) >= 2, "Mode expected")
+	return sys.argv[1:]
 def main():
-	flags = processLineArgs()
-	compileCompiler()
-	runTests('tests')
+	args = getLineArgs()
+	# compileCompiler() TODO
+	test(args)
 
 if __name__ == '__main__':
 	main()
