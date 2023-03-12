@@ -26,10 +26,11 @@ def getExpectedOutput(test: Path):
 	with open(path, 'r') as testcase:
 		desc = testcase.read()
 	return desc
+def runFile(prompt, path) -> tuple:
+	print(prompt, path)
+	return runCommand(['Masfix',  '-s',  '-r', str(path)])
 def runTest(path: Path) -> bool:
-	print('[TESTING]', path)
-	check(os.path.exists(path), "Tested file not found", quoted(path))
-	code, stdout, stderr = runCommand(['Masfix',  '-s',  '-r', str(path)])
+	code, stdout, stderr = runFile('[TESTING]', path)
 	expected = getExpectedOutput(path)
 	check(expected == stdout, 'The stdout is not as expected')
 	return True
@@ -50,6 +51,12 @@ def runTests(dir: Path):
 	else:
 		print('Some testcases failed')
 		exit(1)
+def updateFile(file: Path):
+	code, stdout, stderr = runFile('[UPDATING]', file)
+	print('[NOTE] stdout:')
+	print(stdout, end='')
+	with open(file.with_suffix('.txt'), 'w') as f:
+		f.write(stdout)
 # modes --------------------------------------
 def processFileArg(file) -> Path:
 	# TODO: add quessing (looking into tests\<path>, <path>.mx, tests\<path>.mx, ...)
@@ -64,9 +71,20 @@ def modeRun(args):
 		assert False, 'Running a single file not implemented yet'
 	else:
 		runTests('tests')
+def modeUpdate(args):
+	checkUsage(len(args) >= 1, 'Update specifier expected')
+	checkUsage(args[0] == 'output', 'Only', quoted('update output'), 'supported for now', quoted(args[0]))
+	args = args[1:]
+	if len(args):
+		file = processFileArg(args[0])
+		updateFile(file)
+	else:
+		assert False, 'Updating all files outputs not implemented yet'
 def test(args):
 	if args[0] == 'run':
 		modeRun(args[1:])
+	if args[0] == 'update':
+		modeUpdate(args[1:])
 	else:
 		checkUsage(False, "Unknown mode", quoted(args[0]))
 # IO ----------------------------------------------
