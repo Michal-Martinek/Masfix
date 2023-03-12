@@ -17,8 +17,8 @@ def check(cond, *messages, insideTestcase=True): # TODO use *messages, use prope
 def runCommand(command):
 	process = Popen(command, stdout=PIPE, stderr=PIPE) # TODO handle process errors
 	stdout, stderr = process.communicate()
-	stdout = stdout.decode() # TODO handle decode errors
-	stderr = stderr.decode()
+	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
+	stderr = stderr.decode().replace('\r', '')
 	return process.returncode, stdout, stderr
 def getExpectedOutput(test: Path):
 	path = test.with_suffix('.txt')
@@ -83,7 +83,7 @@ def modeUpdate(args):
 def test(args):
 	if args[0] == 'run':
 		modeRun(args[1:])
-	if args[0] == 'update':
+	elif args[0] == 'update':
 		modeUpdate(args[1:])
 	else:
 		checkUsage(False, "Unknown mode", quoted(args[0]))
