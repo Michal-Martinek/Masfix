@@ -1,0 +1,18 @@
+; jmp test
+	ld 1
+:top
+	jmpar
+	
+	outc 65 ; ABCDEFGH\n
+	outc 66
+	outc 67
+	outc 68
+	outc 69
+	outc 70
+	outc 71
+	outc 72
+
+	outc 10
+
+	lda 3
+	jmp top

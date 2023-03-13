@@ -1,0 +1,21 @@
+
+:label1
+:label2
+
+ld 8
+ld label1
+ld label3
+
+:label3
+:label2
+:_label2
+:label2_
+
+outu label2_
+
+:L1
+
+:L0
+:L1
+
+:L0

@@ -7,5 +7,12 @@ outcr
 movr
 mova 5
 outuh
-
 outc 10
+
+outur
+
+movs 12 ; '\n'
+ld 5
+lda 2
+movar
+outch
