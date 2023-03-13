@@ -220,7 +220,7 @@ fs::path pathFromMasfix(fs::path p) {
 vector<string> errors;
 void raiseErrors() {
 	for (string s : errors) {
-		cout << s;
+		cerr << s;
 	}
 	if (errors.size())
 		exit(1);
@@ -452,32 +452,42 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	push rsi\n"
 		"	mov rdx, ERROR_template\n"
 		"	mov r8, ERROR_template_len\n"
-		"	call stdout_write\n"
+		"	call stderr_write\n"
 		"	pop rax ; print instr number\n"
-		"	call print_unsigned\n"
+		"	call print_unsigned_err\n"
 		"	pop rdx ; error message\n"
 		"	pop r8\n"
-		"	call stdout_write\n"
+		"	call stderr_write\n"
 		"	pop rax ; errorneous value\n"
-		"	call print_unsigned\n"
+		"	call print_unsigned_err\n"
 		"	mov rdx, stdout_buff\n"
 		"	mov BYTE [rdx], 10 ; '\\n'\n"
 		"	mov r8, 1\n"
-		"	call stdout_write\n"
+		"	call stderr_write\n"
 		"	mov rax, 1 ; exit(1)\n"
 		"	call exit\n"
 		"\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
-		"	mov rcx, -11 ; stdout fd\n"
+		"	mov rcx, -10 ; stdin fd\n"
 		"	sub rsp, 32 ; call with shadow space\n"
+		"	call GetStdHandle@4\n"
+		"	add rsp, 32\n"
+		"	mov rcx, stdin_fd\n"
+		"	mov [rcx], rax\n"
+		"	mov rcx, -11 ; stdout fd\n"
+		"	sub rsp, 32\n"
 		"	call GetStdHandle@4\n"
 		"	add rsp, 32\n"
 		"	mov rcx, stdout_fd\n"
 		"	mov [rcx], rax\n"
+		"	mov rcx, -12 ; stderr fd\n"
+		"	sub rsp, 32\n"
+		"	call GetStdHandle@4\n"
+		"	add rsp, 32\n"
+		"	mov rcx, stderr_fd\n"
+		"	mov [rcx], rax\n"
 		"	ret\n"
-		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	mov rcx, stdout_fd\n"
-		"	mov rcx, [rcx] ; stdout fd\n"
+		"write_file: ; rcx - fd, rdx - buff, r8 - number of bytes -> rax - number written\n"
 		"	push 0 ; number of bytes written var\n"
 		"	mov r9, rsp ; ptr to that var\n"
 		"	push 0 ; OVERLAPPED struct null ptr\n"
@@ -486,11 +496,21 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
 		"	pop rax\n"
 		"	ret\n"
-		"print_unsigned: ; n - rax\n"
+		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
+		"	mov rcx, stdout_fd\n"
+		"	mov rcx, [rcx] ; stdout fd\n"
+		"	call write_file\n"
+		"	ret\n"
+		"stderr_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
+		"	mov rcx, stderr_fd\n"
+		"	mov rcx, [rcx] ; stderr fd\n"
+		"	call write_file\n"
+		"	ret\n"
+		"utos: ; n - rax -> r8 char count, r9 - char* str\n"
 		"	xor r8, r8 ; char count\n"
 		"	mov r9, stdout_buff+" << STDOUT_BUFF_SIZE-1 << " ; curr buff pos\n"
 		"	mov r10, 10 ; base\n"
-		"print_unsigned_loop:\n"
+		"utos_loop:\n"
 		"	xor rdx, rdx\n"
 		"	div r10\n"
 		"	add rdx, '0'\n"
@@ -500,10 +520,19 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	mov [r9], dl\n"
 		"\n"
 		"	cmp rax, 0\n"
-		"	jne print_unsigned_loop\n"
-		"	\n"
-		"	mov rdx, r9 ; buff addr\n"
+		"	jne utos_loop\n"
+		"	ret\n"
+		"print_unsigned: ; rax - n -> rax - num written\n"
+		"	call utos\n"
+		"	mov rdx, r9 ; str\n"
 		"	call stdout_write\n"
+		"	ret\n"
+		"print_unsigned_err: ; rax - n -> rax - num written\n"
+		"	call utos\n"
+		"	mov rcx, stderr_fd\n"
+		"	mov rcx, [rcx]\n"
+		"	mov rdx, r9 ; str\n"
+		"	call write_file\n"
 		"	ret\n"
 		"\n"
 		"global _start\n"
@@ -539,7 +568,9 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"\n"
 		"section .bss\n"
 		"	cells: resw " << CELLS << "\n"
+		"	stdin_fd: resq 1\n"
 		"	stdout_fd: resq 1\n"
+		"	stderr_fd: resq 1\n"
 		"	stdout_buff: resb " << STDOUT_BUFF_SIZE << "\n"
 		"\n"
 		"section .data\n"
@@ -568,12 +599,12 @@ void printUsage() {
 			"	flags:\n"
 			"		-s / --silent     - supresses all unnecessary stdout messages\n"
 			"		-r / --run        - run the executable after compilation\n"
-			"		--keep-files      - keep the temporary compilation files\n"
+			"		--keep-files      - keep the temporary compilation files\n" // TODO rather --keep-asm
 			"		--strict-errors   - disables many errors\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
-		cout << "ERROR: " << message << "\n\n";
+		cerr << "ERROR: " << message << "\n\n";
 		printUsage();
 		exit(1);
 	}
@@ -634,7 +665,7 @@ void runCmdEchoed(string command) {
 void removeFile(fs::path file) {
 	bool ret = remove(file.string().c_str());
 	if (ret) {
-		cout << "WARNING: error on removing the file '" << file.filename() << "'\n";
+		cerr << "WARNING: error on removing the file '" << file.filename() << "'\n";
 	}
 }
 void compileAndRun(fs::path asmPath) {
