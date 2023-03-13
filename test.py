@@ -1,5 +1,6 @@
 from subprocess import Popen, PIPE
 import os, sys
+import re
 from pathlib import Path
 
 class TestcaseException(Exception):
@@ -20,19 +21,49 @@ def runCommand(command):
 	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
 	stderr = stderr.decode().replace('\r', '')
 	return process.returncode, stdout, stderr
-def getExpectedOutput(test: Path):
+def _parseDescBlob(desc, chars):
+	check('\n' in desc, 'Testcase blob must start at a new line')
+	s = desc[desc.find('\n')+1:]
+	check(len(s) >= chars, 'Insufficent character count in description')
+	return s[:chars]
+def parseTestcaseDesc(desc: str):
+	expected = {'stdout': '', 'stderr': ''}
+	while ':' in desc:
+		desc = desc[desc.find(':')+1:]
+		line = desc.split('\n', maxsplit=1)[0]
+		desc = desc[len(line):]
+		if re.match('returncode \d+', line):
+			code = int(line.split(' ')[1])
+			expected['returncode'] = code
+		elif re.match('stdout \d+', line):
+			chars = int(line.split(' ')[1])
+			s = _parseDescBlob(desc, chars)
+			expected['stdout'] = s
+			desc = desc[chars:]
+		elif re.match('stderr \d+', line):
+			chars = int(line.split(' ')[1])
+			s = _parseDescBlob(desc, chars)
+			expected['stderr'] = s
+			desc = desc[chars:]
+		else:
+			check(False, 'Unknown field in description', quoted(line))
+	check('returncode' in expected, 'Testcase description missing :returncode')
+	return expected
+def getTestcaseDesc(test: Path) -> dict:
 	path = test.with_suffix('.txt')
 	check(os.path.exists(path), 'Missing test case desciption', quoted(path))
 	with open(path, 'r') as testcase:
 		desc = testcase.read()
-	return desc
+	return parseTestcaseDesc(desc)
 def runFile(prompt, path) -> tuple:
 	print(prompt, path)
 	return runCommand(['Masfix',  '-s',  '-r', str(path)])
 def runTest(path: Path) -> bool:
 	code, stdout, stderr = runFile('[TESTING]', path)
-	expected = getExpectedOutput(path)
-	check(expected == stdout, 'The stdout is not as expected')
+	expected = getTestcaseDesc(path)
+	check(expected['returncode'] == code, 'The return code is not as expected')
+	check(expected['stdout'] == stdout, 'The stdout is not as expected')
+	check(expected['stderr'] == stderr, 'The stderr is not as expected')
 	return True
 def runTests(dir: Path):
 	success = True
@@ -51,12 +82,19 @@ def runTests(dir: Path):
 	else:
 		print('Some testcases failed')
 		exit(1)
+def genDesc(file: Path, code, stdout, stderr):
+	with open(file.with_suffix('.txt'), 'w') as f:
+		f.write(f':returncode {code}\n\n')
+		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
+		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
 def updateFile(file: Path):
 	code, stdout, stderr = runFile('[UPDATING]', file)
+	print('[NOTE] returncode:', code)
 	print('[NOTE] stdout:')
-	print(stdout, end='')
-	with open(file.with_suffix('.txt'), 'w') as f:
-		f.write(stdout)
+	print(stdout)
+	print('[NOTE] stderr:')
+	print(stderr, end='')
+	genDesc(file, code, stdout, stderr)
 # modes --------------------------------------
 def processFileArg(file) -> Path:
 	# TODO: add quessing (looking into tests\<path>, <path>.mx, tests\<path>.mx, ...)
