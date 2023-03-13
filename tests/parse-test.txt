@@ -1,3 +1,6 @@
+:returncode 1
+
+:stderr 3531
 tests\parse-test.mx:23:2 ERROR: Label name expected after ':'
 tests\parse-test.mx:25:1 ERROR: Label name expected after ':'
 tests\parse-test.mx:26:2 ERROR: Label name expected after ':'
@@ -48,3 +51,5 @@ tests\parse-test.mx:89:1 ERROR: The second suffix must be a register 'strsa'
 tests\parse-test.mx:91:1 ERROR: The second suffix must be a register 'straa'
 tests\parse-test.mx:92:1 ERROR: Instrs must have only imm, or 1 reg for now 'strar 5'
 tests\parse-test.mx:93:1 ERROR: Invalid instruction immediate 'strar a'
+
+

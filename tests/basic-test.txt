@@ -1,3 +1,8 @@
+:returncode 0
+
+:stdout 8
 8
 15
 10
+
+

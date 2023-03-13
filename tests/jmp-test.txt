@@ -1,5 +1,13 @@
+:returncode 1
+
+:stdout 18
 ABCDEFGH
 DEFGH
 GH
 
+
+:stderr 51
+
 ERROR: instr_1: jmp destination out of bounds: 14
+
+
