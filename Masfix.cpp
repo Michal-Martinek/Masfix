@@ -56,32 +56,50 @@ map<char, OpNames> CharToOp = {
 {'a', OPa}, // TODO: add +, - as suffixes
 {'s', OPs},
 };
+enum CondNames {
+	Ceq,
+	Cne,
+
+	Cno,
+	ConditionCount
+};
+static_assert(ConditionCount == 3, "Exhaustive StrToCond definition");
+map<string, CondNames> StrToCond = {
+{"eq", Ceq},
+{"ne", Cne},
+};
 enum InstrNames {
 	Imov,
 	Istr,
 	Ild ,
 	Ijmp,
 
+	Ib,
+
 	Ioutu,
 	Ioutc,
 	InstructionCount
 };
-static_assert(InstructionCount == 6, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 7, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
 {"ld" , Ild },
 {"jmp", Ijmp},
 
+{"b", Ib},
+
 {"outu", Ioutu},
 {"outc", Ioutc},
 };
-static_assert(InstructionCount == 6 && RegisterCount == 5, "Exhaustive InstrToDestReg definition");
-map<InstrNames, RegNames> InstrToDestReg = {
+static_assert(InstructionCount == 7 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
+map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
 	{Istr, Rm},
 	{Ild , Rr},
 	{Ijmp, Rp},
+
+	{Ib, Rno}, // branches cannot have a modifier
 
 	{Ioutu, Rno}, // specials have no destination
 	{Ioutc, Rno},
@@ -104,10 +122,12 @@ struct Loc {
 };
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
+	CondNames cond;
 	OpNames modifier;
 	RegNames reg;
 
 	Suffix() {
+		cond = Cno;
 		modifier = OPno;
 		reg = Rno;
 	}
@@ -129,8 +149,9 @@ struct Instr {
 		this->loc = loc;
 		this->fields = fields;
 	}
-	bool hasMod() { return suffixes.modifier != OPno; }
-	bool hasReg() { return suffixes.reg != Rno; }
+	bool hasCond() { return suffixes.cond != Cno; }
+	bool hasMod()  { return suffixes.modifier != OPno; }
+	bool hasReg()  { return suffixes.reg != Rno; }
 	string toStr() {
 		if (fields.size() == 1) return fields[0];
 		string s = fields[0];
@@ -259,8 +280,15 @@ bool check(bool cond, string message, bool strict=true) {
 	return cond;
 }
 // tokenization ----------------------------------
-bool parseSuffixes(Instr& instr, string s) {
-	static_assert(RegisterCount == 5 && OperationCount == 3, "Exhaustive parseSuffixes definition");
+bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
+	static_assert(RegisterCount == 5 && OperationCount == 3 && ConditionCount == 3, "Exhaustive parseSuffixes definition");
+	if (condExpected) {
+		checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
+		string cond = s.substr(0, 2);
+		checkReturnOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr);
+		instr.suffixes.cond = StrToCond[cond];
+		s = s.substr(2);
+	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
 		char c = s.at(0);
@@ -280,14 +308,14 @@ bool parseSuffixes(Instr& instr, string s) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 6, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 7, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
-	for (int checkedLen = 2; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
+	for (int checkedLen = 1; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
 		string substr = parsing.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
 			string suffix = parsing.substr(checkedLen);
-			return parseSuffixes(instr, suffix);
+			return parseSuffixes(instr, suffix, instr.instr == Ib);
 		}
 	}
 	checkReturnOnFail(false, "Unknown instruction", instr);
@@ -315,11 +343,11 @@ bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr instr) {
-	static_assert(InstructionCount == 6 && sizeof(Suffix) == 2 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 7 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
 	checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
-	if (InstrToDestReg[instr.instr] == Rno) {
-		checkReturnOnFail(!instr.hasMod(), "Special instructions cannot have a modifier", instr);
+	if (InstrToModReg[instr.instr] == Rno) {
+		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	}
 	return true;
 }
@@ -388,15 +416,26 @@ void genOperation(ofstream& outFile, OpNames op) {
 		unreachable();
 	}
 }
+void genCond(ofstream& outFile, CondNames cond, int instrNum) {
+	static_assert(ConditionCount == 3, "Exhaustive genCond definition");
+	outFile << "	cmp r15, 0\n";
+	if (cond == Ceq) {
+		outFile << "	jne instr_" << instrNum + 1 << "\n";
+	} else if (cond == Cne) {
+		outFile << "	je instr_" << instrNum + 1 << "\n";
+	} else {
+		unreachable();
+	}
+}
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
-	static_assert(InstructionCount == 6, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 7, "Exhaustive genInstrBody definition");
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
 		outFile << "	mov [2*r14+r13], cx\n";
 	} else if (instr == Ild) {
 		outFile << "	mov r15, rcx\n";
-	} else if (instr == Ijmp) {
+	} else if (instr == Ijmp || instr == Ib) {
 		outFile <<
 		"	mov rsi, " << instrNum << "\n"
 		"	cmp rcx, instruction_count\n"
@@ -427,8 +466,11 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
 	}
 	if (instr.hasMod()) {
-		genRegisterFetch(outFile, InstrToDestReg[instr.instr], instrNum, false);
+		genRegisterFetch(outFile, InstrToModReg[instr.instr], instrNum, false);
 		genOperation(outFile, instr.suffixes.modifier);
+	}
+	if (instr.hasCond()) {
+		genCond(outFile, instr.suffixes.cond, instrNum);
 	}
 	genInstrBody(outFile, instr.instr, instrNum);
 }

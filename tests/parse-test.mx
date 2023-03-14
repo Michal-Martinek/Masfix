@@ -91,3 +91,24 @@ strsr
 straa
 strar 5
 strar a
+
+
+; branches
+
+b
+l
+bd
+bde
+beqz
+
+ldeq
+jmpne
+movner
+
+beq
+bne
+
+beqr
+beqar
+bnea 5
+ba

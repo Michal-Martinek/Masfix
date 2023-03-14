@@ -1,0 +1,19 @@
+
+outu 1
+beq lab1
+
+outu 2
+:lab1
+ld 1
+beq begin
+bne lab2
+outu 3
+
+:lab2
+outc 10
+outu end
+
+ld 0
+bne begin
+
+beq 25

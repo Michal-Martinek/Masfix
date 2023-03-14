@@ -1,0 +1,11 @@
+:returncode 1
+
+:stdout 4
+1
+12
+
+:stderr 52
+
+ERROR: instr_11: jmp destination out of bounds: 25
+
+
