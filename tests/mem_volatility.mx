@@ -1,0 +1,75 @@
+mov 0
+str 15000
+
+mov 1
+str 18000
+
+movs 1
+outum
+outc 10
+
+ld 65535
+movr
+str 65535
+
+movar ; 65534
+str 45000
+movs 1
+str 8000
+
+mov 0
+outum
+outc 10
+
+movs 1 ; 65535
+outum
+outc 10
+
+movm
+outum
+outc 10
+
+movam ; 65534
+outum
+outc 10
+
+
+mov 15656
+str 1000
+mova 1
+str 2000
+mova 1
+str 3000
+mova 1
+str 4000
+mova 1
+str 5000
+mova 1
+str 6000
+
+ld 10
+outcr
+mov 15661
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
+movs 1
+outum
+outcr
