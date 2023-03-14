@@ -167,7 +167,7 @@ struct Label {
 	string name;
 	int addr;
 	Loc loc;
-	Label() {}
+	Label() { name=""; }
 	Label(string name, int addr, Loc loc) {
 		this->name = name;
 		this->addr = addr;
@@ -181,39 +181,19 @@ struct Label {
 bool isntSpace(char c) {
 	return !isspace(c);
 }
-string deleteWhitespace(string s) {
-	for (int i = 0; i < s.size();) {
-		if (std::isspace(s.at(i)))
-			s.erase(i, 1);
-		else i++;
-	}
-	return s;
-}
-/// @brief splits the string into fields on any non-alphanumeric character except '_', ignores whitespace
-/// @param s string to split
-/// @return vector of fields
-vector<string> splitDeleteWhitespace(string &s) {
+vector<string> splitOnWhitespace(string &s) {
 	vector<string> splits;
 	int start = 0;
 	for (int i = 0; i < s.size(); ++i) {
-		// TODO: make '-' between two letters not split
-		// NOTE: notice the ambiguity
-		// :first
-		// :second
-		// :first-second ; OK - labels are just identifier unless explicit operation is in them ('()')
-		// jmp first-second ; BAD obvious here
-		if (!(isalnum(s.at(i)) || s.at(i) == '_')) {
+		if (isspace(s.at(i))) {
 			string chunk = s.substr(start, i - start);
-			if (chunk.size()) splits.push_back(chunk);
-			chunk = s.substr(i, 1); // this char stands alone, split it
-			chunk = deleteWhitespace(chunk);
 			if (chunk.size()) splits.push_back(chunk);
 			start = i+1;
 		}
 	}
 	if (start < s.size()) {
 		string chunk = s.substr(start);
-		if (chunk.size()) splits.push_back(chunk);
+		splits.push_back(chunk);
 	}
 	return splits;
 }
@@ -344,6 +324,19 @@ bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	}
 	return true;
 }
+pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
+	if (splits[0].at(0) != ':') {
+		return pair(false, "");
+	}
+	if (splits[0] == ":") {
+		if (!check(splits.size() == 2, "Label name expected after ':'", loc, false)) return pair(true, "");
+		return pair(true, splits[1]);
+	}
+	string second = splits.size() == 2 ? splits[1] : "";
+	if (!check(splits.size() == 1, "Invalid label definition '" + splits[0] + " " + second + "'", loc, false)) return pair(true, "");
+	if (!check(splits[0].size() > 1, "Label name expected after ':'", loc, false)) return pair(true, "");
+	return pair(true, splits[0].substr(1));
+}
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
 	static_assert(InstructionCount == 8 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
@@ -369,18 +362,20 @@ vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
 		line = line.substr(0, line.find(';'));
 		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), isntSpace));
 		if (line.size() >= lineStartCol) {
-			vector<string> splits = splitDeleteWhitespace(line);
+			vector<string> splits = splitOnWhitespace(line);
 			Loc loc = Loc(file, lineNum, lineStartCol);
 			checkContinueOnFail(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
-			if (splits[0] == ":") {
-				checkContinueOnFail(splits.size() == 2, "Label name expected after ':'", loc);
-				Label label = Label(splits[1], instrs.size(), loc);
+			pair<bool, string> lab = parseLabelName(splits, loc);
+			if (!lab.first) {
+				Instr instr(loc, splits);
+				instrs.push_back(instr);
+			} else {
+				string labelName = lab.second;
+				continueOnFalse(labelName != "");
+				Label label = Label(labelName, instrs.size(), loc);
 				checkContinueOnFail(isValidIdentifier(label.name), "Invalid label name", label);
 				checkContinueOnFail(strToLabel.count(label.name) == 0, "Label redefinition", label);
 				strToLabel.insert(pair<string, Label>(label.name, label));
-			} else {
-				Instr instr(loc, splits);
-				instrs.push_back(instr);
 			}
 		}
 	}
