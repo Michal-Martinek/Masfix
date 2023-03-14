@@ -96,10 +96,14 @@ def updateFile(file: Path):
 	print(stderr, end='')
 	genDesc(file, code, stdout, stderr)
 # modes --------------------------------------
-def processFileArg(file) -> Path:
-	# TODO: add quessing (looking into tests\<path>, <path>.mx, tests\<path>.mx, ...)
-	check(os.path.exists(file) or file is None, "File was not found", quoted(file), insideTestcase=False)
-	file = Path(file)
+def processFileArg(arg) -> Path:
+	file = None
+	for folder in ['', 'tests']:
+		for ext in ['', '.mx']:
+			path = os.path.join(folder, arg + ext)
+			if os.path.exists(path):
+				file = Path(path)
+	check(isinstance(file, Path), 'File was not found', quoted(arg), insideTestcase=False)
 	check(file.suffix == '.mx', "The file is expected to end with '.mx'", quoted(file), insideTestcase=False)
 	return file
 def modeRun(args):
