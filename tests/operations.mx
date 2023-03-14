@@ -1,0 +1,43 @@
+; add
+ld 18
+str 28
+strar
+outum
+outc 10
+
+ld 65535
+str 12
+strar
+outum
+outc 10
+
+ld 65535
+str 65535
+strar
+outum
+outc 10
+
+; subtract
+ld 8
+str 15
+strsr
+outum
+outc 10
+
+ld 65535
+str 65535
+strsr
+outum
+outc 10
+
+ld 869
+str 65535
+strsr
+outum
+outc 10
+
+ld 65535
+str 14
+strsr
+outum
+outc 10
