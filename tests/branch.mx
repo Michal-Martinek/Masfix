@@ -16,4 +16,6 @@ outu end
 ld 0
 bne begin
 
-beq 25
+bne 25
+beq 26
+outu 5

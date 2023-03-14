@@ -2,10 +2,10 @@
 
 :stdout 4
 1
-12
+14
 
 :stderr 52
 
-ERROR: instr_11: jmp destination out of bounds: 25
+ERROR: instr_12: jmp destination out of bounds: 26
 
 
