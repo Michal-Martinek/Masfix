@@ -76,11 +76,12 @@ enum InstrNames {
 
 	Ib,
 
+	Iswap,
 	Ioutu,
 	Ioutc,
 	InstructionCount
 };
-static_assert(InstructionCount == 7, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 8, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -89,10 +90,11 @@ map<string, InstrNames> StrToInstr {
 
 {"b", Ib},
 
+{"swap", Iswap},
 {"outu", Ioutu},
 {"outc", Ioutc},
 };
-static_assert(InstructionCount == 7 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
+static_assert(InstructionCount == 8 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
 	{Istr, Rm},
@@ -101,7 +103,8 @@ map<InstrNames, RegNames> InstrToModReg = {
 
 	{Ib, Rno}, // branches cannot have a modifier
 
-	{Ioutu, Rno}, // specials have no destination
+	{Iswap, Rno}, // specials have no destination
+	{Ioutu, Rno},
 	{Ioutc, Rno},
 };
 // structs -------------------------------
@@ -308,7 +311,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 7, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 8, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
 	for (int checkedLen = 1; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
 		string substr = parsing.substr(0, checkedLen);
@@ -342,9 +345,13 @@ bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	return true;
 }
 // checks if the instr has correct combination of suffixes and immediates
-bool checkValidity(Instr instr) {
-	static_assert(InstructionCount == 7 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+bool checkValidity(Instr& instr) {
+	static_assert(InstructionCount == 8 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
+	if (instr.instr == Iswap) {
+		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "Swap instruction has no arguments", instr);
+		instr.suffixes.reg = Rm; // pretend that the register is m
+	}
 	checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
 	if (InstrToModReg[instr.instr] == Rno) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
@@ -428,7 +435,7 @@ void genCond(ofstream& outFile, CondNames cond, int instrNum) {
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
-	static_assert(InstructionCount == 7, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 8, "Exhaustive genInstrBody definition");
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
@@ -442,6 +449,9 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 		"	ja jmp_error\n"
 		"	mov rbx, instruction_offsets\n"
 		"	jmp [rbx+8*rcx]\n";
+	} else if (instr == Iswap) { // m in second
+		outFile << "	mov [2*r14+r13], r15w\n"
+			"	mov r15, rcx\n";
 	} else if (instr == Ioutu) {
 		outFile << "	mov rax, rcx\n"
 			"	call print_unsigned\n";

@@ -73,3 +73,29 @@ outcr
 movs 1
 outum
 outcr
+
+; swap
+outc 10
+mov 15245
+str 15000
+mova 1
+str 9845
+mova 1
+str 65000
+movs 1
+
+ld 18655
+swap
+
+movs 1
+outum
+outc 10
+mova 1
+outum
+outc 10
+mova 1
+outum
+outc 10
+
+outur
+outc 10
