@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4856
+:stderr 5573
 tests\parse-test.mx:23:2 ERROR: Label name expected after ':'
 tests\parse-test.mx:25:1 ERROR: Label name expected after ':'
 tests\parse-test.mx:26:2 ERROR: Label name expected after ':'
@@ -70,5 +70,14 @@ tests\parse-test.mx:119:1 ERROR: Swap instruction has no arguments 'swapr'
 tests\parse-test.mx:120:1 ERROR: Swap instruction has no arguments 'swap 5'
 tests\parse-test.mx:121:1 ERROR: Swap instruction has no arguments 'swapa 5'
 tests\parse-test.mx:122:1 ERROR: Swap instruction has no arguments 'swapp 5'
+tests\parse-test.mx:125:1 ERROR: Invalid instruction immediate 'mov |100'
+tests\parse-test.mx:126:1 ERROR: Invalid instruction immediate 'mov 10&000'
+tests\parse-test.mx:128:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|'
+tests\parse-test.mx:130:1 ERROR: Instrs must have only imm, or 1 reg for now 'str^'
+tests\parse-test.mx:132:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|r 5'
+tests\parse-test.mx:133:1 ERROR: The second suffix must be a register 'str^&'
+tests\parse-test.mx:134:1 ERROR: Instrs must have only imm, or 1 reg for now 'strt'
+tests\parse-test.mx:136:1 ERROR: The first suffix must be an operation 'strrt'
+tests\parse-test.mx:137:1 ERROR: Invalid instruction immediate 'str t'
 
 

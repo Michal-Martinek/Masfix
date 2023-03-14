@@ -41,3 +41,50 @@ str 14
 strsr
 outum
 outc 10
+
+; multiply
+ld 18
+str 69
+strtr
+outum
+outc 10
+
+ld 0
+str 150
+strtr
+outum
+outc 10
+
+ld 180
+str 520
+strtr
+outum
+outc 10
+
+ld 65535
+str 65535
+strtr
+outum
+outc 10
+
+; and, or, xor
+ld 1080
+ld| 8950
+outur
+outc 10
+
+ld& 3327
+outur
+outc 10
+
+ld^ 8500
+outur
+outc 10
+
+ld 5600
+ld| 1
+outur
+outc 10
+ld^ 65535
+outur
+outc 10

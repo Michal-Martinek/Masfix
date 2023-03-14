@@ -47,14 +47,24 @@ map<char, RegNames> CharToReg = {
 enum OpNames {
 	OPa,
 	OPs,
+	OPt,
+
+	OPand, // bitwise
+	OPor,
+	OPxor,
 
 	OPno,
 	OperationCount
 };
-static_assert(OperationCount == 3, "Exhaustive CharToOp definition");
+static_assert(OperationCount == 7, "Exhaustive CharToOp definition");
 map<char, OpNames> CharToOp = {
 {'a', OPa}, // TODO: add +, - as suffixes
 {'s', OPs},
+{'t', OPt},
+
+{'&', OPand},
+{'|', OPor},
+{'^', OPxor},
 };
 enum CondNames {
 	Ceq,
@@ -264,7 +274,7 @@ bool check(bool cond, string message, bool strict=true) {
 }
 // tokenization ----------------------------------
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
-	static_assert(RegisterCount == 5 && OperationCount == 3 && ConditionCount == 3, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 7 && ConditionCount == 3, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
 		string cond = s.substr(0, 2);
@@ -408,12 +418,22 @@ void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSeco
 	}
 }
 void genOperation(ofstream& outFile, OpNames op) {
-	static_assert(OperationCount == 3, "Exhaustive genOperation definition");
+	static_assert(OperationCount == 7, "Exhaustive genOperation definition");
 	if (op == OPa) {
 		outFile << "	add cx, bx\n";
 	} else if (op == OPs) {
 		outFile << "	sub bx, cx\n"
 			"	mov rcx, rbx\n";
+	} else if (op == OPt) {
+		outFile << "	mov rax, rbx\n"
+			"	mul rcx\n"
+			"	mov cx, ax\n";
+	} else if (op == OPand) {
+		outFile << "	and rcx, rbx\n";
+	} else if (op == OPor) {
+		outFile << "	or rcx, rbx\n";
+	} else if (op == OPxor) {
+		outFile << "	xor rcx, rbx\n";
 	} else {
 		unreachable();
 	}

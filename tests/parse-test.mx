@@ -120,3 +120,18 @@ swapr
 swap 5
 swapa 5
 swapp 5
+
+; bitwises
+mov |100
+mov 10&000
+
+str|
+str& 5
+str^
+str^p
+str|r 5
+str^&
+strt
+strth
+strrt
+str t
