@@ -1,0 +1,31 @@
+ld 10 ; num ; TODO add input
+
+; mem [a, b, num]
+; init
+mov 1
+str 1
+mov 2
+strr
+mov 0
+
+:loop ; at a
+
+; print a
+outum
+outc 10
+
+; (a, b) = (b, a + b)
+ldm
+mov 1
+swap
+strar
+
+mov 0
+strr
+
+; branch
+mov 2
+strs 1
+ldm
+mov 0
+bne loop

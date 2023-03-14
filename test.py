@@ -98,7 +98,7 @@ def updateFile(file: Path):
 # modes --------------------------------------
 def processFileArg(arg) -> Path:
 	file = None
-	for folder in ['', 'tests']:
+	for folder in ['examples', 'tests', '']: # highest priority on the right
 		for ext in ['', '.mx']:
 			path = os.path.join(folder, arg + ext)
 			if os.path.exists(path):
@@ -113,6 +113,8 @@ def modeRun(args):
 		assert False, 'Running a single file not implemented yet'
 	else:
 		runTests('tests')
+		print()
+		runTests('examples')
 def modeUpdate(args):
 	checkUsage(len(args) >= 1, 'Update specifier expected')
 	checkUsage(args[0] == 'output', 'Only', quoted('update output'), 'supported for now', quoted(args[0]))
