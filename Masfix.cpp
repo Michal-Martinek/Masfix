@@ -69,14 +69,22 @@ map<char, OpNames> CharToOp = {
 enum CondNames {
 	Ceq,
 	Cne,
+	Clt,
+	Cle,
+	Cgt,
+	Cge,
 
 	Cno,
 	ConditionCount
 };
-static_assert(ConditionCount == 3, "Exhaustive StrToCond definition");
+static_assert(ConditionCount == 7, "Exhaustive StrToCond definition");
 map<string, CondNames> StrToCond = {
 {"eq", Ceq},
 {"ne", Cne},
+{"lt", Clt},
+{"le", Cle},
+{"gt", Cgt},
+{"ge", Cge},
 };
 enum InstrNames {
 	Imov,
@@ -274,7 +282,7 @@ bool check(bool cond, string message, bool strict=true) {
 }
 // tokenization ----------------------------------
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
-	static_assert(RegisterCount == 5 && OperationCount == 7 && ConditionCount == 3, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 7 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
 		string cond = s.substr(0, 2);
@@ -439,12 +447,20 @@ void genOperation(ofstream& outFile, OpNames op) {
 	}
 }
 void genCond(ofstream& outFile, CondNames cond, int instrNum) {
-	static_assert(ConditionCount == 3, "Exhaustive genCond definition");
-	outFile << "	cmp r15, 0\n";
-	if (cond == Ceq) {
+	static_assert(ConditionCount == 7, "Exhaustive genCond definition");
+	outFile << "	cmp r15w, 0\n";
+	if (cond == Ceq) { // TODO test all values with l<cond>
 		outFile << "	jne instr_" << instrNum + 1 << "\n";
 	} else if (cond == Cne) {
 		outFile << "	je instr_" << instrNum + 1 << "\n";
+	} else if (cond == Clt) {
+		outFile << "	jns instr_" << instrNum + 1 << "\n";
+	} else if (cond == Cle) {
+		outFile << "	jg instr_" << instrNum + 1 << "\n";
+	} else if (cond == Cgt) {
+		outFile << "	jle instr_" << instrNum + 1 << "\n";
+	} else if (cond == Cge) {
+		outFile << "	js instr_" << instrNum + 1 << "\n";
 	} else {
 		unreachable();
 	}
