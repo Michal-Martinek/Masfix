@@ -146,11 +146,13 @@ struct Loc {
 };
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
+	RegNames condReg;
 	CondNames cond;
 	OpNames modifier;
 	RegNames reg;
 
 	Suffix() {
+		condReg = Rno;
 		cond = Cno;
 		modifier = OPno;
 		reg = Rno;
@@ -241,6 +243,7 @@ fs::path pathFromMasfix(fs::path p) {
 #define returnOnFalse(cond) if (!(cond)) return false;
 #define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
 #define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
+#define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value;
 
 vector<string> errors;
 void raiseErrors() {
@@ -284,14 +287,27 @@ bool check(bool cond, string message, bool strict=true) {
 	return cond;
 }
 // tokenization ----------------------------------
+pair<bool, string> parseCond(Instr& instr, string s) {
+	checkReturnValOnFail(s.size() >= 1, "Missing condition", instr, pair(false, ""));
+	char reg = s.at(0);
+	if (CharToReg.count(reg) == 1) {
+		checkReturnValOnFail(reg == 'r' || reg == 'm', "Conditions can test only r/m", instr, pair(false, ""));
+		instr.suffixes.condReg = CharToReg[reg];
+		s = s.substr(1);
+	}
+	checkReturnValOnFail(s.size() >= 2, "Missing condition", instr, pair(false, ""));
+	string cond = s.substr(0, 2);
+	checkReturnValOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr, pair(false, ""));
+	instr.suffixes.cond = StrToCond[cond];
+	return pair(true, s.substr(2));
+}
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	static_assert(RegisterCount == 5 && OperationCount == 7 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
-		checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
-		string cond = s.substr(0, 2);
-		checkReturnOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr);
-		instr.suffixes.cond = StrToCond[cond];
-		s = s.substr(2);
+		instr.suffixes.condReg = Rr; // default
+		auto ret = parseCond(instr, s);
+		returnOnFalse(ret.first);
+		s = ret.second;
 	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
@@ -355,13 +371,13 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 		return pair(true, splits[1]);
 	}
 	string second = splits.size() == 2 ? splits[1] : "";
-	if (!check(splits.size() == 1, "Invalid label definition '" + splits[0] + " " + second + "'", loc, false)) return pair(true, "");
-	if (!check(splits[0].size() > 1, "Label name expected after ':'", loc, false)) return pair(true, "");
+	checkReturnValOnFail(splits.size() == 1, "Invalid label definition '" + splits[0] + " " + second + "'", loc, pair(true, ""));
+	checkReturnValOnFail(splits[0].size() > 1, "Label name expected after ':'", loc, pair(true, ""));
 	return pair(true, splits[0].substr(1));
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 9 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 9 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap) {
 		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "Swap instruction has no arguments", instr);
@@ -371,7 +387,12 @@ bool checkValidity(Instr& instr) {
 	if (InstrToModReg[instr.instr] == Rno) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	}
-	// NOTE: conditions are checked in parseSuffixes
+	RegNames condReg = instr.suffixes.condReg; CondNames cond = instr.suffixes.cond;
+	if (instr.instr == Ib || instr.instr == Il) {
+		checkReturnOnFail((condReg == Rr || condReg == Rm) && cond != Cno, "Invalid condition register or condition", instr);
+	} else {
+		checkReturnOnFail(condReg == Rno && cond == Cno, "Unexpected condition", instr);
+	}
 	return true;
 }
 vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
@@ -462,23 +483,24 @@ map<CondNames, string> _jmpInstr {
 };
 static_assert(ConditionCount == 7, "Exhaustive _condLoadInstr definition");
 map<CondNames, string> _condLoadInstr {
-	{Ceq, "cmove"},
-	{Cne, "cmovne"},
-	{Clt, "cmovs"},
-	{Cle, "cmovle"},
-	{Cgt, "cmovlg"},
-	{Cge, "cmovns"},
+	{Ceq, "sete"},
+	{Cne, "setne"},
+	{Clt, "sets"},
+	{Cle, "setle"},
+	{Cgt, "setg"},
+	{Cge, "setns"},
 };
-void genCond(ofstream& outFile, InstrNames instr, CondNames cond, int instrNum) {
+void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames cond, int instrNum) {
 	static_assert(ConditionCount == 7, "Exhaustive genCond definition"); // TODO test all values with l<cond>
+	genRegisterFetch(outFile, condReg, -1, false);
 	if (instr == Ib) {
-		outFile << "	cmp r15w, 0\n"
+		outFile << "	cmp bx, 0\n"
 		"	" << _jmpInstr[cond] << " instr_" << instrNum + 1 << "\n";
 	} else if (instr == Il) {
-		outFile << "	mov rbx, r15\n"
-			"	mov r15, 0\n"
+		outFile <<
+			"	xor r15, r15\n"
 			"	cmp bx, cx\n"
-			"	" << _condLoadInstr[cond] << " r15, 1\n";
+			"	" << _condLoadInstr[cond] << " r15b\n";
 	} else {
 		unreachable();
 	}
@@ -530,7 +552,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 		genOperation(outFile, instr.suffixes.modifier);
 	}
 	if (instr.hasCond()) {
-		genCond(outFile, instr.instr, instr.suffixes.cond, instrNum);
+		genCond(outFile, instr.instr, instr.suffixes.condReg, instr.suffixes.cond, instrNum);
 	}
 	genInstrBody(outFile, instr.instr, instrNum);
 }

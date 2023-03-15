@@ -1,0 +1,144 @@
+; tests all conditions and branches
+
+; print condition headers
+outc 101
+outc 113
+outc 124
+outc 110
+outc 101
+outc 124
+outc 108
+outc 116
+outc 124
+outc 108
+outc 101
+outc 124
+outc 103
+outc 116
+outc 124
+outc 103
+outc 101
+outc 10
+
+; memory
+mov 0 ; curr tested
+str 0
+mov 1 ; bool - stage 1 done
+str 0
+mov 0
+	; 2 - branch test ret addr
+
+outum
+outc 10
+
+:loop
+
+; tests
+mov 2
+strp
+mov 0
+ld 65535
+lmeq 0
+outur
+bmeq branch_true
+jmp branch_false
+outc 124
+
+mov 2
+strp
+mov 0
+ld 65535
+lmne 0
+outur
+bmne branch_true
+jmp branch_false
+outc 124
+
+mov 2
+strp
+mov 0
+ld 65535
+lmlt 0
+outur
+bmlt branch_true
+jmp branch_false
+outc 124
+
+mov 2
+strp
+mov 0
+ld 65535
+lmle 0
+outur
+bmle branch_true
+jmp branch_false
+outc 124
+
+mov 2
+strp
+mov 0
+ld 65535
+lmgt 0
+outur
+bmgt branch_true
+jmp branch_false
+outc 124
+
+mov 2
+strp
+mov 0
+ld 65535
+lmge 0
+outur
+bmge branch_true
+jmp branch_false
+outc 10
+
+; increments
+stra 1
+
+ldm
+lds 6
+bne stage1_end
+outc 10
+str 32765
+outum
+outc 10
+
+mov 1 ; stage 1 done
+str 1
+mov 0
+jmp loop
+
+:stage1_end
+ldm
+lds 32771
+bne stage2_end
+outc 10
+str 65533
+outum
+outc 10
+jmp loop
+
+:stage2_end
+lmeq 3 ; end if (curr == 2) && stage1_done
+mov 1
+ld&m
+mov 0
+beq loop
+jmp end
+
+; branch outcomes
+:branch_true
+outu 1
+jmp branch_ret
+
+:branch_false
+outu 0
+
+:branch_ret
+mov 2
+ldm
+mov 0
+lda 7 ; jump to outc '|' out there
+jmpr

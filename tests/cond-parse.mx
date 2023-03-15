@@ -27,3 +27,31 @@ bleq
 llta 5
 bgetr
 blet 5
+
+
+lmlt 5
+lmle 5
+lmgt 5
+lmge 5
+
+bmeq lab
+bmgt lab
+bmge lab
+
+lpeq
+bhge
+ldm
+ldle
+lrle 8
+lmdeq
+brge 19
+lz
+lez
+leqz
+ldz
+llteq
+lgtz
+
+b|eq
+be
+bme
