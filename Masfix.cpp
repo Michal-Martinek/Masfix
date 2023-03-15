@@ -17,6 +17,8 @@ using namespace std;
 
 // constants -------------------------------
 #define STDOUT_BUFF_SIZE 256
+#define STDIN_BUFF_SIZE 256
+
 #define WORD_MAX_VAL 65535
 #define CELLS WORD_MAX_VAL+1
 // globals ---------------------------------
@@ -98,9 +100,10 @@ enum InstrNames {
 	Iswap,
 	Ioutu,
 	Ioutc,
+	Iinc,
 	InstructionCount
 };
-static_assert(InstructionCount == 9, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 10, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -113,8 +116,9 @@ map<string, InstrNames> StrToInstr {
 {"swap", Iswap},
 {"outu", Ioutu},
 {"outc", Ioutc},
+{"inc", Iinc},
 };
-static_assert(InstructionCount == 9 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
+static_assert(InstructionCount == 10 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
 	{Istr, Rm},
@@ -124,9 +128,10 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ib, Rno}, // conditionals cannot have a modifier
 	{Il, Rno},
 
-	{Iswap, Rno}, // specials have no destination
+	{Iswap, Rno}, // specials have no modifiable destination
 	{Ioutu, Rno},
 	{Ioutc, Rno},
+	{Iinc, Rno},
 };
 // structs -------------------------------
 struct Loc {
@@ -328,7 +333,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 9, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 10, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
 	for (int checkedLen : {2, 1, 3, 4}) { // avoid parsing 'ld' as Il
 		if (parsing.size() < checkedLen) continue;
@@ -377,13 +382,20 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 9 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 10 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap) {
 		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "Swap instruction has no arguments", instr);
 		instr.suffixes.reg = Rm; // pretend that the register is m
 	}
-	checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+	if (instr.instr == Iinc) {
+		checkReturnOnFail(!instr.hasImm, "This instruction cannot have an immediate", instr);
+		if (instr.suffixes.reg == Rno) {
+			instr.suffixes.reg = Rr; // default
+		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
+	} else {
+		checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+	}
 	if (InstrToModReg[instr.instr] == Rno) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	}
@@ -505,8 +517,8 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 		unreachable();
 	}
 }
-void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
-	static_assert(InstructionCount == 9, "Exhaustive genInstrBody definition");
+void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
+	static_assert(InstructionCount == 10, "Exhaustive genInstrBody definition");
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
@@ -533,6 +545,10 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 			"	mov [rdx], cl\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
+	} else if (instr == Iinc) {
+		string dest = inputToR ? "r15w" : "[2*r14+r13]";
+		outFile << "	call get_next_char\n"
+			"	mov " << dest << ", dx\n";
 	} else {
 		unreachable();
 	}
@@ -544,7 +560,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// TODO specify responsibilities for clamping and register preserving
 	if (instr.hasImm) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
-	} else {
+	} else if (instr.instr != Iinc) {
 		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
 	}
 	if (instr.hasMod()) {
@@ -554,7 +570,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	if (instr.hasCond()) {
 		genCond(outFile, instr.instr, instr.suffixes.condReg, instr.suffixes.cond, instrNum);
 	}
-	genInstrBody(outFile, instr.instr, instrNum);
+	genInstrBody(outFile, instr.instr, instrNum, instr.suffixes.reg == Rr);
 }
 
 void generate(ofstream& outFile, vector<Instr>& instrs) {
@@ -562,6 +578,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"extern ExitProcess@4\n"
 		"extern GetStdHandle@4\n"
 		"extern WriteFile@20\n"
+		"extern ReadFile@20\n"
 		"\n"
 		"section .text\n"
 		"exit: ; exits the program with code in rax\n"
@@ -620,6 +637,15 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
 		"	pop rax\n"
 		"	ret\n"
+		"read_file: ; rcx - fd, rdx - buff, r8 - buff size -> rax - number read\n"
+		"	push 0 ; number of bytes read var\n"
+		"	mov r9, rsp ; ptr to that var\n"
+		"	push 0 ; OVERLAPPED struct null ptr\n"
+		"	sub rsp, 32 ; call with shadow space\n"
+		"	call ReadFile@20\n"
+		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
+		"	pop rax\n"
+		"	ret\n"
 		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
 		"	mov rcx, stdout_fd\n"
 		"	mov rcx, [rcx] ; stdout fd\n"
@@ -630,9 +656,42 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	mov rcx, [rcx] ; stderr fd\n"
 		"	call write_file\n"
 		"	ret\n"
+		"stdin_read:\n"
+		"	mov rcx, stdin_fd ; get chars into stdin_buff\n"
+		"	mov rcx, [rcx]\n"
+		"	mov rdx, stdin_buff\n"
+		"	mov r8, STDIN_BUFF_SIZE\n"
+		"	call read_file\n"
+		"\n"
+		"	mov rcx, stdin_buff_char_count ; store how many were read\n"
+		"	mov [rcx], rax\n"
+		"	mov rcx, stdin_buff_chars_read ; 0 chars were processed\n"
+		"	mov QWORD [rcx], 0\n"
+		"	ret\n"
+		"\n"
+		"get_next_char: ; gets next char from stdin (buffered), ignores '\\r' -> rdx char\n"
+		"	mov rax, stdin_buff_char_count ; if (char_count == chars_read) fill the stdin_buff\n"
+		"	mov rcx, [rax]\n"
+		"	mov rax, stdin_buff_chars_read\n"
+		"	cmp rcx, [rax]\n"
+		"	jne get_next_char_valid\n"
+		"	call stdin_read\n"
+		"\n"
+		"get_next_char_valid:\n"
+		"	mov rax, stdin_buff_chars_read ; get first unread char\n"
+		"	xor rdx, rdx\n"
+		"	mov rcx, stdin_buff\n"
+		"	add rcx, [rax]\n"
+		"	mov dl, [rcx]\n"
+		"	inc QWORD [rax]\n"
+		"\n"
+		"	cmp rdx, 13 ; repeat if char == '\\r'\n"
+		"	je get_next_char\n"
+		"	ret\n"
+		"\n"
 		"utos: ; n - rax -> r8 char count, r9 - char* str\n"
 		"	xor r8, r8 ; char count\n"
-		"	mov r9, stdout_buff+" << STDOUT_BUFF_SIZE-1 << " ; curr buff pos\n"
+		"	mov r9, stdout_buff+STDOUT_BUFF_SIZE-1 ; curr buff pos\n"
 		"	mov r10, 10 ; base\n"
 		"utos_loop:\n"
 		"	xor rdx, rdx\n"
@@ -663,6 +722,11 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"_start:\n"
 		"	; initialization\n"
 		"	call get_std_fds\n"
+		"	mov rcx, stdin_buff_char_count\n"
+		"	mov QWORD [rcx], 0\n"
+		"	mov rcx, stdin_buff_chars_read\n"
+		"	mov QWORD [rcx], 0\n"
+		"\n"
 		"	mov r13, cells\n"
 		"	xor r14, r14\n"
 		"	xor r15, r15\n"
@@ -695,9 +759,15 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	stdin_fd: resq 1\n"
 		"	stdout_fd: resq 1\n"
 		"	stderr_fd: resq 1\n"
-		"	stdout_buff: resb " << STDOUT_BUFF_SIZE << "\n"
+		"	stdout_buff: resb STDOUT_BUFF_SIZE\n"
+		"	stdin_buff_chars_read: resq 1\n"
+		"	stdin_buff_char_count: resq 1\n"
+		"	stdin_buff: resb STDIN_BUFF_SIZE\n"
 		"\n"
 		"section .data\n"
+		"	STDOUT_BUFF_SIZE: EQU " << STDOUT_BUFF_SIZE << "\n"
+		"	STDIN_BUFF_SIZE: EQU " << STDIN_BUFF_SIZE << "\n"
+		"\n"
 		"	; error messages\n"
 		"	ERROR_template: db 10,\"ERROR: instr_\"\n"
 		"	ERROR_template_len: EQU $-ERROR_template\n"

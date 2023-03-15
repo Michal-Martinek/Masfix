@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 5563
+:stderr 5967
 tests\parse-test.mx:23:2 ERROR: Label name expected after ':'
 tests\parse-test.mx:25:1 ERROR: Label name expected after ':'
 tests\parse-test.mx:26:2 ERROR: Label name expected after ':'
@@ -79,5 +79,10 @@ tests\parse-test.mx:133:1 ERROR: The second suffix must be a register 'str^&'
 tests\parse-test.mx:134:1 ERROR: Instrs must have only imm, or 1 reg for now 'strt'
 tests\parse-test.mx:136:1 ERROR: The first suffix must be an operation 'strrt'
 tests\parse-test.mx:137:1 ERROR: Invalid instruction immediate 'str t'
+tests\parse-test.mx:142:1 ERROR: Input destination can be only r/m 'inch'
+tests\parse-test.mx:144:1 ERROR: This instruction cannot have a modifier 'incar'
+tests\parse-test.mx:145:1 ERROR: This instruction cannot have an immediate 'inc 15'
+tests\parse-test.mx:146:1 ERROR: This instruction cannot have an immediate 'incr 10'
+tests\parse-test.mx:147:1 ERROR: This instruction cannot have a modifier 'inc|'
 
 
