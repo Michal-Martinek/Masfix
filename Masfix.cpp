@@ -93,13 +93,14 @@ enum InstrNames {
 	Ijmp,
 
 	Ib,
+	Il,
 
 	Iswap,
 	Ioutu,
 	Ioutc,
 	InstructionCount
 };
-static_assert(InstructionCount == 8, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 9, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -107,19 +108,21 @@ map<string, InstrNames> StrToInstr {
 {"jmp", Ijmp},
 
 {"b", Ib},
+{"l", Il},
 
 {"swap", Iswap},
 {"outu", Ioutu},
 {"outc", Ioutc},
 };
-static_assert(InstructionCount == 8 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
+static_assert(InstructionCount == 9 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
 	{Istr, Rm},
 	{Ild , Rr},
 	{Ijmp, Rp},
 
-	{Ib, Rno}, // branches cannot have a modifier
+	{Ib, Rno}, // conditionals cannot have a modifier
+	{Il, Rno},
 
 	{Iswap, Rno}, // specials have no destination
 	{Ioutu, Rno},
@@ -309,14 +312,15 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 8, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 9, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
-	for (int checkedLen = 1; parsing.size() >= checkedLen && checkedLen <= 4; ++checkedLen) {
+	for (int checkedLen : {2, 1, 3, 4}) { // avoid parsing 'ld' as Il
+		if (parsing.size() < checkedLen) continue;
 		string substr = parsing.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
 			string suffix = parsing.substr(checkedLen);
-			return parseSuffixes(instr, suffix, instr.instr == Ib);
+			return parseSuffixes(instr, suffix, instr.instr == Ib || instr.instr == Il);
 		}
 	}
 	checkReturnOnFail(false, "Unknown instruction", instr);
@@ -357,7 +361,7 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 8 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 9 && sizeof(Suffix) == 3 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap) {
 		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "Swap instruction has no arguments", instr);
@@ -367,6 +371,7 @@ bool checkValidity(Instr& instr) {
 	if (InstrToModReg[instr.instr] == Rno) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	}
+	// NOTE: conditions are checked in parseSuffixes
 	return true;
 }
 vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
@@ -446,27 +451,40 @@ void genOperation(ofstream& outFile, OpNames op) {
 		unreachable();
 	}
 }
-void genCond(ofstream& outFile, CondNames cond, int instrNum) {
-	static_assert(ConditionCount == 7, "Exhaustive genCond definition");
-	outFile << "	cmp r15w, 0\n";
-	if (cond == Ceq) { // TODO test all values with l<cond>
-		outFile << "	jne instr_" << instrNum + 1 << "\n";
-	} else if (cond == Cne) {
-		outFile << "	je instr_" << instrNum + 1 << "\n";
-	} else if (cond == Clt) {
-		outFile << "	jns instr_" << instrNum + 1 << "\n";
-	} else if (cond == Cle) {
-		outFile << "	jg instr_" << instrNum + 1 << "\n";
-	} else if (cond == Cgt) {
-		outFile << "	jle instr_" << instrNum + 1 << "\n";
-	} else if (cond == Cge) {
-		outFile << "	js instr_" << instrNum + 1 << "\n";
+static_assert(ConditionCount == 7, "Exhaustive _jmpInstr definition");
+map<CondNames, string> _jmpInstr {
+	{Ceq, "jne"},
+	{Cne, "je"},
+	{Clt, "jns"},
+	{Cle, "jg"},
+	{Cgt, "jle"},
+	{Cge, "js"},
+};
+static_assert(ConditionCount == 7, "Exhaustive _condLoadInstr definition");
+map<CondNames, string> _condLoadInstr {
+	{Ceq, "cmove"},
+	{Cne, "cmovne"},
+	{Clt, "cmovs"},
+	{Cle, "cmovle"},
+	{Cgt, "cmovlg"},
+	{Cge, "cmovns"},
+};
+void genCond(ofstream& outFile, InstrNames instr, CondNames cond, int instrNum) {
+	static_assert(ConditionCount == 7, "Exhaustive genCond definition"); // TODO test all values with l<cond>
+	if (instr == Ib) {
+		outFile << "	cmp r15w, 0\n"
+		"	" << _jmpInstr[cond] << " instr_" << instrNum + 1 << "\n";
+	} else if (instr == Il) {
+		outFile << "	mov rbx, r15\n"
+			"	mov r15, 0\n"
+			"	cmp bx, cx\n"
+			"	" << _condLoadInstr[cond] << " r15, 1\n";
 	} else {
 		unreachable();
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
-	static_assert(InstructionCount == 8, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 9, "Exhaustive genInstrBody definition");
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
@@ -480,6 +498,7 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum) {
 		"	ja jmp_error\n"
 		"	mov rbx, instruction_offsets\n"
 		"	jmp [rbx+8*rcx]\n";
+	} else if (instr == Il) { // handled in genCond
 	} else if (instr == Iswap) { // m in second
 		outFile << "	mov [2*r14+r13], r15w\n"
 			"	mov r15, rcx\n";
@@ -511,7 +530,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 		genOperation(outFile, instr.suffixes.modifier);
 	}
 	if (instr.hasCond()) {
-		genCond(outFile, instr.suffixes.cond, instrNum);
+		genCond(outFile, instr.instr, instr.suffixes.cond, instrNum);
 	}
 	genInstrBody(outFile, instr.instr, instrNum);
 }

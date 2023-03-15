@@ -1,0 +1,17 @@
+:returncode 1
+
+:stderr 819
+tests\cond-parse.mx:17:1 ERROR: Missing condition 'l'
+tests\cond-parse.mx:18:1 ERROR: Missing condition 'la 5'
+tests\cond-parse.mx:19:1 ERROR: Missing condition 'lr'
+tests\cond-parse.mx:20:1 ERROR: Missing condition 'l eq'
+tests\cond-parse.mx:21:1 ERROR: The first suffix must be an operation 'ldgt'
+tests\cond-parse.mx:22:1 ERROR: Max two letter suffixes are supported for now 'ldale'
+tests\cond-parse.mx:23:1 ERROR: Missing condition 'lt'
+tests\cond-parse.mx:25:1 ERROR: Instrs must have only imm, or 1 reg for now 'ble'
+tests\cond-parse.mx:26:1 ERROR: Unknown suffix 'bleq'
+tests\cond-parse.mx:27:1 ERROR: This instruction cannot have a modifier 'llta 5'
+tests\cond-parse.mx:28:1 ERROR: This instruction cannot have a modifier 'bgetr'
+tests\cond-parse.mx:29:1 ERROR: This instruction cannot have a modifier 'blet 5'
+
+

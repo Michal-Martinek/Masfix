@@ -1,0 +1,29 @@
+
+leq 5
+lne 5
+llt 5
+lle 5
+lgt 5
+lge 5
+
+:lab
+beq lab
+bne lab
+blt lab
+ble lab
+bgt lab
+bge lab
+
+l
+la 5
+lr
+l eq
+ldgt
+ldale
+lt
+
+ble
+bleq
+llta 5
+bgetr
+blet 5
