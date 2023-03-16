@@ -1,0 +1,26 @@
+:returncode 0
+
+:stdout 208
+I'm thinking a number 1-100
+Your guess: B 80
+Your guess: A 10
+Your guess: B 50
+Your guess: B 30
+Your guess: A 20
+Your guess: A 25
+Your guess: B 28
+Your guess: Correct!
+You have guessed correctly in 8 guesses
+
+
+:stdin 24
+80
+10
+50
+30
+20
+25
+28
+27
+
+

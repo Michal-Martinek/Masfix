@@ -1,0 +1,135 @@
+
+; Starting prompt
+outc 73
+outc 39
+outc 109
+outc 32
+outc 116
+outc 104
+outc 105
+outc 110
+outc 107
+outc 105
+outc 110
+outc 103
+outc 32
+outc 97
+outc 32
+outc 110
+outc 117
+outc 109
+outc 98
+outc 101
+outc 114
+outc 32
+outc 49
+outc 45
+outc 49
+outc 48
+outc 48
+outc 10
+
+mov 0 ; THE number, TODO use random number
+str 27
+mov 1 ; number of guesses
+str 0
+	; 2 - last guess
+
+:loop
+	outc 89 ; guess prompt
+	outc 111
+	outc 117
+	outc 114
+	outc 32
+	outc 103
+	outc 117
+	outc 101
+	outc 115
+	outc 115
+	outc 58
+	outc 32
+
+	mov 2
+	inum ; get guess
+	inl  ; get to next line
+	
+	mov 1 ; guess count ++
+	stra 1
+
+	; compare
+	mov 0
+	ldm
+	mov 2
+
+	ldsm
+	beq equal
+	blt below
+	bgt above
+
+:above
+	outc 65
+	jmp comp_end
+:below
+	outc 66
+	jmp comp_end
+
+:equal
+	outc 67 ; correct prompt, exit
+	outc 111
+	outc 114
+	outc 114
+	outc 101
+	outc 99
+	outc 116
+	outc 33
+	outc 10
+	outc 89
+	outc 111
+	outc 117
+	outc 32
+	outc 104
+	outc 97
+	outc 118
+	outc 101
+	outc 32
+	outc 103
+	outc 117
+	outc 101
+	outc 115
+	outc 115
+	outc 101
+	outc 100
+	outc 32
+	outc 99
+	outc 111
+	outc 114
+	outc 114
+	outc 101
+	outc 99
+	outc 116
+	outc 108
+	outc 121
+	outc 32
+	outc 105
+	outc 110
+	outc 32
+
+	mov 1
+	outum
+
+	outc 32
+	outc 103
+	outc 117
+	outc 101
+	outc 115
+	outc 115
+	outc 101
+	outc 115
+	outc 10
+	jmp end
+
+:comp_end
+	outc 32
+	outum
+	outc 10
+	jmp loop

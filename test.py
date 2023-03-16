@@ -116,7 +116,12 @@ def updateInput(file: Path):
 	desc = getTestcaseDesc(file, update=True)
 	desc['stdin'] = inputed
 	saveDesc(file, desc)
-	# TODO ask for output update
+	
+	print()
+	answer = input("Would you like to update output now? (y / n): ")
+	if answer and answer[0].lower() == 'y':
+		print()
+		updateFileOutput(file)
 
 # modes --------------------------------------
 def processFileArg(arg) -> Path:
@@ -165,9 +170,10 @@ def compileCompiler():
 def usage():
 	print(
 """Usage: test.py <mode>
-	modes:
-	run                    - test all in the tests folder
-	update output <test>   - update the expected output of <test> to the actual output"""
+modes:
+	run                    - test all in the 'tests', 'examples' folders
+	update output <test>   - update the expected output of <test> to the actual output
+	update input <test>    - update the stdin passed to <test>"""
 	)
 def checkUsage(cond, *messages):
 	if not cond:
