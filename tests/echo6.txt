@@ -1,0 +1,16 @@
+:returncode 0
+
+:stdout 18
+49
+10
+65
+66
+10
+64
+
+
+:stdin 6
+1
+AB
+@
+

@@ -1,0 +1,25 @@
+; echoes first 6 chars from stdin
+
+inc
+outur
+outc 10
+
+inc
+outur
+outc 10
+
+inc
+outur
+outc 10
+
+inc
+outur
+outc 10
+
+inc
+outur
+outc 10
+
+inc
+outur
+outc 10

@@ -15,55 +15,54 @@ def check(cond, *messages, insideTestcase=True): # TODO use *messages, use prope
 		else:
 			exit(1)
 # testcases ------------------------------------
-def runCommand(command):
-	process = Popen(command, stdout=PIPE, stderr=PIPE) # TODO handle process errors
-	stdout, stderr = process.communicate()
+def runCommand(command, stdin: str) -> dict:
+	stdin = stdin.encode()
+	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE) # TODO handle process errors
+	stdout, stderr = process.communicate(input=stdin)
 	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
 	stderr = stderr.decode().replace('\r', '')
-	return process.returncode, stdout, stderr
-def _parseDescBlob(desc, chars):
-	check('\n' in desc, 'Testcase blob must start at a new line')
-	s = desc[desc.find('\n')+1:]
-	check(len(s) >= chars, 'Insufficent character count in description')
-	return s[:chars]
+	return {'returncode': process.returncode, 'stdout': stdout, 'stderr': stderr}
 def parseTestcaseDesc(desc: str):
-	expected = {'stdout': '', 'stderr': ''}
+	expected = {'stdout': '', 'stderr': '', 'stdin': ''}
 	while ':' in desc:
 		desc = desc[desc.find(':')+1:]
 		line = desc.split('\n', maxsplit=1)[0]
 		desc = desc[len(line):]
-		if re.match('returncode \d+', line):
-			code = int(line.split(' ')[1])
-			expected['returncode'] = code
-		elif re.match('stdout \d+', line):
-			chars = int(line.split(' ')[1])
-			s = _parseDescBlob(desc, chars)
-			expected['stdout'] = s
-			desc = desc[chars:]
-		elif re.match('stderr \d+', line):
-			chars = int(line.split(' ')[1])
-			s = _parseDescBlob(desc, chars)
-			expected['stderr'] = s
-			desc = desc[chars:]
+		for fieldType, fieldName in [(int, 'returncode'), (str, 'stdout'), (str, 'stderr'), (str, 'stdin')]:
+			if not re.match(f'{fieldName} \d+', line): continue
+			num = int(line.split(' ')[1])
+			if fieldType == int:
+				expected[fieldName] = num
+			elif fieldType == str:
+				check('\n' in desc, 'Testcase blob must start at a new line')
+				s = desc[desc.find('\n')+1:]
+				check(len(s) >= num, 'Insufficent character count in description')
+				expected[fieldName] = s[:num]
+				desc = desc[num:]
+			break
 		else:
 			check(False, 'Unknown field in description', quoted(line))
 	check('returncode' in expected, 'Testcase description missing :returncode')
 	return expected
-def getTestcaseDesc(test: Path) -> dict:
+def getTestcaseDesc(test: Path, update=False) -> dict:
 	path = test.with_suffix('.txt')
-	check(os.path.exists(path), 'Missing test case desciption', quoted(path))
+	if update:
+		if not os.path.exists(path):
+			return {'returncode': 0, 'stdout': '', 'stderr': '', 'stdin': ''}
+	else:
+		check(os.path.exists(path), 'Missing test case desciption', quoted(path))
 	with open(path, 'r') as testcase:
 		desc = testcase.read()
 	return parseTestcaseDesc(desc)
-def runFile(prompt, path) -> tuple:
+def runFile(prompt, path, stdin) -> dict:
 	print(prompt, path)
-	return runCommand(['Masfix',  '-s',  '-r', str(path)])
+	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
 def runTest(path: Path) -> bool:
-	code, stdout, stderr = runFile('[TESTING]', path)
 	expected = getTestcaseDesc(path)
-	check(expected['returncode'] == code, 'The return code is not as expected')
-	check(expected['stdout'] == stdout, 'The stdout is not as expected')
-	check(expected['stderr'] == stderr, 'The stderr is not as expected')
+	ran = runFile('[TESTING]', path, expected['stdin'])
+	check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
+	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
+	check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
 	return True
 def runTests(dir: Path):
 	success = True
@@ -82,19 +81,43 @@ def runTests(dir: Path):
 	else:
 		print('Some testcases failed')
 		exit(1)
-def genDesc(file: Path, code, stdout, stderr):
+def saveDesc(file: Path, desc):
+	code = desc['returncode']
+	stdout = desc['stdout']
+	stderr = desc['stderr']
+	stdin = desc['stdin']
 	with open(file.with_suffix('.txt'), 'w') as f:
 		f.write(f':returncode {code}\n\n')
 		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
 		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
-def updateFile(file: Path):
-	code, stdout, stderr = runFile('[UPDATING]', file)
-	print('[NOTE] returncode:', code)
+		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
+def updateFileOutput(file: Path):
+	original = getTestcaseDesc(file)
+	ran = runFile('[UPDATING]', file, original['stdin'])
+	print('[NOTE] returncode:', ran['returncode'])
 	print('[NOTE] stdout:')
-	print(stdout)
+	print(ran['stdout'])
 	print('[NOTE] stderr:')
-	print(stderr, end='')
-	genDesc(file, code, stdout, stderr)
+	print(ran['stderr'], end='')
+	ran['stdin'] = original['stdin']
+	saveDesc(file, ran)
+def updateInput(file: Path):
+	print('[INPUT]', file)
+	print('Type your input here, type Ctrl-Z on blank line to end')
+	inputed = ''
+	try:
+		inputed += input()
+		while True:
+			line = input()
+			inputed += '\n' + line
+	except EOFError:
+		pass
+	print('\n[STDIN]', repr(inputed))
+	desc = getTestcaseDesc(file, update=True)
+	desc['stdin'] = inputed
+	saveDesc(file, desc)
+	# TODO ask for output update
+
 # modes --------------------------------------
 def processFileArg(arg) -> Path:
 	file = None
@@ -117,13 +140,15 @@ def modeRun(args):
 		runTests('examples')
 def modeUpdate(args):
 	checkUsage(len(args) >= 1, 'Update specifier expected')
-	checkUsage(args[0] == 'output', 'Only', quoted('update output'), 'supported for now', quoted(args[0]))
+	update = args[0]
+	checkUsage(update in ['output', 'input'], 'Unknown update specifier', quoted(update))
 	args = args[1:]
-	if len(args):
-		file = processFileArg(args[0])
-		updateFile(file)
-	else:
-		assert False, 'Updating all files outputs not implemented yet'
+	checkUsage(len(args) >= 1, 'Updated file expected')
+	file = processFileArg(args[0])
+	if update == 'input':
+		updateInput(file)
+	elif update == 'output':
+		updateFileOutput(file)
 def test(args):
 	if args[0] == 'run':
 		modeRun(args[1:])
