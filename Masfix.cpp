@@ -102,9 +102,10 @@ enum InstrNames {
 	Ioutc,
 	Iinc,
 	Iinu,
+	Iinl,
 	InstructionCount
 };
-static_assert(InstructionCount == 11, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 12, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -119,6 +120,7 @@ map<string, InstrNames> StrToInstr {
 {"outc", Ioutc},
 {"inc", Iinc},
 {"inu", Iinu},
+{"inl", Iinl},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -327,7 +329,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 11, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 12, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
 	for (int checkedLen : {2, 1, 3, 4}) { // avoid parsing 'ld' as Il
 		if (parsing.size() < checkedLen) continue;
@@ -376,13 +378,11 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 11 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 12 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
 	if (instr.instr == InstructionCount) unreachable();
-	if (instr.instr == Iswap) {
-		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "Swap instruction has no arguments", instr);
-		instr.suffixes.reg = Rm; // pretend that the register is m
-	}
-	if (instr.instr == Iinc || instr.instr == Iinu) {
+	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
+		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "This instruction should have no arguments", instr);
+	} else if (instr.instr == Iinc || instr.instr == Iinu) {
 		checkReturnOnFail(!instr.hasImm, "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
@@ -512,7 +512,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 11, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 12, "Exhaustive genInstrBody definition");
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
@@ -527,9 +527,10 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		"	mov rbx, instruction_offsets\n"
 		"	jmp [rbx+8*rcx]\n";
 	} else if (instr == Il) { // handled in genCond
-	} else if (instr == Iswap) { // m in second
-		outFile << "	mov [2*r14+r13], r15w\n"
-			"	mov r15, rcx\n";
+	} else if (instr == Iswap) {
+		outFile << "	mov cx, [2*r14+r13]\n"
+			"	mov [2*r14+r13], r15w\n"
+			"	mov r15w, cx\n";
 	} else if (instr == Ioutu) {
 		outFile << "	mov rax, rcx\n"
 			"	call print_unsigned\n";
@@ -547,6 +548,10 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		string dest = inputToR ? "r15w" : "[2*r14+r13]";
 		outFile << "	call input_unsigned\n"
 			"	mov " << dest << ", ax\n";
+	} else if (instr == Iinl) {
+		outFile << "	call get_next_char\n"
+			"	cmp rdx, 10\n"
+			"	jne instr_" << instrNum << "\n";
 	} else {
 		unreachable();
 	}
@@ -682,13 +687,10 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	xor rdx, rdx ; peek the char\n"
 		"	mov dl, [rcx]\n"
 		"	ret\n"
-		"get_next_char: ; gets next char from stdin (buffered), ignores '\\r', advances read ptr -> rdx char\n"
+		"get_next_char: ; gets next char from stdin (buffered), advances read ptr -> rdx char\n"
 		"	call stdin_peek ; peek the first unread char\n"
 		"	mov rax, stdin_buff_chars_read ; eat the char\n"
 		"	inc QWORD [rax]\n"
-		"\n"
-		"	cmp rdx, 13 ; repeat if char == '\\r'\n"
-		"	je get_next_char\n"
 		"	ret\n"
 		"\n"
 		"utos: ; n - rax -> r8 char count, r9 - char* str\n"

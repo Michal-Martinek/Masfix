@@ -1,12 +1,18 @@
 :returncode 1
 
-:stderr 560
-tests\input-parse.mx:5:1 ERROR: Input destination can be only r/m 'inch'
-tests\input-parse.mx:9:1 ERROR: Input destination can be only r/m 'inup'
-tests\input-parse.mx:11:1 ERROR: This instruction cannot have a modifier 'inuar'
-tests\input-parse.mx:12:1 ERROR: This instruction cannot have an immediate 'inc 15'
-tests\input-parse.mx:13:1 ERROR: This instruction cannot have an immediate 'inu 28'
-tests\input-parse.mx:14:1 ERROR: This instruction cannot have an immediate 'inur 10'
-tests\input-parse.mx:15:1 ERROR: This instruction cannot have a modifier 'inc|'
+:stderr 1052
+tests\input-parse.mx:8:1 ERROR: Input destination can be only r/m 'inch'
+tests\input-parse.mx:12:1 ERROR: Input destination can be only r/m 'inup'
+tests\input-parse.mx:14:1 ERROR: This instruction should have no arguments 'inlr'
+tests\input-parse.mx:15:1 ERROR: This instruction should have no arguments 'inlh'
+tests\input-parse.mx:17:1 ERROR: This instruction cannot have a modifier 'inuar'
+tests\input-parse.mx:18:1 ERROR: This instruction cannot have an immediate 'inc 15'
+tests\input-parse.mx:19:1 ERROR: This instruction cannot have an immediate 'inu 28'
+tests\input-parse.mx:20:1 ERROR: This instruction should have no arguments 'inl 89'
+tests\input-parse.mx:22:1 ERROR: This instruction cannot have an immediate 'inur 10'
+tests\input-parse.mx:23:1 ERROR: This instruction cannot have a modifier 'inc|'
+tests\input-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'inla'
+tests\input-parse.mx:26:1 ERROR: This instruction cannot have a modifier 'inl&'
+tests\input-parse.mx:27:1 ERROR: This instruction should have no arguments 'inlsm'
 
 
