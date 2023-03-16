@@ -27,7 +27,7 @@ fs::path OutputFileName = "";
 
 bool FLAG_silent = false;
 bool FLAG_run = false;
-bool FLAG_keepTempFiles = false;
+bool FLAG_keepAsm = false;
 bool FLAG_strictErrors = false;
 // enums --------------------------------
 enum RegNames {
@@ -818,7 +818,7 @@ void printUsage() {
 			"	flags:\n"
 			"		-s / --silent     - supresses all unnecessary stdout messages\n"
 			"		-r / --run        - run the executable after compilation\n"
-			"		--keep-files      - keep the temporary compilation files\n" // TODO rather --keep-asm
+			"		--keep-asm        - keep the assembly file\n"
 			"		--strict-errors   - disables many errors\n";
 }
 void checkUsage(bool cond, string message) {
@@ -849,8 +849,8 @@ void processLineArgs(int argc, char *argv[]) {
 			FLAG_silent = true;
 		} else if (s == "-r" || s == "--run") {
 			FLAG_run = true;
-		} else if (s == "--keep-files") {
-			FLAG_keepTempFiles = true;
+		} else if (s == "--keep-asm") {
+			FLAG_keepAsm = true;
 		} else if (s == "--strict-errors") {
 			FLAG_strictErrors = true;
 		} else {
@@ -895,10 +895,12 @@ void compileAndRun(fs::path asmPath) {
 
 	runCmdEchoed("nasm -fwin64 " + asmPath.string());
 	runCmdEchoed("ld C:\\Windows\\System32\\kernel32.dll -e _start -o " + exePath.string() + " " + objectPath.string());
-	if (!FLAG_keepTempFiles) {
+	if (!FLAG_keepAsm) {
 		removeFile(asmPath);
-		removeFile(objectPath);
+	} else {
+		cout << "[NOTE] asm file: " << asmPath.string() << ":179:1\n";
 	}
+	removeFile(objectPath);
 	if (FLAG_run) {
 		runCmdEchoed(exePath.string());
 	}
