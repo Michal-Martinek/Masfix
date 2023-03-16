@@ -378,7 +378,7 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 12 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition"); // TODO add these everywhere
+	static_assert(InstructionCount == 12 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
 		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "This instruction should have no arguments", instr);
@@ -497,7 +497,7 @@ map<CondNames, string> _condLoadInstr {
 	{Cge, "setns"},
 };
 void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames cond, int instrNum) {
-	static_assert(ConditionCount == 7, "Exhaustive genCond definition"); // TODO test all values with l<cond>
+	static_assert(ConditionCount == 7, "Exhaustive genCond definition");
 	genRegisterFetch(outFile, condReg, -1, false);
 	if (instr == Ib) {
 		outFile << "	cmp bx, 0\n"
@@ -560,7 +560,10 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
 	// intermediate values - first - rbx, second - rcx
 	// addr of cells[0] - r13
-	// TODO specify responsibilities for clamping and register preserving
+	// responsibilities for clamping and register preserving:
+	// each operation, register fetch or instr body must touch only appropriate architecture registers, others must be left unchanged
+	// also, they need to make sure all changed architecture regs, intermediate value registers and the memory /
+	//		is clamped to the right bitsize and contains a valid value
 	if (instr.hasImm) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
 	} else if (instr.hasReg()) {

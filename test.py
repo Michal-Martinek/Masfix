@@ -7,7 +7,7 @@ class TestcaseException(Exception):
 	pass
 def quoted(s):
 	return "'" + str(s) + "'"
-def check(cond, *messages, insideTestcase=True): # TODO use *messages, use properly everywhere
+def check(cond, *messages, insideTestcase=True):
 	if not cond:
 		print('ERROR:', *messages)
 		if insideTestcase:
