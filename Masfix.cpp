@@ -120,21 +120,12 @@ map<string, InstrNames> StrToInstr {
 {"inc", Iinc},
 {"inu", Iinu},
 };
-static_assert(InstructionCount == 11 && RegisterCount == 5, "Exhaustive InstrToModReg definition");
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
 	{Istr, Rm},
 	{Ild , Rr},
 	{Ijmp, Rp},
-
-	{Ib, Rno}, // conditionals cannot have a modifier
-	{Il, Rno},
-
-	{Iswap, Rno}, // specials have no modifiable destination
-	{Ioutu, Rno},
-	{Ioutc, Rno},
-	{Iinc, Rno},
-	{Iinu, Rno},
+	// others don't have modifiable destination
 };
 // structs -------------------------------
 struct Loc {
@@ -399,7 +390,7 @@ bool checkValidity(Instr& instr) {
 	} else {
 		checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
 	}
-	if (InstrToModReg[instr.instr] == Rno) {
+	if (InstrToModReg.count(instr.instr) == 0) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	}
 	RegNames condReg = instr.suffixes.condReg; CondNames cond = instr.suffixes.cond;
