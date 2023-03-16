@@ -1,7 +1,25 @@
-ld 10 ; num ; TODO add input
+; input prompt
+outc 72
+outc 111
+outc 119
+outc 32
+outc 109
+outc 97
+outc 110
+outc 121
+outc 63
+outc 32
+
+inu ; input
+inl
+bne not_zero ; prohibit 0
+ld 1
+:not_zero
 
 ; mem [a, b, num]
 ; init
+mov 0
+str 0
 mov 1
 str 1
 mov 2
