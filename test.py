@@ -54,12 +54,12 @@ def getTestcaseDesc(test: Path, update=False) -> dict:
 	with open(path, 'r') as testcase:
 		desc = testcase.read()
 	return parseTestcaseDesc(desc)
-def runFile(prompt, path, stdin) -> dict:
-	print(prompt, path)
+def runFile(path, stdin) -> dict:
 	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
 def runTest(path: Path) -> bool:
+	print('[TESTING]', path)
 	expected = getTestcaseDesc(path)
-	ran = runFile('[TESTING]', path, expected['stdin'])
+	ran = runFile(path, expected['stdin'])
 	check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
 	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
 	check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
@@ -92,8 +92,9 @@ def saveDesc(file: Path, desc):
 		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
 		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
 def updateFileOutput(file: Path):
-	original = getTestcaseDesc(file)
-	ran = runFile('[UPDATING]', file, original['stdin'])
+	print('[UPDATING]', file)
+	original = getTestcaseDesc(file, update=True)
+	ran = runFile(file, original['stdin'])
 	print('[NOTE] returncode:', ran['returncode'])
 	print('[NOTE] stdout:')
 	print(ran['stdout'])
