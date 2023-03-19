@@ -88,3 +88,69 @@ outc 10
 ld^ 65535
 outur
 outc 10
+
+; shifts
+outc 10
+ld 5
+ld< 2
+outur
+outc 10
+
+ld 65535
+ld< 4
+outur
+outc 10
+
+ld 65535
+ld> 2
+outur
+outc 10
+
+ld 65535
+ld< 15
+outur
+outc 10
+
+ld 65535
+ld< 0
+outur
+outc 10
+
+ld 65535
+ld> 0
+outur
+outc 10
+
+; bit
+str 43690
+ldm
+ld. 0
+outur
+outc 10
+
+ldm
+ld. 1
+outur
+outc 10
+
+ldm
+ld. 15
+outur
+outc 10
+
+ldm
+ld. 16
+outur
+outc 10
+
+ld 65535
+ld. 16
+outur
+outc 10
+
+ld 50000 ; test if it shifts the CF flag or something
+str 30000
+ldam
+ld> 2
+outur
+outc 10
