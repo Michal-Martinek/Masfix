@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 5595
+:stderr 5593
 tests\parse-test.mx:23:2 ERROR: Label name expected after ':'
 tests\parse-test.mx:25:1 ERROR: Label name expected after ':'
 tests\parse-test.mx:26:2 ERROR: Label name expected after ':'
@@ -64,7 +64,7 @@ tests\parse-test.mx:109:1 ERROR: Instrs must have only imm, or 1 reg for now 'bn
 tests\parse-test.mx:112:1 ERROR: This instruction cannot have a modifier 'beqar'
 tests\parse-test.mx:113:1 ERROR: This instruction cannot have a modifier 'bnea 5'
 tests\parse-test.mx:114:1 ERROR: Missing condition 'ba'
-tests\parse-test.mx:117:1 ERROR: Unknown instruction 'swa'
+tests\parse-test.mx:117:1 ERROR: Unknown condition 'swa'
 tests\parse-test.mx:118:1 ERROR: This instruction cannot have a modifier 'swapa'
 tests\parse-test.mx:119:1 ERROR: This instruction should have no arguments 'swapr'
 tests\parse-test.mx:120:1 ERROR: This instruction should have no arguments 'swap 5'

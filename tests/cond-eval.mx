@@ -27,6 +27,7 @@ mov 1 ; bool - stage 1 done
 str 0
 mov 0
 	; 2 - branch test ret addr
+	; 3 - test for s<cond> instr
 
 outum
 outc 10
@@ -34,6 +35,7 @@ outc 10
 :loop
 
 ; tests
+; TODO use macros, test properly all Il, Ib, Is; against not only 0
 mov 2
 strp
 mov 0
@@ -44,13 +46,15 @@ bmeq branch_true
 jmp branch_false
 outc 124
 
+mov 0
+ldm
 mov 2
 strp
-mov 0
-ld 65535
-lmne 0
-outur
-bmne branch_true
+mov 3
+str 65535
+sne 0
+outum
+bne branch_true
 jmp branch_false
 outc 124
 
@@ -74,13 +78,15 @@ bmle branch_true
 jmp branch_false
 outc 124
 
+mov 0
+ldm
 mov 2
 strp
-mov 0
-ld 65535
-lmgt 0
-outur
-bmgt branch_true
+mov 3
+str 65535
+sgt 0
+outum
+bgt branch_true
 jmp branch_false
 outc 124
 

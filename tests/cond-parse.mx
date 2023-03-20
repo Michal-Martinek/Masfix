@@ -55,3 +55,22 @@ lgtz
 b|eq
 be
 bme
+
+s
+seq
+strlt
+srge
+smlt
+speq
+stne
+sl
+
+seqa 5
+slt.r
+sge 5
+
+swap
+seqap
+swa
+stap 5
+streq 10
