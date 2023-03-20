@@ -109,11 +109,12 @@ enum InstrNames {
 	Ioutu,
 	Ioutc,
 	Iinc,
+	Iipc,
 	Iinu,
 	Iinl,
 	InstructionCount
 };
-static_assert(InstructionCount == 12, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 13, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -127,6 +128,7 @@ map<string, InstrNames> StrToInstr {
 {"outu", Ioutu},
 {"outc", Ioutc},
 {"inc", Iinc},
+{"ipc", Iipc},
 {"inu", Iinu},
 {"inl", Iinl},
 };
@@ -337,7 +339,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 12, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 13, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
 	for (int checkedLen : {2, 1, 3, 4}) { // avoid parsing 'ld' as Il
 		if (parsing.size() < checkedLen) continue;
@@ -386,11 +388,11 @@ pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 12 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 13 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
 		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "This instruction should have no arguments", instr);
-	} else if (instr.instr == Iinc || instr.instr == Iinu) {
+	} else if (instr.instr == Iinc || instr.instr == Iinu || instr.instr == Iipc) {
 		checkReturnOnFail(!instr.hasImm, "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
@@ -530,7 +532,9 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 12, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 13, "Exhaustive genInstrBody definition");
+	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
+
 	if (instr == Imov) {
 		outFile << "	mov r14, rcx\n";
 	} else if (instr == Istr) {
@@ -559,13 +563,15 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
 	} else if (instr == Iinc) {
-		string dest = inputToR ? "r15w" : "[2*r14+r13]";
 		outFile << "	call get_next_char\n"
-			"	mov " << dest << ", dx\n";
+			"	mov " << inputDest << ", dx\n";
+	} else if (instr == Iipc) {
+		outFile << "	call stdin_peek\n"
+			"	mov " << inputDest << ", dx\n";
 	} else if (instr == Iinu) {
 		string dest = inputToR ? "r15w" : "[2*r14+r13]";
 		outFile << "	call input_unsigned\n"
-			"	mov " << dest << ", ax\n";
+			"	mov " << inputDest << ", ax\n";
 	} else if (instr == Iinl) {
 		outFile << "	call get_next_char\n"
 			"	cmp rdx, 10\n"

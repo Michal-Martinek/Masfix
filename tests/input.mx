@@ -1,9 +1,9 @@
 ; whole stdin:
-;ABC -> 65, 66, 67
-;58 -> 58
-;!26 -> 0, 33, 26
-;47A -> 47, 65
-;'\n \nT\n' -> 0, 10, 0, 32, 84
+;ABC -> 65, 66, 67, 67
+;58 -> 58, 10
+;!26 -> 0, 33, 33, 26
+;47A -> 47, 65, 10
+;'\n \nT\n' -> 0, 10, 0, 32, 32, 84
 ;0 45 100 2048 4500 60000 65535 65536 123456789\n -> 0 45 100 2048 4500 60000 65535 0 52501
 ;('123' * 50) + 'E\n' -> \n62387\n69\n
 
@@ -13,6 +13,10 @@ outur
 outc 32
 
 inc
+outur
+outc 32
+
+ipc
 outur
 outc 32
 
@@ -28,12 +32,20 @@ inu
 outur
 outc 32
 
+ipc
+outur
+outc 32
+
 inl
 outc 10
 
 ; stdin: !26\n
 inu
 outur
+outc 32
+
+ipcm
+outum
 outc 32
 
 inc
@@ -56,6 +68,10 @@ inc
 outur
 outc 32
 
+ipc
+outur
+outc 32
+
 inl
 outc 10
 
@@ -71,6 +87,10 @@ outc 32
 
 inu ; eats nothing, stays at ' '
 outur
+outc 32
+
+ipcm
+outum
 outc 32
 
 inc ; space - 32
