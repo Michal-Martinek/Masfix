@@ -147,18 +147,18 @@ def modeRun(args):
 def modeUpdate(args):
 	checkUsage(len(args) >= 1, 'Update specifier expected')
 	update = args[0]
-	checkUsage(update in ['output', 'input'], 'Unknown update specifier', quoted(update))
+	checkUsage(update in ['output', 'o', 'input', 'i'], 'Unknown update specifier', quoted(update))
 	args = args[1:]
 	checkUsage(len(args) >= 1, 'Updated file expected')
 	file = processFileArg(args[0])
-	if update == 'input':
+	if update in ['input', 'i']:
 		updateInput(file)
-	elif update == 'output':
+	elif update in ['output', 'o']:
 		updateFileOutput(file)
 def test(args):
-	if args[0] == 'run':
+	if args[0] in ['run', 'r']:
 		modeRun(args[1:])
-	elif args[0] == 'update':
+	elif args[0] in ['update', 'u']:
 		modeUpdate(args[1:])
 	else:
 		checkUsage(False, "Unknown mode", quoted(args[0]))
