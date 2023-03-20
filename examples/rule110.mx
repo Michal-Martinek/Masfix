@@ -1,0 +1,229 @@
+; TODO desc: rule 110 in Masfix
+
+; input prompt
+:start
+	outc 73
+	outc 110
+	outc 112
+	outc 117
+	outc 116
+	outc 32
+	outc 98
+	outc 111
+	outc 97
+	outc 114
+	outc 100
+	outc 32
+	outc 115
+	outc 105
+	outc 122
+	outc 101
+	outc 32
+	outc 40
+	outc 50
+	outc 32
+	outc 45
+	outc 32
+	outc 49
+	outc 48
+	outc 48
+	outc 41
+	outc 58
+	outc 32
+
+	inu
+	inl
+	outc 10
+
+:run_rule110 ; size @r
+; clamp to bounds
+	strr
+	lds 2
+	bge over2
+	str 2
+	:over2
+	ldm
+	lds 100
+	blt below100
+	str 100
+	:below100
+	ldm
+
+; memory ; size @r
+	mov 0 ; size of board
+	strr
+	mov 1 ; line idx
+	str 0
+	mov 2 ; cell idx
+	str 0
+
+	mov 3 ; new value for the left cell
+	str 0
+	mov 4 ; addr of curr cell
+	str 0
+	; 10 - 20 temp
+	; 1024 - 1024+size - line of board
+
+:init_line
+	mov 2 ; board[curr] = 0
+	movm
+	mova 1023
+	str 0
+
+	mov 0 ; while (curr != size)
+	ldm
+	lda 2 ; before first and after last
+	mov 2
+	stra 1 ; curr ++
+	ldsm
+	bne init_line
+
+	mov 2 ; curr = 0
+	str 0
+	
+	mov 0 ; board[-1] = true
+	movm
+	mova 1023
+	str 1
+
+:line_loop
+	mov 0
+	ldm
+
+	mov 1 ; while (line idx < board size)
+	ldsm
+	beq end_rule110
+	ldm
+
+	; var init - cell idx = 0, new val = 0
+	mov 2
+	str 0
+	mov 3
+	str 0
+
+:cell_loop
+	mov 0 ; while (cell idx < board size)
+	ldm
+	mov 2
+	ldsm
+	beq end_line_loop
+	
+	ldm ; r = &board[curr]
+	lda 1024
+
+	mov 4 ; curr addr = &board[curr]
+	strr
+
+; update_cell ; cell addr in temp[1]
+	mov 4
+	movm
+
+; get cells around ; at central cell
+	movs 1
+	ldm
+	mova 1
+	ld< 1
+	ldam
+	mova 1
+	ld< 1
+	ldam
+
+; print original cell ; cell values @r
+	mov 10
+	strr
+	ld. 1
+	ld^ 1
+	ldt 11
+	lda 35
+	outcr
+
+; get evolved value ; cell values @m
+	ldm
+	ld& 3
+	lne 0
+	swap
+	lne 7
+	ld&m
+
+; update left node, store curr ; evolved state @r
+	mov 3
+	swap
+	mov 2
+	movm
+	mova 1023
+	strr
+
+	mov 2 ; cell idx ++
+	stra 1
+	jmp cell_loop
+
+:end_line_loop
+	; update last entry
+	mov 3
+	ldm
+	mov 0
+	movm
+	mova 1023
+	strr
+
+	outc 10
+	mov 1 ; line idx ++
+	stra 1
+	jmp line_loop
+
+:end_rule110
+
+; repeat prompt
+	outc 10
+	outc 82
+	outc 101
+	outc 112
+	outc 101
+	outc 97
+	outc 116
+	outc 63
+	outc 32
+	outc 40
+	outc 121
+	outc 47
+	outc 110
+	outc 47
+	outc 110
+	outc 117
+	outc 109
+	outc 98
+	outc 101
+	outc 114
+	outc 41
+	outc 58
+	outc 32
+
+	ipc
+
+	strr
+	lds 89 ; 'Y'
+	beq repeat
+
+	ldm
+	lds 121 ; 'y'
+	beq repeat
+
+	ldm
+	lds 48 ; '0'
+	blt end
+	lds 9
+	bgt end
+
+	inu
+	inl
+	beq end
+	jmp repeat_with_num
+
+:repeat
+	inl
+	outc 10
+	jmp start
+
+:repeat_with_num
+	outc 10
+	jmp run_rule110
