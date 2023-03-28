@@ -1,4 +1,4 @@
-; TODO desc: rule 110 in Masfix
+; Rule 110 reference implementation in Masfix, without macros
 
 ; input prompt
 :start

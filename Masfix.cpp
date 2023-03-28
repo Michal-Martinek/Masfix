@@ -343,8 +343,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 bool parseInstrOpcode(Instr& instr) {
 	static_assert(InstructionCount == 14, "Exhaustive parseInstrOpcode definition");
 	string parsing = instr.fields[0];
-	for (int checkedLen : {4, 3, 2, 1}) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
-		if (parsing.size() < checkedLen) continue;
+	for (int checkedLen = min(4, (int)parsing.size()); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = parsing.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
