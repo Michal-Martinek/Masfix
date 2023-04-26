@@ -6,6 +6,7 @@ namespace fs = std::filesystem;
 #include <string>
 #include <map>
 #include <vector>
+#include <list>
 
 #include <algorithm>
 #include <math.h>
@@ -30,6 +31,14 @@ bool FLAG_run = false;
 bool FLAG_keepAsm = false;
 bool FLAG_strictErrors = false;
 // enums --------------------------------
+enum TokenTypes {
+	Tnumeric,
+	Talpha,
+	Tspecial,
+	// TODO do we want line breaks between instructions?
+
+	TokenCount
+};
 enum RegNames {
 	Rh,
 	Rm,
@@ -157,6 +166,23 @@ struct Loc {
 		return file + ":" + to_string(row) + ":" + to_string(col);
 	}
 };
+struct Token {
+	TokenTypes type;
+	string data;
+	bool continued;
+	// TODO add Loc;
+
+	Token() {}
+	Token(TokenTypes type, string data, bool continued) {
+		this->type = type;
+		this->data = data;
+		this->continued = continued;
+	}
+	int64_t asLong() {
+		assert(type == Tnumeric);
+		return stoi(data);
+	}
+};
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
 	RegNames condReg;
@@ -214,25 +240,6 @@ struct Label {
 	}
 };
 // helpers ---------------------------------
-bool isntSpace(char c) {
-	return !isspace(c);
-}
-vector<string> splitOnWhitespace(string &s) {
-	vector<string> splits;
-	int start = 0;
-	for (int i = 0; i < s.size(); ++i) {
-		if (isspace(s.at(i))) {
-			string chunk = s.substr(start, i - start);
-			if (chunk.size()) splits.push_back(chunk);
-			start = i+1;
-		}
-	}
-	if (start < s.size()) {
-		string chunk = s.substr(start);
-		splits.push_back(chunk);
-	}
-	return splits;
-}
 bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
 	// TODO: add reason for invalid identifier
@@ -271,6 +278,13 @@ void addError(string message, bool strict=true) {
 	if (strict || FLAG_strictErrors)
 		raiseErrors();
 }
+bool check(bool cond, string message, Token token, bool strict=true) { // TODO use this instead od Instr X we want to show whole Instr on error, but use the correct loc
+	if (!cond) {
+		string err = " ERROR: " + message + " '" + token.data + "'\n";
+		addError(err, strict);
+	}
+	return cond;
+}
 bool check(bool cond, string message, Instr instr, bool strict=true) {
 	if (!cond) {
 		string err = instr.loc.toStr() + " ERROR: " + message + " '" + instr.toStr() + "'\n";
@@ -300,6 +314,93 @@ bool check(bool cond, string message, bool strict=true) {
 	return cond;
 }
 // tokenization ----------------------------------
+string getCharRun(string s) {
+	int num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
+	if (num == 0 && alpha == 0 && space == 0) return string(1, s.at(0));
+	string out;
+	int i = 0;
+	do {
+		out.push_back(s.at(i));
+		i++;
+	} while (i < s.size() && isdigit(s.at(i)) == num && isalpha(s.at(i)) == alpha && isspace(s.at(i)) == space);
+	return out;
+}
+list<Token> tokenize(ifstream& inFile) {
+	static_assert(TokenCount == 3, "Exhaustive tokenize definition");
+	string line;
+	bool continued;
+
+	list<Token> tokens;
+	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
+		continued = false;
+		line = line.substr(0, line.find(';'));
+		while (line.size()) {
+			char first = line.at(0);
+			string run = getCharRun(line);
+			line = line.substr(run.size());
+			if (isspace(first)) {
+				continued = false;
+				continue;
+			}
+			Token token;
+			if (isdigit(first)) {
+				token = Token(Tnumeric, run, continued);
+			} else if (isalpha(first)) {
+				token = Token(Talpha, run, continued);
+			} else if (run.size() == 1) {
+				token = Token(Tspecial, run, continued);
+			} else {
+				assert(false);
+			}
+			continued = true;
+			tokens.push_back(token);
+		}
+	}
+	return tokens;
+}
+// compilation -----------------------------------
+string joinTokens(list<Token>& tokens) {
+	string out;
+	while (tokens.size() && tokens.front().continued) {
+		out += tokens.front().data;
+		tokens.pop_front();
+	}
+	return out;
+}
+string extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel) {
+	checkReturnValOnFail(tokens.size(), "Label name expected after ':'", tokens.front(), "");
+	string name = joinTokens(tokens);
+	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", tokens.front(), "");
+	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", tokens.front(), "");
+	return name;
+}
+pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file) {
+	// TODO add asserts
+	vector<Instr> instrs;
+	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
+
+	while (tokens.size()) {
+		Token top = tokens.front();
+		if (top.type == Tspecial) {
+			checkContinueOnFail(top.data == ":", "TODO: the only special allowed now is ':'", top);
+			tokens.pop_front();
+			string labelName = extractLabelName(tokens, strToLabel);
+			continueOnFalse(labelName != "");
+			strToLabel.insert(pair<string, Label>(labelName, Label(labelName, instrs.size(), Loc("", 1, 1))));
+		} else if (top.type == Talpha) {
+			vector<string> fields = vector<string>({ joinTokens(tokens) }); // TODO split instr fields into string opcode and vector<token> imm?
+			if (tokens.size() && tokens.front().type == Tnumeric) {
+				fields.push_back(tokens.front().data);
+				tokens.pop_front();
+			}
+			instrs.push_back(Instr(Loc("", 1, 1), fields));
+		}
+	}
+	strToLabel["end"].addr = instrs.size();
+	// TODO end has loc of last token
+	return pair(instrs, strToLabel);
+}
+// parsing of instructions -----------------------------------------
 pair<bool, string> parseCond(Instr& instr, string s) {
 	checkReturnValOnFail(s.size() >= 1, "Missing condition", instr, pair(false, ""));
 	char reg = s.at(0);
@@ -374,19 +475,6 @@ bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	}
 	return true;
 }
-pair<bool, string> parseLabelName(vector<string>& splits, Loc loc) {
-	if (splits[0].at(0) != ':') {
-		return pair(false, "");
-	}
-	if (splits[0] == ":") {
-		if (!check(splits.size() == 2, "Label name expected after ':'", loc, false)) return pair(true, "");
-		return pair(true, splits[1]);
-	}
-	string second = splits.size() == 2 ? splits[1] : "";
-	checkReturnValOnFail(splits.size() == 1, "Invalid label definition '" + splits[0] + " " + second + "'", loc, pair(true, ""));
-	checkReturnValOnFail(splits[0].size() > 1, "Label name expected after ':'", loc, pair(true, ""));
-	return pair(true, splits[0].substr(1));
-}
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
 	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
@@ -412,43 +500,13 @@ bool checkValidity(Instr& instr) {
 	}
 	return true;
 }
-vector<Instr> tokenize(ifstream& inFile, fs::path fileName) {
-	string file = pathFromMasfix(fileName).string();
-	string line;
-
-	vector<Instr> instrs;
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
-
-	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
-		line = line.substr(0, line.find(';'));
-		int lineStartCol = 1 + distance(line.begin(), find_if(line.begin(), line.end(), isntSpace));
-		if (line.size() >= lineStartCol) {
-			vector<string> splits = splitOnWhitespace(line);
-			Loc loc = Loc(file, lineNum, lineStartCol);
-			checkContinueOnFail(splits.size() <= 2, "This line has too many fields '" + line + "'", loc);
-			pair<bool, string> lab = parseLabelName(splits, loc);
-			if (!lab.first) {
-				Instr instr(loc, splits);
-				instrs.push_back(instr);
-			} else {
-				string labelName = lab.second;
-				continueOnFalse(labelName != "");
-				Label label = Label(labelName, instrs.size(), loc);
-				checkContinueOnFail(isValidIdentifier(label.name), "Invalid label name", label);
-				checkContinueOnFail(strToLabel.count(label.name) == 0, "Label redefinition", label);
-				strToLabel.insert(pair<string, Label>(label.name, label));
-			}
-		}
-	}
-	strToLabel["end"].addr = instrs.size();
+void parseInstrs(vector<Instr>& instrs, map<string, Label>& strToLabel) {
 	for (int i = 0; i < instrs.size(); ++i) {
 		Instr instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr, strToLabel));
 		continueOnFalse(checkValidity(instr));
 		instrs[i] = instr;
 	}
-	raiseErrors();
-	return instrs;
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -941,11 +999,22 @@ void compileAndRun(fs::path asmPath) {
 }
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
+	string file = pathFromMasfix(InputFileName).string();
+
 	ifstream inFile = getInputFile();
-	vector<Instr> instrs = tokenize(inFile, InputFileName);
+	list<Token> tokens = tokenize(inFile);
 	inFile.close();
+	
+	auto compiled = compile(tokens, file);
+	vector<Instr> instrs = compiled.first;
+	map<string, Label> strToLabel = compiled.second;
+
+	parseInstrs(instrs, strToLabel);
+	raiseErrors(); // TODO come up with good error continuation strategies for all compilation stages
+
 	ofstream outFile = getOutputFile();
 	generate(outFile, instrs);
 	outFile.close();
+
 	compileAndRun(OutputFileName);
 }
