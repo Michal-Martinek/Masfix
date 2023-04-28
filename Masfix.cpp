@@ -170,13 +170,15 @@ struct Token {
 	TokenTypes type;
 	string data;
 	bool continued;
+	bool firstOnLine;
 	// TODO add Loc;
 
 	Token() {}
-	Token(TokenTypes type, string data, bool continued) {
+	Token(TokenTypes type, string data, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
 		this->continued = continued;
+		this->firstOnLine = firstOnLine;
 	}
 	int64_t asLong() {
 		assert(type == Tnumeric);
@@ -328,12 +330,14 @@ string getCharRun(string s) {
 list<Token> tokenize(ifstream& inFile) {
 	static_assert(TokenCount == 3, "Exhaustive tokenize definition");
 	string line;
-	bool continued;
+	bool continued, firstOnLine;
 
 	list<Token> tokens;
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		continued = false;
+		firstOnLine = true;
 		line = line.substr(0, line.find(';'));
+
 		while (line.size()) {
 			char first = line.at(0);
 			string run = getCharRun(line);
@@ -344,56 +348,65 @@ list<Token> tokenize(ifstream& inFile) {
 			}
 			Token token;
 			if (isdigit(first)) {
-				token = Token(Tnumeric, run, continued);
+				token = Token(Tnumeric, run, continued, firstOnLine);
 			} else if (isalpha(first)) {
-				token = Token(Talpha, run, continued);
+				token = Token(Talpha, run, continued, firstOnLine);
 			} else if (run.size() == 1) {
-				token = Token(Tspecial, run, continued);
+				token = Token(Tspecial, run, continued, firstOnLine);
 			} else {
 				assert(false);
 			}
 			continued = true;
+			firstOnLine = false;
 			tokens.push_back(token);
 		}
 	}
 	return tokens;
 }
 // compilation -----------------------------------
-string joinTokens(list<Token>& tokens) {
-	string out;
+string joinTokens(Token top, list<Token>& tokens) {
+	string out = top.data;
 	while (tokens.size() && tokens.front().continued) {
 		out += tokens.front().data;
 		tokens.pop_front();
 	}
 	return out;
 }
+string joinTokens(list<Token>& tokens) {
+	Token top = tokens.front();
+	tokens.pop_front();
+	return joinTokens(top, tokens);
+}
 string extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel) {
-	checkReturnValOnFail(tokens.size(), "Label name expected after ':'", tokens.front(), "");
 	string name = joinTokens(tokens);
-	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", tokens.front(), "");
-	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", tokens.front(), "");
+	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", Token(), "");
+	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", Token(), "");
 	return name;
 }
 pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file) {
-	// TODO add asserts
 	vector<Instr> instrs;
 	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
 
 	while (tokens.size()) {
 		Token top = tokens.front();
+		tokens.pop_front();
 		if (top.type == Tspecial) {
-			checkContinueOnFail(top.data == ":", "TODO: the only special allowed now is ':'", top);
-			tokens.pop_front();
+			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
+			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after ':'", top); // TODO do not report the data
 			string labelName = extractLabelName(tokens, strToLabel);
 			continueOnFalse(labelName != "");
-			strToLabel.insert(pair<string, Label>(labelName, Label(labelName, instrs.size(), Loc("", 1, 1))));
+			strToLabel.insert(pair(labelName, Label(labelName, instrs.size(), Loc("", 1, 1))));
 		} else if (top.type == Talpha) {
-			vector<string> fields = vector<string>({ joinTokens(tokens) }); // TODO split instr fields into string opcode and vector<token> imm?
-			if (tokens.size() && tokens.front().type == Tnumeric) {
-				fields.push_back(tokens.front().data);
+			vector<string> fields = {joinTokens(top, tokens)}; // TODO split instr fields into string opcode and vector<token> imm?
+			// TODO the instr should have vector<Token> and no Loc
+			if (tokens.size() && !tokens.front().firstOnLine) fields.push_back( joinTokens(tokens) );
+			checkContinueOnFail(tokens.size() == 0 || tokens.front().firstOnLine, "This line has too many fields", top);
+			instrs.push_back(Instr(Loc("", 1, 1), fields));
+		} else {
+			while (!tokens.front().firstOnLine) {
 				tokens.pop_front();
 			}
-			instrs.push_back(Instr(Loc("", 1, 1), fields));
+			checkContinueOnFail(false, "Expected instruction or immediate", top);
 		}
 	}
 	strToLabel["end"].addr = instrs.size();
