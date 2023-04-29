@@ -1,0 +1,21 @@
+
+	 	 
+	 	 	 		; comment  buvei 		 	 	
+
+ld 8
+	 	ld 	  8 	;comm 	
+	mov 50; comm
+;
+		;  ;
+		; :label
+:
+	:
+	here
+	\
+	\n
+	\t	
+	\;comm
+  ;\
+  ;\n\t
+
+:

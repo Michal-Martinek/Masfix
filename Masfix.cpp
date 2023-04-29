@@ -171,7 +171,6 @@ struct Token {
 	Loc loc;
 	bool continued;
 	bool firstOnLine;
-	// TODO add Loc;
 
 	Token() {}
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
@@ -215,12 +214,23 @@ struct Instr {
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
 	string toStr() {
-		string s = opcodeStr;
-		for (Token t : immFields) {
-			if (!t.continued) s.push_back(' ');
-			s.append(t.data);
+		string out = opcodeStr;
+		for (string s : immAsWords()) {
+			out.push_back(' ');
+			out.append(s);
 		}
-		return s;
+		return out;
+	}
+	vector<string> immAsWords() {
+		vector<string> out;
+		for (Token t : immFields) {
+			if (t.continued) {
+				out[out.size()-1].append(t.data);
+			} else {
+				out.push_back(t.data);
+			}
+		}
+		return out;
 	}
 };
 struct Label {
@@ -476,15 +486,15 @@ bool parseInstrOpcode(Instr& instr) {
 	return false;
 }
 bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
-	checkReturnOnFail(instr.immFields.size() == 1, "This line has too many fields", instr);
-	Token t = instr.immFields[0];
-	if (stringToLabel.count(t.data) > 0) {
-		instr.immediate = stringToLabel[t.data].addr;
+	vector<string> immWords = instr.immAsWords();
+	checkReturnOnFail(immWords.size() == 1, "This line has too many fields", instr);
+	if (stringToLabel.count(immWords[0]) > 0) {
+		instr.immediate = stringToLabel[immWords[0]].addr;
 		return true;
 	}
-	checkReturnOnFail(isdigit(t.data.at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(t.data);
-	checkReturnOnFail(to_string(instr.immediate) == t.data, "Invalid instruction immediate", instr);
+	checkReturnOnFail(isdigit(immWords[0].at(0)), "Invalid instruction immediate", instr);
+	instr.immediate = stoi(immWords[0]);
+	checkReturnOnFail(to_string(instr.immediate) == immWords[0], "Invalid instruction immediate", instr);
 	checkReturnOnFail(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 	return true;
 }

@@ -1,8 +1,0 @@
-:returncode 1
-
-:stderr 178
-tests\label-redef.mx:10:1 ERROR: Label redefinition ':label2'
-tests\label-redef.mx:19:1 ERROR: Label redefinition ':L1'
-tests\label-redef.mx:21:1 ERROR: Label redefinition ':L0'
-
-

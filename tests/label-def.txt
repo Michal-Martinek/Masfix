@@ -1,0 +1,33 @@
+:returncode 1
+
+:stderr 1639
+tests\label-def.mx:6:2 ERROR: Label name expected after ':'
+tests\label-def.mx:8:1 ERROR: Label name expected after ':'
+tests\label-def.mx:9:2 ERROR: Label name expected after ':'
+tests\label-def.mx:10:2 ERROR: Label name expected after ':'
+tests\label-def.mx:18:1 ERROR: Invalid label name 'label-test'
+tests\label-def.mx:19:1 ERROR: Invalid label name 'label-'
+tests\label-def.mx:20:1 ERROR: Invalid label name 'label.here'
+tests\label-def.mx:21:1 ERROR: Invalid label name '58'
+tests\label-def.mx:22:2 ERROR: Invalid label name '58lab'
+tests\label-def.mx:24:1 ERROR: Invalid label name '05label_test'
+tests\label-def.mx:28:1 ERROR: Invalid label name ':'
+tests\label-def.mx:29:1 ERROR: Invalid label name ':'
+tests\label-def.mx:30:1 ERROR: Invalid label name 'label:'
+tests\label-def.mx:36:1 ERROR: Label redefinition '_lab1'
+tests\label-def.mx:37:1 ERROR: Label redefinition 'end'
+tests\label-def.mx:38:1 ERROR: Label redefinition 'begin'
+tests\label-def.mx:39:1 ERROR: Invalid label name '58'
+tests\label-def.mx:47:7 ERROR: Expected instruction '5'
+tests\label-def.mx:48:6 ERROR: Expected instruction '8'
+tests\label-def.mx:49:1 ERROR: Invalid label name 'ld>r'
+tests\label-def.mx:50:6 ERROR: Expected instruction '9'
+tests\label-def.mx:54:2 ERROR: Label name expected after ':'
+tests\label-def.mx:14:4 ERROR: Unknown condition 'lab2'
+tests\label-def.mx:27:5 ERROR: Missing condition 'b'
+tests\label-def.mx:31:1 ERROR: Unknown condition 'label'
+tests\label-def.mx:32:1 ERROR: Unknown instruction 'wabel'
+tests\label-def.mx:33:1 ERROR: Unknown condition 'label:'
+tests\label-def.mx:46:8 ERROR: This line has too many fields 'ld n + 2'
+
+

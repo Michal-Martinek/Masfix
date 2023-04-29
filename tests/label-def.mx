@@ -1,0 +1,54 @@
+:label1
+: label2
+	:label3  	
+	: label4
+		: label5; comm
+	:;comm  
+	:ghrg;:ghrg
+:
+	:  
+	:;label
+
+:n
+:_lab1
+:_ lab2
+: _lab3
+: _lab4_
+
+:label-test
+:label-
+:label.here
+:58
+	:58lab
+:_58lab
+:05label_test
+:label_test
+
+: a b
+::
+: :
+: label:
+label
+wabel
+label:
+
+; redefinitions
+:_lab1
+:end
+:begin
+:58
+
+; label then instr
+:test1
+mov 5
+:test2 ld 6
+: test3 strr
+:test4 ld n + 2
+:test 5 swap
+: ld 8
+: ld>r
+:mov 9
+:ldam
+
+; stray ':' at EOF
+	:
