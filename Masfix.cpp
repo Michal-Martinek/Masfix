@@ -168,14 +168,16 @@ struct Loc {
 struct Token {
 	TokenTypes type;
 	string data;
+	Loc loc;
 	bool continued;
 	bool firstOnLine;
 	// TODO add Loc;
 
 	Token() {}
-	Token(TokenTypes type, string data, bool continued, bool firstOnLine) {
+	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
+		this->loc = loc;
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
 	}
@@ -199,30 +201,25 @@ struct Suffix {
 	}
 };
 struct Instr {
-	InstrNames instr;
+	InstrNames instr = InstructionCount;
 	Suffix suffixes;
-	bool hasImm;
 	int immediate;
 
-	Loc loc;
-	vector<string> fields; // TODO loc for each field, suffixes
+	string opcodeStr;
+	Loc opcodeLoc;
+	vector<Token> immFields;
 	
 	Instr() {}
-	Instr(Loc loc, vector<string> fields) {
-		this->instr = InstructionCount; // invalid
-		this->suffixes = Suffix();
-		this->hasImm = false;
-		this->loc = loc;
-		this->fields = fields;
-	}
+	bool hasImm() { return immFields.size() != 0; }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
 	string toStr() {
-		if (fields.size() == 1) return fields[0];
-		string s = fields[0];
-		s.push_back(' ');
-		s.append(fields[1]);
+		string s = opcodeStr;
+		for (Token t : immFields) {
+			if (!t.continued) s.push_back(' ');
+			s.append(t.data);
+		}
 		return s;
 	}
 };
@@ -288,7 +285,7 @@ bool check(bool cond, string message, Token token, bool strict=true) { // TODO u
 }
 bool check(bool cond, string message, Instr instr, bool strict=true) {
 	if (!cond) {
-		string err = instr.loc.toStr() + " ERROR: " + message + " '" + instr.toStr() + "'\n";
+		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + " '" + instr.toStr() + "'\n";
 		addError(err, strict);
 	}
 	return cond;
@@ -326,7 +323,7 @@ string getCharRun(string s) {
 	} while (i < s.size() && isdigit(s.at(i)) == num && isalpha(s.at(i)) == alpha && isspace(s.at(i)) == space);
 	return out;
 }
-list<Token> tokenize(ifstream& inFile) {
+list<Token> tokenize(ifstream& inFile, string fileName) {
 	static_assert(TokenCount == 3, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine;
@@ -336,22 +333,25 @@ list<Token> tokenize(ifstream& inFile) {
 		continued = false;
 		firstOnLine = true;
 		line = line.substr(0, line.find(';'));
+		int col = 1;
 
 		while (line.size()) {
 			char first = line.at(0);
 			string run = getCharRun(line);
+			Token token;
+			Loc loc = Loc(fileName, lineNum, col);
+			col += run.size();
 			line = line.substr(run.size());
 			if (isspace(first)) {
 				continued = false;
 				continue;
 			}
-			Token token;
 			if (isdigit(first)) {
-				token = Token(Tnumeric, run, continued, firstOnLine);
+				token = Token(Tnumeric, run, loc, continued, firstOnLine);
 			} else if (isalpha(first)) {
-				token = Token(Talpha, run, continued, firstOnLine);
+				token = Token(Talpha, run, loc, continued, firstOnLine);
 			} else if (run.size() == 1) {
-				token = Token(Tspecial, run, continued, firstOnLine);
+				token = Token(Tspecial, run, loc, continued, firstOnLine);
 			} else {
 				assert(false);
 			}
@@ -376,7 +376,7 @@ string joinTokens(list<Token>& tokens) {
 	tokens.pop_front();
 	return joinTokens(top, tokens);
 }
-bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, int instrNum) {
+bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
 	string name = joinTokens(tokens);
 	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", Token(), false);
 	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", Token(), false);
@@ -388,7 +388,7 @@ void _ignoreLine(list<Token>& tokens) {
 		tokens.pop_front();
 	}
 }
-pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file) {
+pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
 	vector<Instr> instrs;
 	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
 	bool ignoreLine = false;
@@ -404,13 +404,15 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
 			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after ':'", top); // TODO do not report the data
 			ignoreLine = false;
-			continueOnFalse(extractLabelName(tokens, strToLabel, instrs.size()));
+			continueOnFalse(extractLabelName(tokens, strToLabel, top.loc, instrs.size()));
 		} else if (top.type == Talpha) {
-			vector<string> fields = {joinTokens(top, tokens)}; // TODO split instr fields into string opcode and vector<token> imm?
-			// TODO the instr should have vector<Token> and no Loc
-			if (tokens.size() && !tokens.front().firstOnLine) fields.push_back( joinTokens(tokens) );
-			checkContinueOnFail(tokens.size() == 0 || tokens.front().firstOnLine, "This line has too many fields", top);
-			instrs.push_back(Instr(Loc("", 1, 1), fields));
+			Instr instr;
+			instr.opcodeStr = joinTokens(top, tokens);
+			instr.opcodeLoc = top.loc;
+			while (tokens.size() && !tokens.front().firstOnLine) {
+				instr.immFields.push_back(tokens.front());
+			}
+			instrs.push_back(instr);
 		} else {
 			checkContinueOnFail(false, "Expected instruction or immediate", top);
 		}
@@ -463,12 +465,11 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 }
 bool parseInstrOpcode(Instr& instr) {
 	static_assert(InstructionCount == 14, "Exhaustive parseInstrOpcode definition");
-	string parsing = instr.fields[0];
-	for (int checkedLen = min(4, (int)parsing.size()); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
-		string substr = parsing.substr(0, checkedLen);
+	for (int checkedLen = min(4, (int)instr.opcodeStr.size()); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
+		string substr = instr.opcodeStr.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
-			string suffix = parsing.substr(checkedLen);
+			string suffix = instr.opcodeStr.substr(checkedLen);
 			return parseSuffixes(instr, suffix, instr.instr == Ib || instr.instr == Il || instr.instr == Is);
 		}
 	}
@@ -476,21 +477,21 @@ bool parseInstrOpcode(Instr& instr) {
 	return false;
 }
 bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
-	string s = instr.fields[1];
-	if (stringToLabel.count(s) > 0) {
-		instr.immediate = stringToLabel[s].addr;
+	checkReturnOnFail(instr.immFields.size() == 1, "This line has too many fields", instr);
+	Token t = instr.immFields[0];
+	if (stringToLabel.count(t.data) > 0) {
+		instr.immediate = stringToLabel[t.data].addr;
 		return true;
 	}
-	checkReturnOnFail(isdigit(s.at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(s);
-	checkReturnOnFail(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
+	checkReturnOnFail(isdigit(t.data.at(0)), "Invalid instruction immediate", instr);
+	instr.immediate = stoi(t.data);
+	checkReturnOnFail(to_string(instr.immediate) == t.data, "Invalid instruction immediate", instr);
 	checkReturnOnFail(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 	return true;
 }
 bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	returnOnFalse(parseInstrOpcode(instr));
-	instr.hasImm = instr.fields.size() == 2;
-	if (instr.hasImm) {
+	if (instr.hasImm()) {
 		returnOnFalse(parseInstrImmediate(instr, stringToLabel));
 	}
 	return true;
@@ -500,14 +501,14 @@ bool checkValidity(Instr& instr) {
 	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
 	if (instr.instr == InstructionCount) unreachable();
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
-		checkReturnOnFail(!instr.hasImm && !instr.hasReg(), "This instruction should have no arguments", instr);
+		checkReturnOnFail(!instr.hasImm() && !instr.hasReg(), "This instruction should have no arguments", instr);
 	} else if (instr.instr == Iinc || instr.instr == Iinu || instr.instr == Iipc) {
-		checkReturnOnFail(!instr.hasImm, "This instruction cannot have an immediate", instr);
+		checkReturnOnFail(!instr.hasImm(), "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else {
-		checkReturnOnFail(instr.hasImm ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+		checkReturnOnFail(instr.hasImm() ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
 	}
 	if (InstrToModReg.count(instr.instr) == 0) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
@@ -673,7 +674,7 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// each operation, register fetch or instr body must touch only appropriate architecture registers, others must be left unchanged
 	// also, they need to make sure all changed architecture regs, intermediate value registers and the memory /
 	//		is clamped to the right bitsize and contains a valid value
-	if (instr.hasImm) {
+	if (instr.hasImm()) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
 	} else if (instr.hasReg()) {
 		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
