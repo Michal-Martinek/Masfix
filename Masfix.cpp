@@ -261,7 +261,7 @@ fs::path pathFromMasfix(fs::path p) {
 #define returnOnFalse(cond) if (!(cond)) return false;
 #define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
 #define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
-#define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value;
+#define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value; // TODO make checkReturnOnFail return a default value of the corresponding type making this obsolete
 
 vector<string> errors;
 void raiseErrors() {
@@ -276,23 +276,18 @@ void addError(string message, bool strict=true) {
 	if (strict || FLAG_strictErrors)
 		raiseErrors();
 }
-bool check(bool cond, string message, Token token, bool strict=true) { // TODO use this instead od Instr X we want to show whole Instr on error, but use the correct loc
+
+#define errorQuoted(s) " '" + s + "'"
+bool check(bool cond, string message, Token token, bool strict=true) {
 	if (!cond) {
-		string err = " ERROR: " + message + " '" + token.data + "'\n";
+		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.data) "\n";
 		addError(err, strict);
 	}
 	return cond;
 }
 bool check(bool cond, string message, Instr instr, bool strict=true) {
 	if (!cond) {
-		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + " '" + instr.toStr() + "'\n";
-		addError(err, strict);
-	}
-	return cond;
-}
-bool check(bool cond, string message, Label label, bool strict=true) {
-	if (!cond) {
-		string err = label.loc.toStr() + " ERROR: " + message + " '" + label.toStr() + "'\n";
+		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
 		addError(err, strict);
 	}
 	return cond;
@@ -378,9 +373,9 @@ string joinTokens(list<Token>& tokens) {
 }
 bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
 	string name = joinTokens(tokens);
-	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", Token(), false);
-	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", Token(), false);
-	strToLabel.insert(pair(name, Label(name, instrNum, Loc("", 1, 1))));
+	checkReturnOnFail(isValidIdentifier(name), "Invalid label name" errorQuoted(name), topLoc);
+	checkReturnOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), topLoc);
+	strToLabel.insert(pair(name, Label(name, instrNum, topLoc)));
 	return true;
 }
 void _ignoreLine(list<Token>& tokens) {
@@ -390,19 +385,23 @@ void _ignoreLine(list<Token>& tokens) {
 }
 pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
 	vector<Instr> instrs;
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
+	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
+	if (tokens.size()) {
+		strToLabel["begin"].loc = tokens.front().loc;
+		strToLabel["end"].loc = tokens.back().loc;
+	}
+	
 	bool ignoreLine = false;
-
 	while (true) {
 		if (ignoreLine) _ignoreLine(tokens);
 		ignoreLine = true;
-		if (!tokens.size()) break;
+		if (tokens.size() == 0) break;
 
 		Token top = tokens.front();
 		tokens.pop_front();
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
-			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after ':'", top); // TODO do not report the data
+			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after", top);
 			ignoreLine = false;
 			continueOnFalse(extractLabelName(tokens, strToLabel, top.loc, instrs.size()));
 		} else if (top.type == Talpha) {
@@ -411,15 +410,15 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 			instr.opcodeLoc = top.loc;
 			while (tokens.size() && !tokens.front().firstOnLine) {
 				instr.immFields.push_back(tokens.front());
+				tokens.pop_front();
 			}
 			instrs.push_back(instr);
 		} else {
-			checkContinueOnFail(false, "Expected instruction or immediate", top);
+			checkContinueOnFail(false, "Expected instruction", top);
 		}
 		ignoreLine = false;
 	}
 	strToLabel["end"].addr = instrs.size();
-	// TODO end has loc of last token
 	return pair(instrs, strToLabel);
 }
 // parsing of instructions -----------------------------------------
@@ -1020,13 +1019,13 @@ void compileAndRun(fs::path asmPath) {
 }
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
-	string file = pathFromMasfix(InputFileName).string();
+	string fileName = pathFromMasfix(InputFileName).string();
 
 	ifstream inFile = getInputFile();
-	list<Token> tokens = tokenize(inFile);
+	list<Token> tokens = tokenize(inFile, fileName);
 	inFile.close();
 	
-	auto compiled = compile(tokens, file);
+	auto compiled = compile(tokens, fileName);
 	vector<Instr> instrs = compiled.first;
 	map<string, Label> strToLabel = compiled.second;
 
