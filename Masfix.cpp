@@ -35,7 +35,6 @@ enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tspecial,
-	// TODO do we want line breaks between instructions?
 
 	TokenCount
 };
@@ -377,25 +376,35 @@ string joinTokens(list<Token>& tokens) {
 	tokens.pop_front();
 	return joinTokens(top, tokens);
 }
-string extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel) {
+bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, int instrNum) {
 	string name = joinTokens(tokens);
-	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", Token(), "");
-	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", Token(), "");
-	return name;
+	checkReturnValOnFail(isValidIdentifier(name), "Invalid label name", Token(), false);
+	checkReturnValOnFail(strToLabel.count(name) == 0, "Label redefinition", Token(), false);
+	strToLabel.insert(pair(name, Label(name, instrNum, Loc("", 1, 1))));
+	return true;
+}
+void _ignoreLine(list<Token>& tokens) {
+	while (tokens.size() && !tokens.front().firstOnLine) {
+		tokens.pop_front();
+	}
 }
 pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file) {
 	vector<Instr> instrs;
 	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(file, 1, 1))}, {"end", Label("end", 0, Loc(file, 1, 1))}};
+	bool ignoreLine = false;
 
-	while (tokens.size()) {
+	while (true) {
+		if (ignoreLine) _ignoreLine(tokens);
+		ignoreLine = true;
+		if (!tokens.size()) break;
+
 		Token top = tokens.front();
 		tokens.pop_front();
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
 			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after ':'", top); // TODO do not report the data
-			string labelName = extractLabelName(tokens, strToLabel);
-			continueOnFalse(labelName != "");
-			strToLabel.insert(pair(labelName, Label(labelName, instrs.size(), Loc("", 1, 1))));
+			ignoreLine = false;
+			continueOnFalse(extractLabelName(tokens, strToLabel, instrs.size()));
 		} else if (top.type == Talpha) {
 			vector<string> fields = {joinTokens(top, tokens)}; // TODO split instr fields into string opcode and vector<token> imm?
 			// TODO the instr should have vector<Token> and no Loc
@@ -403,11 +412,9 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 			checkContinueOnFail(tokens.size() == 0 || tokens.front().firstOnLine, "This line has too many fields", top);
 			instrs.push_back(Instr(Loc("", 1, 1), fields));
 		} else {
-			while (!tokens.front().firstOnLine) {
-				tokens.pop_front();
-			}
 			checkContinueOnFail(false, "Expected instruction or immediate", top);
 		}
+		ignoreLine = false;
 	}
 	strToLabel["end"].addr = instrs.size();
 	// TODO end has loc of last token
