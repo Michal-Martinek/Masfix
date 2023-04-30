@@ -1,0 +1,28 @@
+
+str|
+str& 5
+str^
+str^p
+str|r 5
+str^&
+strt
+strth
+strrt
+str t
+str! 5
+
+b|
+beq|
+bne& 5
+bgt 5
+bgtt 6
+
+blt^
+ble^p
+bne|r 5
+lgt^&
+seqr
+bgeth
+slttr
+sgert
+sge t

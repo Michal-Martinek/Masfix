@@ -1,0 +1,13 @@
+:returncode 1
+
+:stderr 525
+tests\tokenization.mx:11:1 ERROR: Label name expected after ':'
+tests\tokenization.mx:12:2 ERROR: Label name expected after ':'
+tests\tokenization.mx:14:2 ERROR: Unsupported special character '\'
+tests\tokenization.mx:15:2 ERROR: Unsupported special character '\'
+tests\tokenization.mx:16:2 ERROR: Unsupported special character '\'
+tests\tokenization.mx:17:2 ERROR: Unsupported special character '\'
+tests\tokenization.mx:21:1 ERROR: Label name expected after ':'
+tests\tokenization.mx:13:2 ERROR: Unknown instruction 'here'
+
+
