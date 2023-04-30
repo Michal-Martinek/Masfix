@@ -363,14 +363,14 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 			if (firstOnLine) firstOnLine--;
 			char first = line.at(0);
 			string run = getCharRun(line);
+			Token token;
+			Loc loc = Loc(fileName, lineNum, col);
 			col += run.size();
 			line = line.substr(run.size());
 			if (isspace(first)) {
 				continued = false;
 				continue;
 			}
-			Token token;
-			Loc loc = Loc(fileName, lineNum, col);
 			if (isdigit(first)) {
 				token = Token(Tnumeric, run, loc, continued, firstOnLine);
 			} else if (isalpha(first)) {
@@ -399,7 +399,10 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 			addToken(tokens, listTokens, token);
 		}
 	}
-	check(listTokens.size() == 0, "Unclosed token list", listTokens.size() == 0 ? Token() : *listTokens.top(), false); // TODO better coupling of delim pairs in case of mismatches
+	while (listTokens.size()) {
+		check(false, "Unclosed token list", *listTokens.top(), false);
+		listTokens.pop();
+	}
 	return tokens;
 }
 // compilation -----------------------------------
