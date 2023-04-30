@@ -7,6 +7,7 @@ namespace fs = std::filesystem;
 #include <map>
 #include <vector>
 #include <list>
+#include <stack>
 
 #include <algorithm>
 #include <math.h>
@@ -35,6 +36,7 @@ enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tspecial,
+	Tlist,
 
 	TokenCount
 };
@@ -168,6 +170,8 @@ struct Loc {
 struct Token {
 	TokenTypes type;
 	string data;
+	list<Token> tlist;
+
 	Loc loc;
 	bool continued;
 	bool firstOnLine;
@@ -274,7 +278,7 @@ fs::path pathFromMasfix(fs::path p) {
 #define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value; // TODO make checkReturnOnFail return a default value of the corresponding type making this obsolete
 
 vector<string> errors;
-void raiseErrors() {
+void raiseErrors() { // TODO sort errors based on line and file
 	for (string s : errors) {
 		cerr << s;
 	}
@@ -328,43 +332,74 @@ string getCharRun(string s) {
 	} while (i < s.size() && isdigit(s.at(i)) == num && isalpha(s.at(i)) == alpha && isspace(s.at(i)) == space);
 	return out;
 }
+void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
+	Token* addedPtr;
+	if (listTokens.size()) {
+		listTokens.top()->tlist.push_back(token);
+		addedPtr = &listTokens.top()->tlist.back();
+	} else {
+		tokens.push_back(token);
+		addedPtr = &tokens.back();
+	}
+	if (token.type == Tlist) {
+		listTokens.push(addedPtr);
+	}
+} 
 list<Token> tokenize(ifstream& inFile, string fileName) {
-	static_assert(TokenCount == 3, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 4, "Exhaustive tokenize definition");
 	string line;
-	bool continued, firstOnLine;
+	bool continued;
+	int firstOnLine;
 
 	list<Token> tokens;
+	stack<Token*> listTokens;
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		continued = false;
-		firstOnLine = true;
+		firstOnLine = 2;
 		line = line.substr(0, line.find(';'));
 		int col = 1;
 
 		while (line.size()) {
+			if (firstOnLine) firstOnLine--;
 			char first = line.at(0);
 			string run = getCharRun(line);
-			Token token;
-			Loc loc = Loc(fileName, lineNum, col);
 			col += run.size();
 			line = line.substr(run.size());
 			if (isspace(first)) {
 				continued = false;
 				continue;
 			}
+			Token token;
+			Loc loc = Loc(fileName, lineNum, col);
 			if (isdigit(first)) {
 				token = Token(Tnumeric, run, loc, continued, firstOnLine);
 			} else if (isalpha(first)) {
 				token = Token(Talpha, run, loc, continued, firstOnLine);
 			} else if (run.size() == 1) {
-				token = Token(Tspecial, run, loc, continued, firstOnLine);
+				if (first == '(' || first == '[' || first == '{') {
+					token = Token(Tlist, string(1, first), loc, continued, firstOnLine);
+					addToken(tokens, listTokens, token);
+					continued = false;
+					continue;
+				} else if (first == ')' || first == ']' || first == '}') {
+					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
+					token = *listTokens.top();
+					assert(token.type == Tlist && token.data.size() == 1);
+					checkContinueOnFail(token.data.at(0) == first - 2 + (first == ')'), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
+					listTokens.pop();
+					continued = true;
+					continue;
+				} else {
+					token = Token(Tspecial, run, loc, continued, firstOnLine);
+				}
 			} else {
 				assert(false);
 			}
 			continued = true;
-			firstOnLine = false;
-			tokens.push_back(token);
+			addToken(tokens, listTokens, token);
 		}
 	}
+	check(listTokens.size() == 0, "Unclosed token list", listTokens.size() == 0 ? Token() : *listTokens.top(), false); // TODO better coupling of delim pairs in case of mismatches
 	return tokens;
 }
 // compilation -----------------------------------
