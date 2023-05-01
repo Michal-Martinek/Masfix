@@ -251,25 +251,31 @@ struct Label {
 		return ":" + name;
 	}
 };
-// helpers ---------------------------------
-bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
+// helpers --------------------------------------------------------------
+bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
 	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
+	return s.size() > 0 && find_if_not(s.begin(), s.end(), _validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
 }
-fs::path pathFromMasfix(fs::path p) {
-	fs::path out;
-	bool found = false;
-	for (fs::path part : p) {
-		string s = part.string();
-		if (found) out.append(s);
-		if (s == "Masfix") {
-			found = true;
-		}
+string joinTokens(Token top, list<Token>& tokens) {
+	string out = top.data;
+	while (tokens.size() && tokens.front().continued) {
+		out += tokens.front().data;
+		tokens.pop_front();
 	}
-	return found ? out : p;
+	return out;
 }
-// checks
+string joinTokens(list<Token>& tokens) {
+	Token top = tokens.front();
+	tokens.pop_front();
+	return joinTokens(top, tokens);
+}
+void eatLine(list<Token>& tokens) {
+	while (tokens.size() && !tokens.front().firstOnLine) {
+		tokens.pop_front();
+	}
+}
+// checks --------------------------------------------------------------------
 #define unreachable() assert(("Unreachable", false));
 #define continueOnFalse(cond) if (!(cond)) continue;
 #define returnOnFalse(cond) if (!(cond)) return false;
@@ -369,6 +375,7 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 			line = line.substr(run.size());
 			if (isspace(first)) {
 				continued = false;
+				firstOnLine ++;
 				continue;
 			}
 			if (isdigit(first)) {
@@ -406,30 +413,12 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 	return tokens;
 }
 // compilation -----------------------------------
-string joinTokens(Token top, list<Token>& tokens) {
-	string out = top.data;
-	while (tokens.size() && tokens.front().continued) {
-		out += tokens.front().data;
-		tokens.pop_front();
-	}
-	return out;
-}
-string joinTokens(list<Token>& tokens) {
-	Token top = tokens.front();
-	tokens.pop_front();
-	return joinTokens(top, tokens);
-}
 bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
 	string name = joinTokens(tokens);
 	checkReturnOnFail(isValidIdentifier(name), "Invalid label name" errorQuoted(name), topLoc);
 	checkReturnOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), topLoc);
 	strToLabel.insert(pair(name, Label(name, instrNum, topLoc)));
 	return true;
-}
-void _ignoreLine(list<Token>& tokens) {
-	while (tokens.size() && !tokens.front().firstOnLine) {
-		tokens.pop_front();
-	}
 }
 pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
 	vector<Instr> instrs;
@@ -441,7 +430,7 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 	
 	bool ignoreLine = false;
 	while (true) {
-		if (ignoreLine) _ignoreLine(tokens);
+		if (ignoreLine) eatLine(tokens);
 		ignoreLine = true;
 		if (tokens.size() == 0) break;
 
@@ -462,7 +451,7 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 			}
 			instrs.push_back(instr);
 		} else {
-			checkContinueOnFail(false, "Expected instruction", top);
+			checkContinueOnFail(false, "Unexpected token", top);
 		}
 		ignoreLine = false;
 	}
@@ -1064,6 +1053,18 @@ void compileAndRun(fs::path asmPath) {
 	if (FLAG_run) {
 		runCmdEchoed(exePath.string());
 	}
+}
+fs::path pathFromMasfix(fs::path p) {
+	fs::path out;
+	bool found = false;
+	for (fs::path part : p) {
+		string s = part.string();
+		if (found) out.append(s);
+		if (s == "Masfix") {
+			found = true;
+		}
+	}
+	return found ? out : p;
 }
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
