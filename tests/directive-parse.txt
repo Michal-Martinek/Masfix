@@ -1,0 +1,38 @@
+:returncode 1
+
+:stderr 2065
+tests\directive-parse.mx:1:1 ERROR: Directive name expected
+tests\directive-parse.mx:2:1 ERROR: Directive name expected
+tests\directive-parse.mx:4:2 ERROR: Unknown directive 'lulw'
+tests\directive-parse.mx:5:3 ERROR: Unknown directive 'lulw'
+tests\directive-parse.mx:7:1 ERROR: Directive name expected
+tests\directive-parse.mx:8:1 ERROR: Directive name expected
+tests\directive-parse.mx:9:2 ERROR: Invalid directive name '89'
+tests\directive-parse.mx:10:2 ERROR: Unknown directive '_'
+tests\directive-parse.mx:11:3 ERROR: Unknown directive '_'
+tests\directive-parse.mx:13:2 ERROR: Define name expected
+tests\directive-parse.mx:14:3 ERROR: Define name expected
+tests\directive-parse.mx:15:2 ERROR: Unknown directive 'define_abc'
+tests\directive-parse.mx:16:2 ERROR: Unknown directive 'defne'
+tests\directive-parse.mx:17:2 ERROR: Unknown directive 'aaaa'
+tests\directive-parse.mx:19:9 ERROR: Define value expected
+tests\directive-parse.mx:20:9 ERROR: Define value expected
+tests\directive-parse.mx:23:2 ERROR: Define name expected
+tests\directive-parse.mx:24:2 ERROR: Define name expected
+tests\directive-parse.mx:26:9 ERROR: Invalid define name '59var'
+tests\directive-parse.mx:27:9 ERROR: Define value expected
+tests\directive-parse.mx:28:9 ERROR: Invalid define name 'CONST_VAL$'
+tests\directive-parse.mx:30:9 ERROR: Define value expected
+tests\directive-parse.mx:35:17 ERROR: Unexpected token after directive '23'
+tests\directive-parse.mx:36:17 ERROR: Unexpected token after directive '25'
+tests\directive-parse.mx:38:17 ERROR: Unexpected token after directive '28'
+tests\directive-parse.mx:39:16 ERROR: Unexpected token after directive '_'
+tests\directive-parse.mx:40:9 ERROR: Define value expected
+tests\directive-parse.mx:42:14 ERROR: Unexpected token type 'abc'
+tests\directive-parse.mx:44:2 ERROR: Define name expected
+tests\directive-parse.mx:21:2 ERROR: Unexpected token '64'
+tests\directive-parse.mx:37:2 ERROR: Unexpected token '26'
+tests\directive-parse.mx:41:2 ERROR: Unexpected token '12'
+tests\directive-parse.mx:3:1 ERROR: Unknown instruction 'dir'
+
+

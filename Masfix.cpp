@@ -251,30 +251,6 @@ struct Label {
 		return ":" + name;
 	}
 };
-// helpers --------------------------------------------------------------
-bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
-bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
-	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), _validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
-}
-string joinTokens(Token top, list<Token>& tokens) {
-	string out = top.data;
-	while (tokens.size() && tokens.front().continued) {
-		out += tokens.front().data;
-		tokens.pop_front();
-	}
-	return out;
-}
-string joinTokens(list<Token>& tokens) {
-	Token top = tokens.front();
-	tokens.pop_front();
-	return joinTokens(top, tokens);
-}
-void eatLine(list<Token>& tokens) {
-	while (tokens.size() && !tokens.front().firstOnLine) {
-		tokens.pop_front();
-	}
-}
 // checks --------------------------------------------------------------------
 #define unreachable() assert(("Unreachable", false));
 #define continueOnFalse(cond) if (!(cond)) continue;
@@ -326,7 +302,60 @@ bool check(bool cond, string message, bool strict=true) {
 	}
 	return cond;
 }
-// tokenization ----------------------------------
+// helpers --------------------------------------------------------------
+// TODO make helpers more usable across codebase
+bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
+bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
+	// TODO: add reason for invalid identifier
+	return s.size() > 0 && find_if_not(s.begin(), s.end(), _validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
+}
+string joinTokens(Token top, list<Token>& tokens) {
+	string out = top.data;
+	while (tokens.size() && tokens.front().continued) {
+		out += tokens.front().data;
+		tokens.pop_front();
+	}
+	return out;
+}
+string joinTokens(list<Token>& tokens) {
+	Token top = tokens.front();
+	tokens.pop_front();
+	return joinTokens(top, tokens);
+}
+void eatLine(list<Token>& tokens, list<Token>::iterator& itr) {
+	while (itr != tokens.end() && !itr->firstOnLine) {
+		itr = tokens.erase(itr);
+	}
+}
+void eatLine(list<Token>& tokens) {
+	list<Token>::iterator itr = tokens.begin();
+	eatLine(tokens, itr);
+}
+void eraseToken(list<Token>& l, list<Token>::iterator& itr) {
+	itr = l.erase(itr);
+}
+bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Token& token, TokenTypes type, string missingTokenErrMesage, bool sameLine=true) {
+	checkReturnOnFail(itr != currList.end(), missingTokenErrMesage, token.loc);
+	if (sameLine) checkReturnOnFail(!itr->firstOnLine, missingTokenErrMesage, token.loc);
+	token = *itr;
+	eraseToken(currList, itr);
+	checkReturnOnFail(token.type == type, "Unexpected token type", token);
+	return true;
+}
+pair<string, Token> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string missingIdentErrMesage, string invalidIdentErrMessage, Loc directiveLoc) {
+	string out = "";
+	bool first = true;
+	Token firstEaten = itr != currList.end() ? *itr : Token();
+	while (itr != currList.end() && !itr->firstOnLine && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
+		out += itr->data;
+		eraseToken(currList, itr); // NOTE eat always?
+		first = false;
+	}
+	checkReturnValOnFail(out != "", missingIdentErrMesage, directiveLoc, pair("", Token()));
+	checkReturnValOnFail(isValidIdentifier(out), invalidIdentErrMessage + errorQuoted(out), firstEaten.loc, pair("", Token()));
+	return pair(out, firstEaten);
+}
+// tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
 	int num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
 	if (num == 0 && alpha == 0 && space == 0) return string(1, s.at(0));
@@ -411,6 +440,52 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 		listTokens.pop();
 	}
 	return tokens;
+}
+// preprocess -------------------------------------------------------------------------
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token token) {
+	string name; Token identToken; // TODO use tie EVERYWHERE
+	tie(name, identToken) = eatIdentifier(currList, itr, "Directive name expected", "Invalid directive name", token.loc);
+	returnOnFalse(name != "");
+	checkReturnOnFail(name == "define", "Unknown directive" errorQuoted(name), identToken.loc);
+	tie(name, identToken) = eatIdentifier(currList, itr, "Define name expected", "Invalid define name", identToken.loc);
+	returnOnFalse(name != "");
+	returnOnFalse(eatToken(currList, itr, identToken, Tnumeric, "Define value expected"));
+
+	// TODO check the list
+	// TODO error encounter strategy
+	// TODO remember the define
+
+	if (itr != currList.end()) {
+		checkReturnOnFail(itr->firstOnLine, "Unexpected token after directive", *itr);
+	}
+	return true;
+}
+void preprocess(list<Token>& tokens) {
+	stack<list<Token>*> openLists( {&tokens} );
+	stack<list<Token>::iterator> openItrs( {tokens.begin()} );
+
+	while (openLists.size()) {
+		list<Token>* currList = openLists.top();
+		list<Token>::iterator* currItr = &openItrs.top();
+		while (*currItr != currList->end()) {
+			Token& currToken = **currItr;
+			if (currToken.type == Tspecial) {
+				if (currToken.data == "%") {
+					eraseToken(*currList, *currItr);
+					if (!processDirective(*currList, *currItr, currToken)) eatLine(*currList, *currItr);
+					continue;
+				}
+			} else if (currToken.type == Tlist) {
+				openLists.push(&currToken.tlist);
+				openItrs.push(currToken.tlist.begin());
+				currList = openLists.top();
+				currItr = &openItrs.top();
+			}
+			++ (*currItr);
+		}
+		openLists.pop();
+		openItrs.pop();
+	}
 }
 // compilation -----------------------------------
 bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
@@ -1074,6 +1149,7 @@ int main(int argc, char *argv[]) {
 	list<Token> tokens = tokenize(inFile, fileName);
 	inFile.close();
 	
+	preprocess(tokens);
 	auto compiled = compile(tokens, fileName);
 	vector<Instr> instrs = compiled.first;
 	map<string, Label> strToLabel = compiled.second;
@@ -1087,3 +1163,6 @@ int main(int argc, char *argv[]) {
 
 	compileAndRun(OutputFileName);
 }
+// TODO ERROR: Unexpected token '(' <- better report of unexpected lists
+// TODO parse lists in label names
+// TODO prohibit complex define names
