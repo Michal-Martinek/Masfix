@@ -274,21 +274,21 @@ void addError(string message, bool strict=true) {
 }
 
 #define errorQuoted(s) " '" + s + "'"
-bool check(bool cond, string message, Token token, bool strict=true) {
+bool check(bool cond, string message, Token token, bool strict=false) {
 	if (!cond) {
 		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.data) "\n";
 		addError(err, strict);
 	}
 	return cond;
 }
-bool check(bool cond, string message, Instr instr, bool strict=true) {
+bool check(bool cond, string message, Instr instr, bool strict=false) {
 	if (!cond) {
 		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
 		addError(err, strict);
 	}
 	return cond;
 }
-bool check(bool cond, string message, Loc loc, bool strict=true) {
+bool check(bool cond, string message, Loc loc, bool strict=false) {
 	if (!cond) {
 		string err = loc.toStr() + " ERROR: " + message + "\n";
 		addError(err, strict);
@@ -303,57 +303,51 @@ bool check(bool cond, string message, bool strict=true) {
 	return cond;
 }
 // helpers --------------------------------------------------------------
-// TODO make helpers more usable across codebase
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
 	// TODO: add reason for invalid identifier
 	return s.size() > 0 && find_if_not(s.begin(), s.end(), _validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
-}
-string joinTokens(Token top, list<Token>& tokens) {
-	string out = top.data;
-	while (tokens.size() && tokens.front().continued) {
-		out += tokens.front().data;
-		tokens.pop_front();
-	}
-	return out;
-}
-string joinTokens(list<Token>& tokens) {
-	Token top = tokens.front();
-	tokens.pop_front();
-	return joinTokens(top, tokens);
 }
 void eatLine(list<Token>& tokens, list<Token>::iterator& itr) {
 	while (itr != tokens.end() && !itr->firstOnLine) {
 		itr = tokens.erase(itr);
 	}
 }
-void eatLine(list<Token>& tokens) {
-	list<Token>::iterator itr = tokens.begin();
-	eatLine(tokens, itr);
+bool expectNewLine(list<Token>& currList, list<Token>::iterator& itr, string afterWhat) {
+	if (itr != currList.end()) {
+		checkReturnOnFail(itr->firstOnLine, "Unexpected token after " + afterWhat, *itr);
+	}
+	return true;
 }
 void eraseToken(list<Token>& l, list<Token>::iterator& itr) {
 	itr = l.erase(itr);
 }
-bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Token& token, TokenTypes type, string missingTokenErrMesage, bool sameLine=true) {
-	checkReturnOnFail(itr != currList.end(), missingTokenErrMesage, token.loc);
-	if (sameLine) checkReturnOnFail(!itr->firstOnLine, missingTokenErrMesage, token.loc);
-	token = *itr;
+bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine=true) {
+	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
+	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
+	outToken = *itr;
 	eraseToken(currList, itr);
-	checkReturnOnFail(token.type == type, "Unexpected token type", token);
-	return true;
+	return check(outToken.type == type, "Unexpected token type", outToken);
 }
-pair<string, Token> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string missingIdentErrMesage, string invalidIdentErrMessage, Loc directiveLoc) {
+pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string errMissing, Loc prevLoc, bool canStartLine=false) {
 	string out = "";
 	bool first = true;
 	Token firstEaten = itr != currList.end() ? *itr : Token();
-	while (itr != currList.end() && !itr->firstOnLine && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
+	while (itr != currList.end() && (!itr->firstOnLine || (canStartLine && first)) && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
 		out += itr->data;
-		eraseToken(currList, itr); // NOTE eat always?
+		eraseToken(currList, itr);
 		first = false;
 	}
-	checkReturnValOnFail(out != "", missingIdentErrMesage, directiveLoc, pair("", Token()));
-	checkReturnValOnFail(isValidIdentifier(out), invalidIdentErrMessage + errorQuoted(out), firstEaten.loc, pair("", Token()));
-	return pair(out, firstEaten);
+	check(out != "", errMissing, prevLoc);
+	return pair(out, firstEaten.loc);
+}
+pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string errMissing, string errInvalid, Loc prevLoc) {
+	string name; Loc loc;
+	tie(name, loc) = eatTokenRun(currList, itr, errMissing, prevLoc);
+	if (name != "") { // maybe you think the branch is unnecessary, but it's needed
+		checkReturnValOnFail(isValidIdentifier(name), errInvalid + errorQuoted(name), loc, pair("", Loc()));
+	}
+	return pair(name, loc);
 }
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
@@ -379,7 +373,7 @@ void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
 	if (token.type == Tlist) {
 		listTokens.push(addedPtr);
 	}
-} 
+}
 list<Token> tokenize(ifstream& inFile, string fileName) {
 	static_assert(TokenCount == 4, "Exhaustive tokenize definition");
 	string line;
@@ -415,7 +409,7 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 				if (first == '(' || first == '[' || first == '{') {
 					token = Token(Tlist, string(1, first), loc, continued, firstOnLine);
 					addToken(tokens, listTokens, token);
-					continued = false;
+					continued = false; // TODO should (first token in list).firstOnLine - always / never / depends?
 					continue;
 				} else if (first == ')' || first == ']' || first == '}') {
 					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
@@ -436,28 +430,26 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 		}
 	}
 	while (listTokens.size()) {
-		check(false, "Unclosed token list", *listTokens.top(), false);
+		check(false, "Unclosed token list", *listTokens.top());
 		listTokens.pop();
 	}
 	return tokens;
 }
 // preprocess -------------------------------------------------------------------------
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token token) {
-	string name; Token identToken; // TODO use tie EVERYWHERE
-	tie(name, identToken) = eatIdentifier(currList, itr, "Directive name expected", "Invalid directive name", token.loc);
+	string name; Loc loc;
+	tie(name, loc) = eatIdentifier(currList, itr, "Directive name expected", "Invalid directive name", token.loc);
 	returnOnFalse(name != "");
-	checkReturnOnFail(name == "define", "Unknown directive" errorQuoted(name), identToken.loc);
-	tie(name, identToken) = eatIdentifier(currList, itr, "Define name expected", "Invalid define name", identToken.loc);
+	checkReturnOnFail(name == "define", "Unknown directive" errorQuoted(name), loc);
+	tie(name, loc) = eatIdentifier(currList, itr, "Define name expected", "Invalid define name", loc);
 	returnOnFalse(name != "");
-	returnOnFalse(eatToken(currList, itr, identToken, Tnumeric, "Define value expected"));
+	returnOnFalse(eatToken(currList, itr, loc, token, Tnumeric, "Define value expected"));
 
 	// TODO check the list
 	// TODO error encounter strategy
 	// TODO remember the define
 
-	if (itr != currList.end()) {
-		checkReturnOnFail(itr->firstOnLine, "Unexpected token after directive", *itr);
-	}
+	expectNewLine(currList, itr, "directive");
 	return true;
 }
 void preprocess(list<Token>& tokens) {
@@ -475,54 +467,61 @@ void preprocess(list<Token>& tokens) {
 					if (!processDirective(*currList, *currItr, currToken)) eatLine(*currList, *currItr);
 					continue;
 				}
-			} else if (currToken.type == Tlist) {
+			}
+			++ (*currItr);
+			if (currToken.type == Tlist) {
 				openLists.push(&currToken.tlist);
 				openItrs.push(currToken.tlist.begin());
 				currList = openLists.top();
 				currItr = &openItrs.top();
 			}
-			++ (*currItr);
 		}
 		openLists.pop();
 		openItrs.pop();
 	}
 }
 // compilation -----------------------------------
-bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
-	string name = joinTokens(tokens);
-	checkReturnOnFail(isValidIdentifier(name), "Invalid label name" errorQuoted(name), topLoc);
-	checkReturnOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), topLoc);
-	strToLabel.insert(pair(name, Label(name, instrNum, topLoc)));
-	return true;
-}
-pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
-	vector<Instr> instrs;
+map<string, Label> defaultStrToLabel(list<Token>& tokens, string fileName) {
 	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
 	if (tokens.size()) {
 		strToLabel["begin"].loc = tokens.front().loc;
 		strToLabel["end"].loc = tokens.back().loc;
 	}
+	return strToLabel;
+}
+pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
+	list<Token>::iterator itr = tokens.begin();
+	vector<Instr> instrs;
+	map<string, Label> strToLabel = defaultStrToLabel(tokens, fileName);
 	
 	bool ignoreLine = false;
+	bool labelOnLine;
 	while (true) {
-		if (ignoreLine) eatLine(tokens);
+		if (ignoreLine) eatLine(tokens, itr);
 		ignoreLine = true;
-		if (tokens.size() == 0) break;
+		if (itr == tokens.end()) break;
 
-		Token top = tokens.front();
-		tokens.pop_front();
+		Token top = *itr;
+		labelOnLine = labelOnLine && !top.firstOnLine;
+		++itr;
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
-			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after", top);
+			string name; Loc loc;
+			tie(name, loc) = eatIdentifier(tokens, itr, "Label name expected", "Invalid label name", top.loc);
+			continueOnFalse(name != "");
 			ignoreLine = false;
-			continueOnFalse(extractLabelName(tokens, strToLabel, top.loc, instrs.size()));
+			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
+			labelOnLine = true;
+			checkContinueOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
+			strToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
 		} else if (top.type == Talpha) {
 			Instr instr;
-			instr.opcodeStr = joinTokens(top, tokens);
-			instr.opcodeLoc = top.loc;
-			while (tokens.size() && !tokens.front().firstOnLine) {
-				instr.immFields.push_back(tokens.front());
-				tokens.pop_front();
+			--itr;
+			tie(instr.opcodeStr, instr.opcodeLoc) = eatTokenRun(tokens, itr, "--Unreachable--", Loc(), true);
+			continueOnFalse(instr.opcodeStr != "");
+			while (itr != tokens.end() && !itr->firstOnLine) {
+				instr.immFields.push_back(*itr);
+				++itr;
 			}
 			instrs.push_back(instr);
 		} else {
@@ -533,7 +532,7 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 	strToLabel["end"].addr = instrs.size();
 	return pair(instrs, strToLabel);
 }
-// parsing of instructions -----------------------------------------
+// parsing -------------------------------------------------------------------
 pair<bool, string> parseCond(Instr& instr, string s) {
 	checkReturnValOnFail(s.size() >= 1, "Missing condition", instr, pair(false, ""));
 	char reg = s.at(0);
@@ -552,9 +551,9 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
-		auto ret = parseCond(instr, s);
-		returnOnFalse(ret.first);
-		s = ret.second;
+		bool sucess;
+		tie(sucess, s) = parseCond(instr, s);
+		returnOnFalse(sucess);
 	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
@@ -589,7 +588,7 @@ bool parseInstrOpcode(Instr& instr) {
 }
 bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	vector<string> immWords = instr.immAsWords();
-	checkReturnOnFail(immWords.size() == 1, "This line has too many fields", instr);
+	checkReturnOnFail(immWords.size() == 1, "Only simple immediates for now", instr);
 	if (stringToLabel.count(immWords[0]) > 0) {
 		instr.immediate = stringToLabel[immWords[0]].addr;
 		return true;
@@ -1027,7 +1026,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
-	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL));
+	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), false);
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
@@ -1150,12 +1149,12 @@ int main(int argc, char *argv[]) {
 	inFile.close();
 	
 	preprocess(tokens);
-	auto compiled = compile(tokens, fileName);
-	vector<Instr> instrs = compiled.first;
-	map<string, Label> strToLabel = compiled.second;
+
+	vector<Instr> instrs; map<string, Label> strToLabel;
+	tie(instrs, strToLabel) = compile(tokens, fileName);
 
 	parseInstrs(instrs, strToLabel);
-	raiseErrors(); // TODO come up with good error continuation strategies for all compilation stages
+	raiseErrors();
 
 	ofstream outFile = getOutputFile();
 	generate(outFile, instrs);

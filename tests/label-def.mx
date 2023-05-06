@@ -41,12 +41,16 @@ label:
 ; label then instr
 :test1
 mov 5
+:dublet1 :dublet2
+:dublet3 :dublet4 str$
+:dublet5 :
 :test2 ld 6
 : test3 strr
 :test4 ld n + 2
 :test 5 swap
 : ld 8
 : ld>r
+:label ld>r
 :mov 9
 :ldam
 
