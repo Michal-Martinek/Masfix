@@ -1,6 +1,9 @@
+
+; define definitions
 %
 %
 dir
+%%
 %lulw
 % lulw
 
@@ -40,5 +43,33 @@ dir
 %define def7
 	12
 %define def8 abc 12
+%define testee 5 ld m
+:here_define%define
+:here_define2 %define
 
+; define uses
+%define defined1 1
+%define defined2 2
+%define defined3 3
+%define defined3
+%define defined3 5
+
+%defined1
+mov %defined2
+mov defined3
+:undefined4
+mov undefined4
+mov %undefined4
+
+ld 8 %defined3
+ld %defined1 9
+ld %defined_ 10
+ld 11 %defined_
+ld %define
+
+%defined1()
+%defined1%defined2
+%defined3 %defined1
+
+; trailing define
 %define

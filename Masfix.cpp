@@ -184,9 +184,29 @@ struct Token {
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
 	}
-	int64_t asLong() {
+	string toStr() {
+		string out = data;
+		if (type == Tlist) {
+			char closing = data.at(0) + 2 - (data.at(0) == '(');
+			out.push_back(closing);
+		}
+		return out;
+	}
+	int64_t asLong() { // TODO report value overflows
 		assert(type == Tnumeric);
 		return stoi(data);
+	}
+};
+struct Define {
+	string name;
+	Loc loc;
+	string value;
+
+	Define() {}
+	Define(string name,	Loc loc, string value) {
+		this->name = name;
+		this->loc = loc;
+		this->value = value;
 	}
 };
 struct Suffix {
@@ -255,6 +275,7 @@ struct Label {
 #define unreachable() assert(("Unreachable", false));
 #define continueOnFalse(cond) if (!(cond)) continue;
 #define returnOnFalse(cond) if (!(cond)) return false;
+#define returnOnTrue(cond) if (cond) return true;
 #define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
 #define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
 #define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value; // TODO make checkReturnOnFail return a default value of the corresponding type making this obsolete
@@ -276,7 +297,7 @@ void addError(string message, bool strict=true) {
 #define errorQuoted(s) " '" + s + "'"
 bool check(bool cond, string message, Token token, bool strict=false) {
 	if (!cond) {
-		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.data) "\n";
+		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
 		addError(err, strict);
 	}
 	return cond;
@@ -313,14 +334,10 @@ void eatLine(list<Token>& tokens, list<Token>::iterator& itr) {
 		itr = tokens.erase(itr);
 	}
 }
-bool expectNewLine(list<Token>& currList, list<Token>::iterator& itr, string afterWhat) {
-	if (itr != currList.end()) {
-		checkReturnOnFail(itr->firstOnLine, "Unexpected token after " + afterWhat, *itr);
-	}
-	return true;
-}
-void eraseToken(list<Token>& l, list<Token>::iterator& itr) {
+Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
+	Token out = *itr;
 	itr = l.erase(itr);
+	return out;
 }
 bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine=true) {
 	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
@@ -414,8 +431,8 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 				} else if (first == ')' || first == ']' || first == '}') {
 					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
 					token = *listTokens.top();
-					assert(token.type == Tlist && token.data.size() == 1);
-					checkContinueOnFail(token.data.at(0) == first - 2 + (first == ')'), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
+					assert(token.type == Tlist);
+					checkContinueOnFail(first == token.toStr().at(1), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
 					listTokens.pop();
 					continued = true;
 					continue;
@@ -436,22 +453,43 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 	return tokens;
 }
 // preprocess -------------------------------------------------------------------------
-bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token token) {
-	string name; Loc loc;
-	tie(name, loc) = eatIdentifier(currList, itr, "Directive name expected", "Invalid directive name", token.loc);
+map<string, Define> StrToDefine;
+#define directiveEatIdentifier(missingErr, invalidErr) \
+	tie(name, loc) = eatIdentifier(currList, itr, missingErr, invalidErr, loc); \
 	returnOnFalse(name != "");
-	checkReturnOnFail(name == "define", "Unknown directive" errorQuoted(name), loc);
-	tie(name, loc) = eatIdentifier(currList, itr, "Define name expected", "Invalid define name", loc);
-	returnOnFalse(name != "");
-	returnOnFalse(eatToken(currList, itr, loc, token, Tnumeric, "Define value expected"));
-
-	// TODO check the list
-	// TODO error encounter strategy
-	// TODO remember the define
-
-	expectNewLine(currList, itr, "directive");
+#define directiveEatToken(type, missingErr) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr));
+void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token token) {
+	itr = currList.insert(itr, token);
+}
+bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc) {
+	string name; Loc loc = directiveLoc; Token token;
+	checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directive), percentToken.loc);
+	if (directive == "define") {
+		directiveEatIdentifier("Define name expected", "Invalid define name");
+		checkReturnOnFail(StrToDefine.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
+		directiveEatToken(Tnumeric, "Define value expected");
+		StrToDefine[name] = Define(name, percentToken.loc, token.data);
+	}
+	return itr == currList.end() || check(itr->firstOnLine, "Unexpected token after directive", *itr);
+}
+void processDirectiveUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
+	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
+	insertToken(currList, itr, expanded);
+}
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken) {
+	string name; Loc loc = percentToken.loc;
+	directiveEatIdentifier("Directive name expected", "Invalid directive name");
+	if (itr != currList.end()) checkReturnOnFail(!itr->continued, "Unexpected continued token", *itr);
+	if (name == "define") {
+		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
+	} else if (StrToDefine.count(name) == 1) {
+		processDirectiveUse(currList, itr, percentToken, name);
+	} else {
+		check(false, "Undeclared identifier" errorQuoted(name), loc);
+	}
 	return true;
 }
+#define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); continue; }
 void preprocess(list<Token>& tokens) {
 	stack<list<Token>*> openLists( {&tokens} );
 	stack<list<Token>::iterator> openItrs( {tokens.begin()} );
@@ -463,8 +501,9 @@ void preprocess(list<Token>& tokens) {
 			Token& currToken = **currItr;
 			if (currToken.type == Tspecial) {
 				if (currToken.data == "%") {
-					eraseToken(*currList, *currItr);
-					if (!processDirective(*currList, *currItr, currToken)) eatLine(*currList, *currItr);
+					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken));
+					Token percentToken = eraseToken(*currList, *currItr);
+					eatLineOnFalse(processDirective(*currList, *currItr, percentToken));
 					continue;
 				}
 			}
@@ -505,7 +544,7 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		++itr;
 		if (top.type == Tspecial) {
-			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
+			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
 			string name; Loc loc;
 			tie(name, loc) = eatIdentifier(tokens, itr, "Label name expected", "Invalid label name", top.loc);
 			continueOnFalse(name != "");
@@ -1162,6 +1201,4 @@ int main(int argc, char *argv[]) {
 
 	compileAndRun(OutputFileName);
 }
-// TODO ERROR: Unexpected token '(' <- better report of unexpected lists
 // TODO parse lists in label names
-// TODO prohibit complex define names
