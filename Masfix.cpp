@@ -272,13 +272,15 @@ struct Label {
 	}
 };
 // checks --------------------------------------------------------------------
+#define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
+
 #define continueOnFalse(cond) if (!(cond)) continue;
 #define returnOnFalse(cond) if (!(cond)) return false;
-#define returnOnTrue(cond) if (cond) return true;
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
-#define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value; // TODO make checkReturnOnFail return a default value of the corresponding type making this obsolete
+
+#define check(cond, message, obj) ((cond) || raiseError(message, obj))
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
 
 vector<string> errors;
 void raiseErrors() { // TODO sort errors based on line and file
@@ -294,34 +296,20 @@ void addError(string message, bool strict=true) {
 		raiseErrors();
 }
 
-#define errorQuoted(s) " '" + s + "'"
-bool check(bool cond, string message, Token token, bool strict=false) {
-	if (!cond) {
-		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Token token, bool strict=false) {
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	addError(err, strict);
+	return false;
 }
-bool check(bool cond, string message, Instr instr, bool strict=false) {
-	if (!cond) {
-		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Instr instr, bool strict=false) {
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, strict);
+	return false;
 }
-bool check(bool cond, string message, Loc loc, bool strict=false) {
-	if (!cond) {
-		string err = loc.toStr() + " ERROR: " + message + "\n";
-		addError(err, strict);
-	}
-	return cond;
-}
-bool check(bool cond, string message, bool strict=true) {
-	if (!cond) {
-		string err = "ERROR: " + message + "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Loc loc, bool strict=false) {
+	string err = loc.toStr() + " ERROR: " + message + "\n";
+	addError(err, strict);
+	return false;
 }
 // helpers --------------------------------------------------------------
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
@@ -340,13 +328,15 @@ Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
 	return out;
 }
 bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine=true) {
+	static_assert(TokenCount == 4, "Exhaustive eatToken definition");
 	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
 	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
 	outToken = *itr;
 	eraseToken(currList, itr);
 	return check(outToken.type == type, "Unexpected token type", outToken);
 }
-pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string errMissing, Loc prevLoc, bool canStartLine=false) {
+pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, bool canStartLine=true) {
+	static_assert(TokenCount == 4, "Exhaustive eatTokenRun definition");
 	string out = "";
 	bool first = true;
 	Token firstEaten = itr != currList.end() ? *itr : Token();
@@ -355,16 +345,13 @@ pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr,
 		eraseToken(currList, itr);
 		first = false;
 	}
-	check(out != "", errMissing, prevLoc);
 	return pair(out, firstEaten.loc);
 }
 pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string errMissing, string errInvalid, Loc prevLoc) {
 	string name; Loc loc;
-	tie(name, loc) = eatTokenRun(currList, itr, errMissing, prevLoc);
-	if (name != "") { // maybe you think the branch is unnecessary, but it's needed
-		checkReturnValOnFail(isValidIdentifier(name), errInvalid + errorQuoted(name), loc, pair("", Loc()));
-	}
-	return pair(name, loc);
+	tie(name, loc) = eatTokenRun(currList, itr, false);
+	if (!check(name != "", errMissing, prevLoc)) return pair("", Loc());
+	return check(isValidIdentifier(name), errInvalid + errorQuoted(name), loc) ? pair(name, loc) : pair("", Loc());
 }
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
@@ -470,16 +457,17 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 		directiveEatToken(Tnumeric, "Define value expected");
 		StrToDefine[name] = Define(name, percentToken.loc, token.data);
 	}
-	return itr == currList.end() || check(itr->firstOnLine, "Unexpected token after directive", *itr);
+	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
 void processDirectiveUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
 	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken) {
+	static_assert(TokenCount == 4, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("Directive name expected", "Invalid directive name");
-	if (itr != currList.end()) checkReturnOnFail(!itr->continued, "Unexpected continued token", *itr);
+	checkReturnOnFail(itr == currList.end() || !itr->continued, "Unexpected continued token", *itr);
 	if (name == "define") {
 		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
 	} else if (StrToDefine.count(name) == 1) {
@@ -556,7 +544,7 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 		} else if (top.type == Talpha) {
 			Instr instr;
 			--itr;
-			tie(instr.opcodeStr, instr.opcodeLoc) = eatTokenRun(tokens, itr, "--Unreachable--", Loc(), true);
+			tie(instr.opcodeStr, instr.opcodeLoc) = eatTokenRun(tokens, itr);
 			continueOnFalse(instr.opcodeStr != "");
 			while (itr != tokens.end() && !itr->firstOnLine) {
 				instr.immFields.push_back(*itr);
@@ -572,27 +560,26 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 	return pair(instrs, strToLabel);
 }
 // parsing -------------------------------------------------------------------
-pair<bool, string> parseCond(Instr& instr, string s) {
-	checkReturnValOnFail(s.size() >= 1, "Missing condition", instr, pair(false, ""));
+bool parseCond(Instr& instr, string& s) {
+	checkReturnOnFail(s.size() >= 1, "Missing condition", instr);
 	char reg = s.at(0);
 	if (CharToReg.count(reg) == 1) {
-		checkReturnValOnFail(reg == 'r' || reg == 'm', "Conditions can test only r/m", instr, pair(false, ""));
+		checkReturnOnFail(reg == 'r' || reg == 'm', "Conditions can test only r/m", instr);
 		instr.suffixes.condReg = CharToReg[reg];
 		s = s.substr(1);
 	}
-	checkReturnValOnFail(s.size() >= 2, "Missing condition", instr, pair(false, ""));
+	checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
 	string cond = s.substr(0, 2);
-	checkReturnValOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr, pair(false, ""));
+	s = s.substr(2);
+	checkReturnOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr);
 	instr.suffixes.cond = StrToCond[cond];
-	return pair(true, s.substr(2));
+	return true;
 }
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
-		bool sucess;
-		tie(sucess, s) = parseCond(instr, s);
-		returnOnFalse(sucess);
+		returnOnFalse(parseCond(instr, s));
 	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
@@ -622,8 +609,7 @@ bool parseInstrOpcode(Instr& instr) {
 			return parseSuffixes(instr, suffix, instr.instr == Ib || instr.instr == Il || instr.instr == Is);
 		}
 	}
-	checkReturnOnFail(false, "Unknown instruction", instr);
-	return false;
+	return check(false, "Unknown instruction", instr);
 }
 bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	vector<string> immWords = instr.immAsWords();
@@ -635,8 +621,7 @@ bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	checkReturnOnFail(isdigit(immWords[0].at(0)), "Invalid instruction immediate", instr);
 	instr.immediate = stoi(immWords[0]);
 	checkReturnOnFail(to_string(instr.immediate) == immWords[0], "Invalid instruction immediate", instr);
-	checkReturnOnFail(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
-	return true;
+	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
 	returnOnFalse(parseInstrOpcode(instr));
@@ -677,6 +662,7 @@ void parseInstrs(vector<Instr>& instrs, map<string, Label>& strToLabel) {
 		continueOnFalse(checkValidity(instr));
 		instrs[i] = instr;
 	}
+	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -1065,7 +1051,6 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
-	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), false);
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
@@ -1088,6 +1073,12 @@ void checkUsage(bool cond, string message) {
 		cerr << "ERROR: " << message << "\n\n";
 		printUsage();
 		exit(1);
+	}
+}
+void checkCond(bool cond, string message) {
+	if (!cond) {
+		string err = "ERROR: " + message + "\n";
+		addError(err, true);
 	}
 }
 vector<string> getLineArgs(int argc, char *argv[]) {
@@ -1116,22 +1107,22 @@ void processLineArgs(int argc, char *argv[]) {
 		} else if (s == "--strict-errors") {
 			FLAG_strictErrors = true;
 		} else {
-			checkUsage(false, "Unknown command line arg '" + s + "'");
+			checkUsage(false, "Unknown command line arg" errorQuoted(s));
 		}
 	}
 	genFileNames(args[args.size()-1]);
 }
 ifstream getInputFile() {
 	ifstream inFile;
-	check(fs::exists(InputFileName), "The input file '" + InputFileName.string() + "' couldn't be found");
+	checkCond(fs::exists(InputFileName), "The input file" errorQuoted(InputFileName.string()) " couldn't be found");
 	inFile.open(InputFileName);
-	check(inFile.good(), "The input file '" + InputFileName.string() + "' couldn't be opened");
+	checkCond(inFile.good(), "The input file" errorQuoted(InputFileName.string()) " couldn't be opened");
 	return inFile;
 }
 ofstream getOutputFile() {
 	ofstream outFile;
 	outFile.open(OutputFileName);
-	check(outFile.good(), "The output file '" + OutputFileName.string() + "' couldn't be opened");
+	checkCond(outFile.good(), "The output file" errorQuoted(OutputFileName.string()) " couldn't be opened");
 	return outFile;
 }
 void runCmdEchoed(string command) {
