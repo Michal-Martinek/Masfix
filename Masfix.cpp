@@ -209,6 +209,18 @@ struct Define {
 		this->value = value;
 	}
 };
+struct Macro {
+	string name;
+	Loc loc;
+	list<Token> body;
+
+	Macro() {}
+	Macro(string name, Loc loc, list<Token>& body) { // TODO: how to copy the body?
+		this->name = name;
+		this->loc = loc;
+		this->body = body;
+	}
+};
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
 	RegNames condReg;
@@ -327,7 +339,7 @@ Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
 	itr = l.erase(itr);
 	return out;
 }
-bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine=true) {
+bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
 	static_assert(TokenCount == 4, "Exhaustive eatToken definition");
 	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
 	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
@@ -441,12 +453,25 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 }
 // preprocess -------------------------------------------------------------------------
 map<string, Define> StrToDefine;
+map<string, Macro> StrToMacro;
 #define directiveEatIdentifier(missingErr, invalidErr) \
 	tie(name, loc) = eatIdentifier(currList, itr, missingErr, invalidErr, loc); \
 	returnOnFalse(name != "");
-#define directiveEatToken(type, missingErr) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr));
+#define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr, sameLine));
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token token) {
 	itr = currList.insert(itr, token);
+}
+void insertTokenList(list<Token>& currList, list<Token>::iterator& itr, list<Token>& tlist) {
+	bool first = true;
+	list<Token>::iterator insert = itr;
+	for (Token& inserting : tlist) {
+		insert = currList.insert(insert, inserting);
+		if (first) {
+			itr = insert;
+			first = false;
+		}
+		++insert;
+	}
 }
 bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc) {
 	string name; Loc loc = directiveLoc; Token token;
@@ -454,24 +479,36 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	if (directive == "define") {
 		directiveEatIdentifier("Define name expected", "Invalid define name");
 		checkReturnOnFail(StrToDefine.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
-		directiveEatToken(Tnumeric, "Define value expected");
+		directiveEatToken(Tnumeric, "Define value expected", true);
 		StrToDefine[name] = Define(name, percentToken.loc, token.data);
+	} else if (directive == "macro") {
+		// TODO prohibit macro directives inside macros
+		directiveEatIdentifier("Macro name expected", "Invalid macro name");
+		directiveEatToken(Tlist, "Macro body expected", false);
+		checkReturnOnFail(StrToMacro.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
+		StrToMacro[name] = Macro(name, percentToken.loc, token.tlist);
 	}
 	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
-void processDirectiveUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
+void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
 	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
+}
+void expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
+	Macro mac = StrToMacro[identifier]; // TODO expansion stack limit - prevent recursive macros
+	insertTokenList(currList, itr, mac.body);
 }
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken) {
 	static_assert(TokenCount == 4, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("Directive name expected", "Invalid directive name");
 	checkReturnOnFail(itr == currList.end() || !itr->continued, "Unexpected continued token", *itr);
-	if (name == "define") {
+	if (name == "define" || name == "macro") {
 		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
 	} else if (StrToDefine.count(name) == 1) {
-		processDirectiveUse(currList, itr, percentToken, name);
+		expandDefineUse(currList, itr, percentToken, name);
+	} else if (StrToMacro.count(name) == 1) {
+		expandMacroUse(currList, itr, percentToken, name);
 	} else {
 		check(false, "Undeclared identifier" errorQuoted(name), loc);
 	}
