@@ -1,0 +1,21 @@
+:returncode 1
+
+:stderr 1112
+tests\directive-use.mx:15:5 ERROR: Undeclared identifier 'defined_'
+tests\directive-use.mx:16:8 ERROR: Undeclared identifier 'defined_'
+tests\directive-use.mx:17:4 ERROR: Unexpected directive here 'define'
+tests\directive-use.mx:20:10 ERROR: Unexpected continued token '()'
+tests\directive-use.mx:21:2 ERROR: Invalid directive name 'defined1%defined2'
+tests\directive-use.mx:25:6 ERROR: Directive must not continue
+tests\directive-use.mx:28:24 ERROR: Unexpected token after directive '{}'
+tests\directive-use.mx:8:1 ERROR: Unexpected token '1'
+tests\directive-use.mx:22:1 ERROR: Unexpected token '3'
+tests\directive-use.mx:23:1 ERROR: Unexpected token '()'
+tests\directive-use.mx:26:6 ERROR: Unexpected token '()'
+tests\directive-use.mx:10:1 ERROR: Invalid instruction immediate 'mov defined3'
+tests\directive-use.mx:13:1 ERROR: Only simple immediates for now 'ld 8 3'
+tests\directive-use.mx:14:1 ERROR: Only simple immediates for now 'ld 1 9'
+tests\directive-use.mx:15:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\directive-use.mx:17:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+
+

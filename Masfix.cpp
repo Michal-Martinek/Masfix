@@ -504,7 +504,7 @@ bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token p
 	} else if (StrToMacro.count(name) == 1) {
 		expandMacroUse(currList, itr, percentToken, name);
 	} else {
-		check(false, "Undeclared identifier" errorQuoted(name), loc);
+		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(name), loc);
 	}
 	return true;
 }
@@ -521,7 +521,7 @@ void preprocess(list<Token>& tokens) {
 			Token& currToken = **currItr;
 			if (currToken.type == Tspecial) {
 				if (currToken.data == "%") {
-					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken));
+					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 					Token percentToken = eraseToken(*currList, *currItr);
 					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, !scopeDepth));
 					continue;
