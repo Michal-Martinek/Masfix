@@ -9,7 +9,7 @@ def quoted(s):
 	return "'" + str(s) + "'"
 def check(cond, *messages, insideTestcase=True):
 	if not cond:
-		print('ERROR:', *messages)
+		print('[ERROR]', *messages)
 		if insideTestcase:
 			raise TestcaseException(*messages)
 		else:
@@ -53,7 +53,13 @@ def getTestcaseDesc(test: Path, update=False) -> dict:
 		check(os.path.exists(path), 'Missing test case desciption', quoted(path))
 	with open(path, 'r') as testcase:
 		desc = testcase.read()
-	return parseTestcaseDesc(desc)
+	try:
+		return parseTestcaseDesc(desc)
+	except TestcaseException as e:
+		if update:
+			print('[NOTE] Using default testcase description\n')
+			return {'returncode': 0, 'stdout': '', 'stderr': '', 'stdin': ''}
+		raise e
 def runFile(path, stdin) -> dict:
 	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
 def runTest(path: Path) -> bool:
@@ -74,6 +80,7 @@ def runTests(dir: Path):
 			passed = runTest(path)
 		except TestcaseException:
 			passed = False
+			print()
 		success = success and passed
 	print()
 	if success:
@@ -92,7 +99,7 @@ def saveDesc(file: Path, desc):
 		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
 		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
 def updateFileOutput(file: Path):
-	print('[UPDATING]', file)
+	print('[UPDATING]', file, '\n')
 	original = getTestcaseDesc(file, update=True)
 	ran = runFile(file, original['stdin'])
 	print('[NOTE] returncode:', ran['returncode'])
