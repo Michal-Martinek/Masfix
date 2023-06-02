@@ -5,6 +5,7 @@ namespace fs = std::filesystem;
 
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 #include <list>
 #include <stack>
@@ -23,14 +24,6 @@ using namespace std;
 
 #define WORD_MAX_VAL 65535
 #define CELLS WORD_MAX_VAL+1
-// globals ---------------------------------
-fs::path InputFileName = "";
-fs::path OutputFileName = "";
-
-bool FLAG_silent = false;
-bool FLAG_run = false;
-bool FLAG_keepAsm = false;
-bool FLAG_strictErrors = false;
 // enums --------------------------------
 enum TokenTypes {
 	Tnumeric,
@@ -42,6 +35,11 @@ enum TokenTypes {
 	TIexpansion,
 
 	TokenCount
+};
+constexpr int BuiltinDirectivesCount = 2;
+const set<string> BuiltinDirectivesSet = {
+	"define", 
+	"macro"
 };
 enum RegNames {
 	Rh,
@@ -286,6 +284,18 @@ struct Label {
 		return ":" + name;
 	}
 };
+// globals ---------------------------------
+map<string, Define> StrToDefine;
+map<string, Macro> StrToMacro;
+map<string, Label> StrToLabel;
+
+fs::path InputFileName = "";
+fs::path OutputFileName = "";
+
+bool FLAG_silent = false;
+bool FLAG_run = false;
+bool FLAG_keepAsm = false;
+bool FLAG_strictErrors = false;
 // checks --------------------------------------------------------------------
 #define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
@@ -296,6 +306,9 @@ struct Label {
 #define check(cond, message, obj) ((cond) || raiseError(message, obj))
 #define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
 #define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+
+bool SupressErrors = false;
+#define returnOnErrSupress() if (SupressErrors) return false;
 
 vector<string> errors;
 void raiseErrors() { // TODO sort errors based on line and file
@@ -312,25 +325,40 @@ void addError(string message, bool strict=true) {
 }
 
 bool raiseError(string message, Token token, bool strict=false) {
+	returnOnErrSupress();
 	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
 	addError(err, strict);
 	return false;
 }
 bool raiseError(string message, Instr instr, bool strict=false) {
+	returnOnErrSupress();
 	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
 	addError(err, strict);
 	return false;
 }
 bool raiseError(string message, Loc loc, bool strict=false) {
+	returnOnErrSupress();
 	string err = loc.toStr() + " ERROR: " + message + "\n";
 	addError(err, strict);
 	return false;
 }
 // helpers --------------------------------------------------------------
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
-bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
-	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), _validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
+bool verifyNotInstrOpcode(string name);
+bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
+	checkReturnOnFail(name.size() > 0 && find_if_not(name.begin(), name.end(), _validIdentChar) == name.end(), errInvalid, loc)
+	return check(isalpha(name.at(0)) || name.at(0) == '_', errInvalid, loc);
+}
+bool checkIdentRedefinitons(string name, Loc& loc, bool label) {
+	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
+	checkReturnOnFail(BuiltinDirectivesSet.count(name) == 0, "Name shadows a builtin directive" errorQuoted(name), loc)
+	if (label) {
+		checkReturnOnFail(StrToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
+	} else {
+		checkReturnOnFail(StrToDefine.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(StrToMacro.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
+	}
+	return true;
 }
 void eatLine(list<Token>& tokens, list<Token>::iterator& itr) {
 	while (itr != tokens.end() && !itr->firstOnLine) {
@@ -362,11 +390,11 @@ pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr,
 	}
 	return pair(out, firstEaten.loc);
 }
-pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string errMissing, string errInvalid, Loc prevLoc) {
+pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string identPurpose, Loc prevLoc) {
 	string name; Loc loc;
 	tie(name, loc) = eatTokenRun(currList, itr, false);
-	if (!check(name != "", errMissing, prevLoc)) return pair("", Loc());
-	return check(isValidIdentifier(name), errInvalid + errorQuoted(name), loc) ? pair(name, loc) : pair("", Loc());
+	if (!check(name != "", "Missing " + identPurpose + " name", prevLoc)) return pair("", Loc());
+	return isValidIdentifier(name, "Invalid " + identPurpose + " name" errorQuoted(name), loc) ? pair(name, loc) : pair("", Loc());
 }
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
@@ -455,29 +483,28 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 	return tokens;
 }
 // preprocess -------------------------------------------------------------------------
-map<string, Define> StrToDefine;
-map<string, Macro> StrToMacro;
-#define directiveEatIdentifier(missingErr, invalidErr) \
-	tie(name, loc) = eatIdentifier(currList, itr, missingErr, invalidErr, loc); \
-	returnOnFalse(name != "");
+#define directiveEatIdentifier(identPurpose, definiton) \
+	tie(name, loc) = eatIdentifier(currList, itr, identPurpose, loc); \
+	returnOnFalse(name != ""); \
+	if (definiton) returnOnFalse(checkIdentRedefinitons(name, loc, false));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr, sameLine));
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token token) {
 	itr = currList.insert(itr, token);
 }
 bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc, bool topLevelScope) {
+	static_assert((BuiltinDirectivesCount == 2, "Exhaustive processDirectiveDef definiton"));
 	string name; Loc loc = directiveLoc; Token token;
 	checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directive), percentToken.loc);
+	directiveEatIdentifier(directive, true);
 	if (directive == "define") {
-		directiveEatIdentifier("Define name expected", "Invalid define name");
-		checkReturnOnFail(StrToDefine.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
 		directiveEatToken(Tnumeric, "Define value expected", true);
 		StrToDefine[name] = Define(name, percentToken.loc, token.data);
 	} else if (directive == "macro") {
 		checkReturnOnFail(topLevelScope, "Macro definition not alowed here", percentToken.loc);
-		directiveEatIdentifier("Macro name expected", "Invalid macro name");
 		directiveEatToken(Tlist, "Macro body expected", false);
-		checkReturnOnFail(StrToMacro.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
 		StrToMacro[name] = Macro(name, percentToken.loc, token.tlist);
+	} else {
+		unreachable();
 	}
 	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
@@ -485,24 +512,27 @@ void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token pe
 	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
-void expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
+bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
 	// TODO expansion stack limit - prevent recursive macros
-	Macro mac = StrToMacro[identifier];
-	Token expanded = Token(TIexpansion, "%" + identifier, percentToken.loc, false, percentToken.firstOnLine);
+	checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
+	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
+	Macro& mac = StrToMacro[identifier];
+	Token expanded = Token(TIexpansion, "", percentToken.loc, false, percentToken.firstOnLine);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	insertToken(currList, itr, expanded);
+	return true;
 }
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, bool topLevelScope) {
 	static_assert(TokenCount == 5, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
-	directiveEatIdentifier("Directive name expected", "Invalid directive name");
+	directiveEatIdentifier("directive", false);
 	checkReturnOnFail(itr == currList.end() || !itr->continued, "Unexpected continued token", *itr);
-	if (name == "define" || name == "macro") {
+	if (BuiltinDirectivesSet.count(name) == 1) {
 		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc, topLevelScope));
 	} else if (StrToDefine.count(name) == 1) {
 		expandDefineUse(currList, itr, percentToken, name);
 	} else if (StrToMacro.count(name) == 1) {
-		expandMacroUse(currList, itr, percentToken, name);
+		returnOnFalse(expandMacroUse(currList, itr, percentToken, name));
 	} else {
 		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(name), loc);
 	}
@@ -544,18 +574,17 @@ void preprocess(list<Token>& tokens) {
 	}
 }
 // compilation -----------------------------------
-map<string, Label> defaultStrToLabel(list<Token>& tokens, string fileName) {
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
+void initStrToLabel(list<Token>& tokens, string fileName) {
+	StrToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
 	if (tokens.size()) {
-		strToLabel["begin"].loc = tokens.front().loc;
-		strToLabel["end"].loc = tokens.back().loc;
+		StrToLabel["begin"].loc = tokens.front().loc;
+		StrToLabel["end"].loc = tokens.back().loc;
 	}
-	return strToLabel;
 }
-pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
+vector<Instr> compile(list<Token>& tokens, string fileName) {
 	list<Token>::iterator itr = tokens.begin();
 	vector<Instr> instrs;
-	map<string, Label> strToLabel = defaultStrToLabel(tokens, fileName);
+	initStrToLabel(tokens, fileName);
 	
 	bool ignoreLine = false;
 	bool labelOnLine;
@@ -570,13 +599,13 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
 			string name; Loc loc;
-			tie(name, loc) = eatIdentifier(tokens, itr, "Label name expected", "Invalid label name", top.loc);
+			tie(name, loc) = eatIdentifier(tokens, itr, "label", top.loc);
 			continueOnFalse(name != "");
+			continueOnFalse(checkIdentRedefinitons(name, loc, true));
 			ignoreLine = false;
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
-			checkContinueOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
-			strToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
+			StrToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
 		} else if (top.type == Talpha) {
 			Instr instr;
 			--itr;
@@ -596,8 +625,8 @@ pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string file
 		}
 		ignoreLine = false;
 	}
-	strToLabel["end"].addr = instrs.size();
-	return pair(instrs, strToLabel);
+	StrToLabel["end"].addr = instrs.size();
+	return instrs;
 }
 // parsing -------------------------------------------------------------------
 bool parseCond(Instr& instr, string& s) {
@@ -651,11 +680,19 @@ bool parseInstrOpcode(Instr& instr) {
 	}
 	return check(false, "Unknown instruction", instr);
 }
-bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
+bool verifyNotInstrOpcode(string name) {
+	Instr instr;
+	instr.opcodeStr = name;
+	SupressErrors = true;
+	bool ans = !parseInstrOpcode(instr);
+	SupressErrors = false;
+	return ans;
+}
+bool parseInstrImmediate(Instr& instr) {
 	vector<string> immWords = instr.immAsWords();
 	checkReturnOnFail(immWords.size() == 1, "Only simple immediates for now", instr);
-	if (stringToLabel.count(immWords[0]) > 0) {
-		instr.immediate = stringToLabel[immWords[0]].addr;
+	if (StrToLabel.count(immWords[0]) > 0) {
+		instr.immediate = StrToLabel[immWords[0]].addr;
 		return true;
 	}
 	checkReturnOnFail(isdigit(immWords[0].at(0)), "Invalid instruction immediate", instr);
@@ -663,10 +700,10 @@ bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
 	checkReturnOnFail(to_string(instr.immediate) == immWords[0], "Invalid instruction immediate", instr);
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
-bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
+bool parseInstrFields(Instr& instr) {
 	returnOnFalse(parseInstrOpcode(instr));
 	if (instr.hasImm()) {
-		returnOnFalse(parseInstrImmediate(instr, stringToLabel));
+		returnOnFalse(parseInstrImmediate(instr));
 	}
 	return true;
 }
@@ -695,10 +732,10 @@ bool checkValidity(Instr& instr) {
 	}
 	return true;
 }
-void parseInstrs(vector<Instr>& instrs, map<string, Label>& strToLabel) {
+void parseInstrs(vector<Instr>& instrs) {
 	for (int i = 0; i < instrs.size(); ++i) {
 		Instr instr = instrs[i];
-		continueOnFalse(parseInstrFields(instr, strToLabel));
+		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
 		instrs[i] = instr;
 	}
@@ -1220,10 +1257,9 @@ int main(int argc, char *argv[]) {
 	
 	preprocess(tokens);
 
-	vector<Instr> instrs; map<string, Label> strToLabel;
-	tie(instrs, strToLabel) = compile(tokens, fileName);
+	vector<Instr> instrs = compile(tokens, fileName);
 
-	parseInstrs(instrs, strToLabel);
+	parseInstrs(instrs);
 	raiseErrors();
 
 	ofstream outFile = getOutputFile();

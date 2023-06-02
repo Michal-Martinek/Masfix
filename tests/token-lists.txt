@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1162
+:stderr 1159
 tests\token-lists.mx:13:2 ERROR: Unmatched token list delimiters ')'
 tests\token-lists.mx:14:3 ERROR: Unmatched token list delimiters ']'
 tests\token-lists.mx:15:4 ERROR: Unmatched token list delimiters '}'
@@ -16,9 +16,9 @@ tests\token-lists.mx:2:1 ERROR: Unexpected token '[]'
 tests\token-lists.mx:3:1 ERROR: Unexpected token '{}'
 tests\token-lists.mx:5:1 ERROR: Unexpected token '()'
 tests\token-lists.mx:7:1 ERROR: Unexpected token '()'
-tests\token-lists.mx:9:2 ERROR: Label name expected
-tests\token-lists.mx:10:2 ERROR: Label name expected
-tests\token-lists.mx:11:2 ERROR: Label name expected
+tests\token-lists.mx:9:2 ERROR: Missing label name
+tests\token-lists.mx:10:2 ERROR: Missing label name
+tests\token-lists.mx:11:2 ERROR: Missing label name
 tests\token-lists.mx:13:1 ERROR: Unexpected token '[]'
 tests\token-lists.mx:14:1 ERROR: Unexpected token '[]'
 

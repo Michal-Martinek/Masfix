@@ -1,14 +1,14 @@
 :returncode 1
 
-:stderr 672
-tests\tokenization.mx:24:1 ERROR: Directive name expected
-tests\tokenization.mx:11:1 ERROR: Label name expected
-tests\tokenization.mx:12:2 ERROR: Label name expected
+:stderr 668
+tests\tokenization.mx:24:1 ERROR: Missing directive name
+tests\tokenization.mx:11:1 ERROR: Missing label name
+tests\tokenization.mx:12:2 ERROR: Missing label name
 tests\tokenization.mx:14:2 ERROR: Unexpected special character '\'
 tests\tokenization.mx:15:2 ERROR: Unexpected special character '\'
 tests\tokenization.mx:16:2 ERROR: Unexpected special character '\'
 tests\tokenization.mx:17:2 ERROR: Unexpected special character '\'
-tests\tokenization.mx:21:1 ERROR: Label name expected
+tests\tokenization.mx:21:1 ERROR: Missing label name
 tests\tokenization.mx:23:1 ERROR: Unexpected special character '$'
 tests\tokenization.mx:26:1 ERROR: Unexpected token '()'
 tests\tokenization.mx:13:2 ERROR: Unknown instruction 'here'

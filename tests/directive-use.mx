@@ -4,10 +4,14 @@
 %define defined2 2
 %define defined3 3
 
+%macro test_mac { ld insides }
+%macro test_mac2 { ld more insides }
+
 ; normal use
 %defined1
 mov %defined2
 mov defined3
+%undefd
 
 ; multiple imms
 ld 8 %defined3
@@ -24,5 +28,16 @@ ld %define
 
 :lab1%defined1
 :lab2(%defined2)
+
+:label1 %defined1
+:label2 mov %defined3
+:label3 %test_mac
+
+mov %test_mac
+%test_mac %test_mac2
+str %test_mac2 %test_mac
+ld %defined1 %test_mac
+
 %macro mac1(%defined3)
-%macro mac2(%defined3) {}
+%macro mac2(str %defined3) {}
+%mac2

@@ -48,11 +48,22 @@ mov 5
 : test3 strr
 :test4 ld n + 2
 :test 5 swap
+
+; shadowing instrs
 : ld 8
+:ld
+:ld_
 : ld>r
 :label ld>r
 :mov 9
 :ldam
+:movat
+:swa
+:swap
+:swapa
+:swapping
+:swapa_
+:swap_a
 
 ; stray ':' at EOF
 	:
