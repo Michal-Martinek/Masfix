@@ -32,7 +32,7 @@ dir
 %define %macro
 %define hidden_mac %macro hidden_unga_bunga()
 %hidden_mac
-%macro dsa{
+%macro dsa(){
 	%macro inside_peek[] ; prohibited, but doesn't fail
 }
 
@@ -88,31 +88,73 @@ name
 
 %define used_var %def1
 
-%macro noBody
-%macro afterNobody()
+; macro arglist
+%macro noArglist
+%macro validArglist1() {}
+%macro validArglist2 (x) {}
+%macro validArglist3(x, y) {}
+%macro validArglist4(x,y) {}
+%macro validArglist5(x ,y) {}
+%macro validArglist6(x, y, z, w) {}
+
+%macro nonInline1
+	(x) {}
+%macro nonInline2 (
+	x
+)
+%macro nonInline3 (
+	) {}
+%macro nonInline4(x
+	, y) {}
+%macro nonInline4(x,
+	y)
+	{}
+
+%macro badArglist1(x y)
+%macro badArglist2(,)
+%macro badArglist3(,x)
+%macro badArglist4(x,)
+%macro badArglist5(x, y,)
+%macro badArglist6 (x, y, z w)
+	%badArglist3
+
+%macro badArgName1(12)
+%macro badArgName2(x, x^)
+%macro badArgName3(%define arg 5)
+%macro badArgName4(x, x)
+%macro badArgName5(x, y, z, x)
+
+; macro body
+%macro noBody()
+%macro afterNobody() {}
 ldbad
 	%noBody
 	%afterNobody
 
-%macro first{}
-%macro second {}
-%macro third
+%macro first(){}
+%macro second() {}
+%macro third()
 ()
-%macro fourth {
+%macro fourth() {
 	somting
 }
 	%second
 	%fourth
-%macro unexAfter {
+%macro sepInBody() {
+	ld 5,
+	outur
+} %hello
+
+%macro unexAfter() {
 
 } 9
 	%unexAfter
-%macro unexDirAfter
+%macro unexDirAfter()
 {
 } %define here
 	%unexDirAfter
 	%here
-%macro unexMacDefAfter {
+%macro unexMacDefAfter() {
 } %macro m
 {}
 	%unexDirAfter

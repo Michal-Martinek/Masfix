@@ -29,6 +29,7 @@ enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tspecial,
+	Tseparator,
 	Tlist,
 
 	// intermediate preprocess tokens
@@ -185,17 +186,28 @@ struct Token {
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
 	}
+	char tlistCloseChar() {
+		assert(type == Tlist);
+		return data.at(0) + 2 - (data.at(0) == '(');
+	}
 	string toStr() {
 		string out = data;
 		if (type == Tlist) {
-			char closing = data.at(0) + 2 - (data.at(0) == '(');
-			out.push_back(closing);
+			if (isSeparated()) out.push_back(',');
+			out.push_back(tlistCloseChar());
 		}
 		return out;
 	}
 	int64_t asLong() { // TODO report value overflows
 		assert(type == Tnumeric);
 		return stoi(data);
+	}
+	bool isSeparated() {
+		assert(type == Tlist);
+		for (Token t : tlist) {
+			if (t.type == Tseparator) return true;
+		}
+		return false;
 	}
 };
 struct Define {
@@ -210,17 +222,23 @@ struct Define {
 		this->value = value;
 	}
 };
+struct MacroArg {
+	string name;
+	Loc loc;
+
+	MacroArg() {}
+	MacroArg(string name, Loc loc) {
+		this->name = name;
+		this->loc = loc;
+	}
+};
 struct Macro {
 	string name;
 	Loc loc;
+	map<string, MacroArg> argList;
 	list<Token> body;
 
 	Macro() {}
-	Macro(string name, Loc loc, list<Token>& body) { // TODO: how to copy the body?
-		this->name = name;
-		this->loc = loc;
-		this->body = body;
-	}
 };
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
@@ -371,7 +389,7 @@ Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
 	return out;
 }
 bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
-	static_assert(TokenCount == 5, "Exhaustive eatToken definition");
+	static_assert(TokenCount == 6, "Exhaustive eatToken definition");
 	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
 	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
 	outToken = *itr;
@@ -379,7 +397,7 @@ bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Tok
 	return check(outToken.type == type, "Unexpected token type", outToken);
 }
 pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, bool canStartLine=true) {
-	static_assert(TokenCount == 5, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 6, "Exhaustive eatTokenRun definition");
 	string out = "";
 	bool first = true;
 	Token firstEaten = itr != currList.end() ? *itr : Token();
@@ -422,7 +440,7 @@ void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
 	}
 }
 list<Token> tokenize(ifstream& inFile, string fileName) {
-	static_assert(TokenCount == 5, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 6, "Exhaustive tokenize definition");
 	string line;
 	bool continued;
 	int firstOnLine;
@@ -462,10 +480,12 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
 					token = *listTokens.top();
 					assert(token.type == Tlist);
-					checkContinueOnFail(first == token.toStr().at(1), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
+					checkContinueOnFail(first == token.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
 					listTokens.pop();
 					continued = true;
 					continue;
+				} else if (first == ',') {
+					token = Token(Tseparator, run, loc, continued, firstOnLine);
 				} else {
 					token = Token(Tspecial, run, loc, continued, firstOnLine);
 				}
@@ -491,6 +511,32 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token token) {
 	itr = currList.insert(itr, token);
 }
+bool arglistFromTlist(Token tlist, Macro& mac) {
+	assert(tlist.type == Tlist);
+	Loc loc = tlist.loc; string name; Token token; list<Token>& currList = tlist.tlist; list<Token>::iterator itr = tlist.tlist.begin();
+	bool first = true;
+	while (itr != tlist.tlist.end()) {
+		if (!first) {
+			directiveEatToken(Tseparator, "Separator expected", true);
+			loc = token.loc;
+		}
+		first = false;
+		directiveEatIdentifier("macro arg", true);
+		checkReturnOnFail(mac.argList.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
+		mac.argList.insert(pair(name, MacroArg(name, loc)));
+	}
+	return true;
+}
+bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc) {
+	Token token; Macro mac;
+	directiveEatToken(Tlist, "Macro arglist expected", true);
+	returnOnFalse(arglistFromTlist(token, mac));
+	directiveEatToken(Tlist, "Macro body expected", false);
+	checkReturnOnFail(!token.isSeparated(), "No separators expected in macro body", loc);
+	StrToMacro[name] = mac;
+	StrToMacro[name].body = token.tlist; // TODO: how to properly copy the body?
+	return true;
+}
 bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc, bool topLevelScope) {
 	static_assert((BuiltinDirectivesCount == 2, "Exhaustive processDirectiveDef definiton"));
 	string name; Loc loc = directiveLoc; Token token;
@@ -501,8 +547,7 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 		StrToDefine[name] = Define(name, percentToken.loc, token.data);
 	} else if (directive == "macro") {
 		checkReturnOnFail(topLevelScope, "Macro definition not alowed here", percentToken.loc);
-		directiveEatToken(Tlist, "Macro body expected", false);
-		StrToMacro[name] = Macro(name, percentToken.loc, token.tlist);
+		returnOnFalse(processMacroDef(currList, itr, name, loc));
 	} else {
 		unreachable();
 	}
@@ -523,7 +568,7 @@ bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Token per
 	return true;
 }
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, bool topLevelScope) {
-	static_assert(TokenCount == 5, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 6, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("directive", false);
 	checkReturnOnFail(itr == currList.end() || !itr->continued, "Unexpected continued token", *itr);
