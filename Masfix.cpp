@@ -19,6 +19,8 @@ namespace fs = std::filesystem;
 using namespace std;
 
 // constants -------------------------------
+#define MAX_EXPANSION_DEPTH 1024
+
 #define STDOUT_BUFF_SIZE 256
 #define STDIN_BUFF_SIZE 256
 
@@ -225,6 +227,7 @@ struct Define {
 struct MacroArg {
 	string name;
 	Loc loc;
+	list<Token> value;
 
 	MacroArg() {}
 	MacroArg(string name, Loc loc) {
@@ -235,10 +238,20 @@ struct MacroArg {
 struct Macro {
 	string name;
 	Loc loc;
-	map<string, MacroArg> argList;
+	vector<MacroArg> argList;
 	list<Token> body;
 
 	Macro() {}
+	Macro(string name, Loc loc) {
+		this->name = name;
+		this->loc = loc;
+	}
+	bool hasArg(string& name) {
+		for (MacroArg& arg : argList) {
+			if (arg.name == name) return true;
+		}
+		return false;
+	}
 };
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
@@ -511,43 +524,56 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token token) {
 	itr = currList.insert(itr, token);
 }
-bool arglistFromTlist(Token tlist, Macro& mac) {
+vector<pair<list<Token>, Loc>> splitTlist(Token& tlist) {
 	assert(tlist.type == Tlist);
-	Loc loc = tlist.loc; string name; Token token; list<Token>& currList = tlist.tlist; list<Token>::iterator itr = tlist.tlist.begin();
-	bool first = true;
-	while (itr != tlist.tlist.end()) {
-		if (!first) {
-			directiveEatToken(Tseparator, "Separator expected", true);
-			loc = token.loc;
+	Loc lastSepLoc = tlist.loc;
+	vector<pair<list<Token>, Loc>> splits;
+	for (Token& t : tlist.tlist) {
+		if (t.type == Tseparator) {
+			lastSepLoc = t.loc;
+			splits.push_back(pair<list<Token>, Loc>(list<Token>(), lastSepLoc));
+		} else {
+			if (splits.size()) splits.back().first.push_back(t);
+			else splits.push_back(pair(list<Token>({ t }), lastSepLoc));
 		}
-		first = false;
+	}
+	return splits;
+}
+bool arglistFromTlist(Token& tlist, Macro& mac) {
+	assert(tlist.type == Tlist);
+	string name; list<Token> currList; Loc loc;
+	for (auto [currList, loc] : splitTlist(tlist)) {
+		list<Token>::iterator itr = currList.begin();
+
 		directiveEatIdentifier("macro arg", true);
-		checkReturnOnFail(mac.argList.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
-		mac.argList.insert(pair(name, MacroArg(name, loc)));
+		checkReturnOnFail(itr == currList.end(), "Separator expected", itr->loc);
+		checkReturnOnFail(!mac.hasArg(name), "Macro argument redefinition" errorQuoted(name), loc);
+		mac.argList.push_back(MacroArg(name, loc));
 	}
 	return true;
 }
-bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc) {
-	Token token; Macro mac;
+bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Loc percentLoc) {
+	Token token;
+	StrToMacro[name] = Macro(name, percentLoc);
 	directiveEatToken(Tlist, "Macro arglist expected", true);
-	returnOnFalse(arglistFromTlist(token, mac));
+	returnOnFalse(arglistFromTlist(token, StrToMacro[name]));
 	directiveEatToken(Tlist, "Macro body expected", false);
 	checkReturnOnFail(!token.isSeparated(), "No separators expected in macro body", loc);
-	StrToMacro[name] = mac;
 	StrToMacro[name].body = token.tlist; // TODO: how to properly copy the body?
 	return true;
 }
-bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc, bool topLevelScope) {
+bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc, string currMacName) {
 	static_assert((BuiltinDirectivesCount == 2, "Exhaustive processDirectiveDef definiton"));
 	string name; Loc loc = directiveLoc; Token token;
 	checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directive), percentToken.loc);
 	directiveEatIdentifier(directive, true);
 	if (directive == "define") {
+		checkReturnOnFail(currMacName.size() == 0, "Define not allowed inside macro", percentToken.loc);
 		directiveEatToken(Tnumeric, "Define value expected", true);
 		StrToDefine[name] = Define(name, percentToken.loc, token.data);
 	} else if (directive == "macro") {
-		checkReturnOnFail(topLevelScope, "Macro definition not alowed here", percentToken.loc);
-		returnOnFalse(processMacroDef(currList, itr, name, loc));
+		checkReturnOnFail(currMacName.size() == 0, "Macro definition not allowed inside macro", percentToken.loc);
+		returnOnFalse(processMacroDef(currList, itr, name, loc, percentToken.loc));
 	} else {
 		unreachable();
 	}
@@ -557,37 +583,57 @@ void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token pe
 	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
-bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
-	// TODO expansion stack limit - prevent recursive macros
-	checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
+bool preprocess(list<Token>& tokens, bool processingDirectiveInsides, string directiveInsidesScope);
+bool processExpansionArglist(Token& tlist, Macro& mac) {
+	assert(tlist.type == Tlist);
+	auto splits = splitTlist(tlist);
+	checkReturnOnFail(splits.size() == mac.argList.size(), "Unexpected number of expansion arguments", tlist.loc);
+	list<Token> currList; Loc loc; int idx = 0;
+	for (auto [currList, loc] : splits) {
+		checkReturnOnFail(currList.size() > 0, "Expansion argument expected", loc);
+		returnOnFalse(preprocess(currList, true, mac.name)); // the hyper loop closes
+		mac.argList[idx].value = list(currList.begin(), currList.end());
+		++idx;
+	}
+	return true;
+}
+bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string identifier) {
+	Macro& mac = StrToMacro[identifier]; Token token;
+	directiveEatToken(Tlist, "Expansion arglist expected", true);
+	returnOnFalse(processExpansionArglist(token, mac));
 	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
-	Macro& mac = StrToMacro[identifier];
-	Token expanded = Token(TIexpansion, "", percentToken.loc, false, percentToken.firstOnLine);
+	
+	Token expanded = Token(TIexpansion, identifier, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	insertToken(currList, itr, expanded);
 	return true;
 }
-bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, bool topLevelScope) {
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string currMacName) {
 	static_assert(TokenCount == 6, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("directive", false);
-	checkReturnOnFail(itr == currList.end() || !itr->continued, "Unexpected continued token", *itr);
+	checkReturnOnFail(itr == currList.end() || !itr->continued || StrToMacro.count(name) == 1, "Unexpected continued token", *itr);
 	if (BuiltinDirectivesSet.count(name) == 1) {
-		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc, topLevelScope));
+		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc, currMacName));
 	} else if (StrToDefine.count(name) == 1) {
 		expandDefineUse(currList, itr, percentToken, name);
 	} else if (StrToMacro.count(name) == 1) {
-		returnOnFalse(expandMacroUse(currList, itr, percentToken, name));
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
+		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, name));
+	} else if (currMacName.size() && StrToMacro[currMacName].hasArg(name)) {
+		assert(false);
 	} else {
 		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(name), loc);
 	}
 	return true;
 }
-#define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); continue; }
-void preprocess(list<Token>& tokens) {
+#define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
+bool preprocess(list<Token>& tokens, bool processingDirectiveInsides=false, string directiveInsidesScope="") {
 	stack<reference_wrapper<Token>> openLists;
 	stack<list<Token>::iterator> openItrs({ tokens.begin() });
-	int scopeDepth = 0;
+	bool errorLess = true;
+	stack<string> macroScopes;
+	if (processingDirectiveInsides) macroScopes.push(directiveInsidesScope);
 
 	while (openItrs.size()) {
 		list<Token>* currList = openLists.size() ? &openLists.top().get().tlist : &tokens;
@@ -598,13 +644,19 @@ void preprocess(list<Token>& tokens) {
 				if (currToken.data == "%") {
 					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 					Token percentToken = eraseToken(*currList, *currItr);
-					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, !scopeDepth));
+					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, macroScopes.size() ? macroScopes.top() : ""));
 					continue;
 				}
 			}
 			++ (*currItr);
 			if (currToken.type == Tlist || currToken.type == TIexpansion) {
-				if (currToken.type == TIexpansion) scopeDepth ++;
+				if (currToken.type == TIexpansion) {
+					if (macroScopes.size() > MAX_EXPANSION_DEPTH) {
+						errorLess = false;
+						checkContinueOnFail(false, "Maximum expansion depth exceeded", currToken.loc);
+					}
+					macroScopes.push(currToken.data);
+				}
 				openLists.push(currToken);
 				openItrs.push(currToken.tlist.begin());
 				currList = &openLists.top().get().tlist;
@@ -612,11 +664,12 @@ void preprocess(list<Token>& tokens) {
 			}
 		}
 		if (openLists.size()) {
-			if (openLists.top().get().type == TIexpansion) scopeDepth --;
+			if (openLists.top().get().type == TIexpansion) macroScopes.pop();
 			openLists.pop();
 		}
 		openItrs.pop();
 	}
+	return errorLess;
 }
 // compilation -----------------------------------
 void initStrToLabel(list<Token>& tokens, string fileName) {
