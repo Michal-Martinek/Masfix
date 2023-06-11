@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 6602
+:stderr 6524
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -21,10 +21,10 @@ tests\directive-definition.mx:25:3 ERROR: Undeclared identifier 'macro_'
 tests\directive-definition.mx:26:3 ERROR: Invalid directive name 'macro$'
 tests\directive-definition.mx:29:8 ERROR: Invalid macro name '%define'
 tests\directive-definition.mx:30:12 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:31:2 ERROR: Undeclared identifier 'brb'
+tests\directive-definition.mx:31:5 ERROR: Unexpected number of expansion arguments
 tests\directive-definition.mx:32:9 ERROR: Invalid define name '%macro'
 tests\directive-definition.mx:33:20 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:34:2 ERROR: Undeclared identifier 'hidden_mac'
+tests\directive-definition.mx:34:12 ERROR: Unexpected continued token '()'
 tests\directive-definition.mx:39:13 ERROR: Directive must not continue
 tests\directive-definition.mx:40:15 ERROR: Unexpected directive here 'define'
 tests\directive-definition.mx:41:17 ERROR: Unexpected directive here 'macro'
@@ -59,30 +59,29 @@ tests\directive-definition.mx:89:18 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:92:8 ERROR: Macro arglist expected
 tests\directive-definition.mx:100:8 ERROR: Macro arglist expected
 tests\directive-definition.mx:102:19 ERROR: Missing macro arg name
-tests\directive-definition.mx:107:19 ERROR: Separator expected
 tests\directive-definition.mx:109:20 ERROR: Missing macro arg name
-tests\directive-definition.mx:113:22 ERROR: Unexpected token type 'y'
+tests\directive-definition.mx:113:22 ERROR: Separator expected
 tests\directive-definition.mx:114:19 ERROR: Missing macro arg name
 tests\directive-definition.mx:115:19 ERROR: Missing macro arg name
 tests\directive-definition.mx:116:21 ERROR: Missing macro arg name
 tests\directive-definition.mx:117:24 ERROR: Missing macro arg name
-tests\directive-definition.mx:118:29 ERROR: Unexpected token type 'w'
-tests\directive-definition.mx:119:3 ERROR: Undeclared identifier 'badArglist3'
+tests\directive-definition.mx:118:29 ERROR: Separator expected
+tests\directive-definition.mx:119:21 ERROR: Missing macro arg name
 tests\directive-definition.mx:121:20 ERROR: Invalid macro arg name '12'
 tests\directive-definition.mx:122:23 ERROR: Invalid macro arg name 'x^'
 tests\directive-definition.mx:123:20 ERROR: Invalid macro arg name '%define'
 tests\directive-definition.mx:124:23 ERROR: Macro argument redefinition 'x'
 tests\directive-definition.mx:125:29 ERROR: Macro argument redefinition 'x'
-tests\directive-definition.mx:129:1 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:131:3 ERROR: Undeclared identifier 'noBody'
-tests\directive-definition.mx:132:3 ERROR: Undeclared identifier 'afterNobody'
-tests\directive-definition.mx:143:8 ERROR: No separators expected in macro body
-tests\directive-definition.mx:150:3 ERROR: Unexpected token after directive '9'
-tests\directive-definition.mx:154:3 ERROR: Unexpected token after directive '%'
-tests\directive-definition.mx:156:3 ERROR: Undeclared identifier 'here'
-tests\directive-definition.mx:158:3 ERROR: Unexpected token after directive '%'
-tests\directive-definition.mx:161:3 ERROR: Undeclared identifier 'm'
-tests\directive-definition.mx:164:2 ERROR: Missing define name
+tests\directive-definition.mx:126:20 ERROR: Macro redefinition 'badArgName6'
+tests\directive-definition.mx:130:1 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:133:14 ERROR: Unexpected continued token '()'
+tests\directive-definition.mx:144:8 ERROR: No separators expected in macro body
+tests\directive-definition.mx:151:3 ERROR: Unexpected token after directive '9'
+tests\directive-definition.mx:155:3 ERROR: Unexpected token after directive '%'
+tests\directive-definition.mx:157:3 ERROR: Undeclared identifier 'here'
+tests\directive-definition.mx:159:3 ERROR: Unexpected token after directive '%'
+tests\directive-definition.mx:162:3 ERROR: Undeclared identifier 'm'
+tests\directive-definition.mx:165:2 ERROR: Missing define name
 tests\directive-definition.mx:46:2 ERROR: Unexpected token '64'
 tests\directive-definition.mx:71:2 ERROR: Unexpected token '22'
 tests\directive-definition.mx:73:2 ERROR: Unexpected token '26'
@@ -90,10 +89,10 @@ tests\directive-definition.mx:77:2 ERROR: Unexpected token '12'
 tests\directive-definition.mx:82:2 ERROR: Unexpected token '5'
 tests\directive-definition.mx:101:2 ERROR: Unexpected token '()'
 tests\directive-definition.mx:111:2 ERROR: Unexpected token '{}'
-tests\directive-definition.mx:159:1 ERROR: Unexpected token '{}'
+tests\directive-definition.mx:160:1 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:6:1 ERROR: Unknown instruction 'dir'
 tests\directive-definition.mx:65:1 ERROR: Unknown instruction 'name'
-tests\directive-definition.mx:130:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
-tests\directive-definition.mx:139:2 ERROR: Unknown condition 'somting'
+tests\directive-definition.mx:131:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
+tests\directive-definition.mx:140:2 ERROR: Unknown condition 'somting'
 
 

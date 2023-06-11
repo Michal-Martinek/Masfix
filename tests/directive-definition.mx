@@ -28,10 +28,10 @@ dir
 ; directive context
 %macro %define
 %macro brb %define
-%brb
+%brb(a)
 %define %macro
 %define hidden_mac %macro hidden_unga_bunga()
-%hidden_mac
+%hidden_mac()
 %macro dsa(){
 	%macro inside_peek[] ; prohibited, but doesn't fail
 }
@@ -106,7 +106,7 @@ name
 	) {}
 %macro nonInline4(x
 	, y) {}
-%macro nonInline4(x,
+%macro nonInline5(x,
 	y)
 	{}
 
@@ -116,20 +116,21 @@ name
 %macro badArglist4(x,)
 %macro badArglist5(x, y,)
 %macro badArglist6 (x, y, z w)
-	%badArglist3
+%macro badArglist7(x, ,y, z)
 
 %macro badArgName1(12)
 %macro badArgName2(x, x^)
 %macro badArgName3(%define arg 5)
 %macro badArgName4(x, x)
 %macro badArgName5(x, y, z, x)
+%macro badArgName6(badArgName6)
 
 ; macro body
 %macro noBody()
 %macro afterNobody() {}
 ldbad
-	%noBody
-	%afterNobody
+	%noBody()
+	%afterNobody()
 
 %macro first(){}
 %macro second() {}
@@ -138,8 +139,8 @@ ldbad
 %macro fourth() {
 	somting
 }
-	%second
-	%fourth
+	%second()
+	%fourth()
 %macro sepInBody() {
 	ld 5,
 	outur
@@ -148,16 +149,16 @@ ldbad
 %macro unexAfter() {
 
 } 9
-	%unexAfter
+	%unexAfter()
 %macro unexDirAfter()
 {
 } %define here
-	%unexDirAfter
+	%unexDirAfter()
 	%here
 %macro unexMacDefAfter() {
 } %macro m
 {}
-	%unexDirAfter
+	%unexMacDefAfter()
 	%m
 
 ; trailing define

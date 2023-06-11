@@ -4,8 +4,8 @@
 %define defined2 2
 %define defined3 3
 
-%macro test_mac { ld insides }
-%macro test_mac2 { ld more insides }
+%macro test_mac() { ld insides }
+%macro test_mac2() { ld more insides }
 
 ; normal use
 %defined1
@@ -31,13 +31,64 @@ ld %define
 
 :label1 %defined1
 :label2 mov %defined3
-:label3 %test_mac
+:label3 %test_mac()
 
-mov %test_mac
-%test_mac %test_mac2
-str %test_mac2 %test_mac
-ld %defined1 %test_mac
+mov %test_mac()
+%test_mac() %test_mac2()
+str %test_mac2() %test_mac()
+ld %defined1 %test_mac()
 
-%macro mac1(%defined3)
-%macro mac2(str %defined3) {}
-%mac2
+; expansion arglist
+%macro print(num) { outu %num }
+%macro jnn(a, b,c) {}
+
+%print
+%print()
+%print(5)
+%print(5, 6)
+
+%jnn(5, 6)
+%jnn(7, 8, 9)
+%jnn(0, 1,2,3)
+%print(_)
+
+%jnn(!,% define b 33, unreachable)
+%jnn(!, %define b 33, unreachable)
+%jnn(!,
+	%define b 33, unreachable)
+%jnn(!, nonex,
+	%macro inside() {})
+%jnn(
+	%defined3,
+	%defined1,
+	%print(5)
+)
+
+%macro defLabel(name) {
+	: %name
+}
+%defLabel(:labelInside1)
+%print(labelInside1)
+%defLabel(labelInside2)
+%print(labelInside2)
+
+%jnn(4, %defined1,%defined2)
+%jnn(4, %defined2, %defined_)
+%jnn(%defined3, %test_mac(), 2)
+
+%macro scope1(var, upper) {
+	outu _ %var
+	outu _ %upper
+	%lower
+}
+%macro scope2(var, lower) {
+	outu _ %var
+	outu _ %lower
+	%upper
+
+	%scope1(9, 68)
+}
+%scope2(5, 18)
+%lower
+%scope1(485, 128)
+%upper
