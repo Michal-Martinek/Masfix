@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 6524
+:stderr 6685
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -24,75 +24,77 @@ tests\directive-definition.mx:30:12 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:31:5 ERROR: Unexpected number of expansion arguments
 tests\directive-definition.mx:32:9 ERROR: Invalid define name '%macro'
 tests\directive-definition.mx:33:20 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:34:12 ERROR: Unexpected continued token '()'
+tests\directive-definition.mx:34:2 ERROR: Undeclared identifier 'hidden_mac'
 tests\directive-definition.mx:39:13 ERROR: Directive must not continue
 tests\directive-definition.mx:40:15 ERROR: Unexpected directive here 'define'
 tests\directive-definition.mx:41:17 ERROR: Unexpected directive here 'macro'
-tests\directive-definition.mx:44:9 ERROR: Define value expected
-tests\directive-definition.mx:45:9 ERROR: Define value expected
-tests\directive-definition.mx:47:2 ERROR: Undeclared identifier 'ijkl'
-tests\directive-definition.mx:49:8 ERROR: Unexpected continued token '()'
-tests\directive-definition.mx:50:2 ERROR: Missing define name
-tests\directive-definition.mx:51:8 ERROR: Invalid macro name '$'
-tests\directive-definition.mx:53:9 ERROR: Invalid define name '59var'
-tests\directive-definition.mx:54:9 ERROR: Define value expected
-tests\directive-definition.mx:55:9 ERROR: Invalid define name 'CONST_VAL$'
-tests\directive-definition.mx:56:9 ERROR: Invalid define name 'lab:el'
-tests\directive-definition.mx:59:9 ERROR: Define value expected
-tests\directive-definition.mx:62:8 ERROR: Macro arglist expected
-tests\directive-definition.mx:63:8 ERROR: Invalid macro name '_^'
-tests\directive-definition.mx:64:2 ERROR: Missing macro name
-tests\directive-definition.mx:70:17 ERROR: Unexpected token after directive '23'
-tests\directive-definition.mx:72:17 ERROR: Unexpected token after directive '25'
-tests\directive-definition.mx:74:17 ERROR: Unexpected token after directive '28'
-tests\directive-definition.mx:75:16 ERROR: Unexpected token after directive '_'
-tests\directive-definition.mx:76:9 ERROR: Define value expected
-tests\directive-definition.mx:78:14 ERROR: Unexpected token type 'abc'
-tests\directive-definition.mx:79:3 ERROR: Undeclared identifier 'def8'
-tests\directive-definition.mx:80:18 ERROR: Unexpected token after directive 'ld'
-tests\directive-definition.mx:81:13 ERROR: Unexpected token after directive '%'
-tests\directive-definition.mx:83:3 ERROR: Undeclared identifier 'b'
-tests\directive-definition.mx:84:14 ERROR: Unexpected token type '#'
-tests\directive-definition.mx:86:13 ERROR: Unexpected token type ':'
-tests\directive-definition.mx:87:14 ERROR: Unexpected token type 'here'
-tests\directive-definition.mx:89:18 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:92:8 ERROR: Macro arglist expected
-tests\directive-definition.mx:100:8 ERROR: Macro arglist expected
-tests\directive-definition.mx:102:19 ERROR: Missing macro arg name
-tests\directive-definition.mx:109:20 ERROR: Missing macro arg name
-tests\directive-definition.mx:113:22 ERROR: Separator expected
-tests\directive-definition.mx:114:19 ERROR: Missing macro arg name
-tests\directive-definition.mx:115:19 ERROR: Missing macro arg name
-tests\directive-definition.mx:116:21 ERROR: Missing macro arg name
-tests\directive-definition.mx:117:24 ERROR: Missing macro arg name
-tests\directive-definition.mx:118:29 ERROR: Separator expected
-tests\directive-definition.mx:119:21 ERROR: Missing macro arg name
-tests\directive-definition.mx:121:20 ERROR: Invalid macro arg name '12'
-tests\directive-definition.mx:122:23 ERROR: Invalid macro arg name 'x^'
-tests\directive-definition.mx:123:20 ERROR: Invalid macro arg name '%define'
-tests\directive-definition.mx:124:23 ERROR: Macro argument redefinition 'x'
-tests\directive-definition.mx:125:29 ERROR: Macro argument redefinition 'x'
-tests\directive-definition.mx:126:20 ERROR: Macro redefinition 'badArgName6'
-tests\directive-definition.mx:130:1 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:133:14 ERROR: Unexpected continued token '()'
-tests\directive-definition.mx:144:8 ERROR: No separators expected in macro body
-tests\directive-definition.mx:151:3 ERROR: Unexpected token after directive '9'
-tests\directive-definition.mx:155:3 ERROR: Unexpected token after directive '%'
-tests\directive-definition.mx:157:3 ERROR: Undeclared identifier 'here'
-tests\directive-definition.mx:159:3 ERROR: Unexpected token after directive '%'
-tests\directive-definition.mx:162:3 ERROR: Undeclared identifier 'm'
-tests\directive-definition.mx:165:2 ERROR: Missing define name
-tests\directive-definition.mx:46:2 ERROR: Unexpected token '64'
-tests\directive-definition.mx:71:2 ERROR: Unexpected token '22'
-tests\directive-definition.mx:73:2 ERROR: Unexpected token '26'
-tests\directive-definition.mx:77:2 ERROR: Unexpected token '12'
-tests\directive-definition.mx:82:2 ERROR: Unexpected token '5'
-tests\directive-definition.mx:101:2 ERROR: Unexpected token '()'
-tests\directive-definition.mx:111:2 ERROR: Unexpected token '{}'
-tests\directive-definition.mx:160:1 ERROR: Unexpected token '{}'
+tests\directive-definition.mx:44:2 ERROR: Definition not allowed inside macro
+tests\directive-definition.mx:45:2 ERROR: Definition not allowed inside macro
+tests\directive-definition.mx:50:9 ERROR: Define value expected
+tests\directive-definition.mx:51:9 ERROR: Define value expected
+tests\directive-definition.mx:53:2 ERROR: Undeclared identifier 'ijkl'
+tests\directive-definition.mx:55:8 ERROR: Unexpected continued token '()'
+tests\directive-definition.mx:56:2 ERROR: Missing define name
+tests\directive-definition.mx:57:8 ERROR: Invalid macro name '$'
+tests\directive-definition.mx:59:9 ERROR: Invalid define name '59var'
+tests\directive-definition.mx:60:9 ERROR: Define value expected
+tests\directive-definition.mx:61:9 ERROR: Invalid define name 'CONST_VAL$'
+tests\directive-definition.mx:62:9 ERROR: Invalid define name 'lab:el'
+tests\directive-definition.mx:64:9 ERROR: Define value expected
+tests\directive-definition.mx:67:8 ERROR: Macro arglist expected
+tests\directive-definition.mx:68:8 ERROR: Invalid macro name '_^'
+tests\directive-definition.mx:69:2 ERROR: Missing macro name
+tests\directive-definition.mx:75:17 ERROR: Unexpected token after directive '23'
+tests\directive-definition.mx:77:17 ERROR: Unexpected token after directive '25'
+tests\directive-definition.mx:79:17 ERROR: Unexpected token after directive '28'
+tests\directive-definition.mx:80:16 ERROR: Unexpected token after directive '_'
+tests\directive-definition.mx:81:9 ERROR: Define value expected
+tests\directive-definition.mx:83:14 ERROR: Unexpected token type 'abc'
+tests\directive-definition.mx:84:3 ERROR: Undeclared identifier 'def8'
+tests\directive-definition.mx:85:18 ERROR: Unexpected token after directive 'ld'
+tests\directive-definition.mx:86:13 ERROR: Unexpected token after directive '%'
+tests\directive-definition.mx:88:3 ERROR: Undeclared identifier 'b'
+tests\directive-definition.mx:89:14 ERROR: Unexpected token type '#'
+tests\directive-definition.mx:91:13 ERROR: Unexpected token type ':'
+tests\directive-definition.mx:92:14 ERROR: Unexpected token type 'here'
+tests\directive-definition.mx:94:18 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:97:8 ERROR: Macro arglist expected
+tests\directive-definition.mx:105:8 ERROR: Macro arglist expected
+tests\directive-definition.mx:107:19 ERROR: Missing macro arg name
+tests\directive-definition.mx:114:20 ERROR: Missing macro arg name
+tests\directive-definition.mx:118:22 ERROR: Separator expected
+tests\directive-definition.mx:119:19 ERROR: Missing macro arg name
+tests\directive-definition.mx:120:19 ERROR: Missing macro arg name
+tests\directive-definition.mx:121:21 ERROR: Missing macro arg name
+tests\directive-definition.mx:122:24 ERROR: Missing macro arg name
+tests\directive-definition.mx:123:29 ERROR: Separator expected
+tests\directive-definition.mx:124:21 ERROR: Missing macro arg name
+tests\directive-definition.mx:126:20 ERROR: Invalid macro arg name '12'
+tests\directive-definition.mx:127:23 ERROR: Invalid macro arg name 'x^'
+tests\directive-definition.mx:128:20 ERROR: Invalid macro arg name '%define'
+tests\directive-definition.mx:129:23 ERROR: Macro argument redefinition 'x'
+tests\directive-definition.mx:130:29 ERROR: Macro argument redefinition 'x'
+tests\directive-definition.mx:131:20 ERROR: Macro redefinition 'badArgName6'
+tests\directive-definition.mx:135:1 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:138:3 ERROR: Undeclared identifier 'afterNobody'
+tests\directive-definition.mx:149:8 ERROR: No separators expected in macro body
+tests\directive-definition.mx:156:3 ERROR: Unexpected token after directive '9'
+tests\directive-definition.mx:160:3 ERROR: Unexpected token after directive '%'
+tests\directive-definition.mx:162:3 ERROR: Undeclared identifier 'here'
+tests\directive-definition.mx:164:3 ERROR: Unexpected token after directive '%'
+tests\directive-definition.mx:167:3 ERROR: Undeclared identifier 'm'
+tests\directive-definition.mx:170:2 ERROR: Missing define name
+tests\directive-definition.mx:52:2 ERROR: Unexpected token '64'
+tests\directive-definition.mx:76:2 ERROR: Unexpected token '22'
+tests\directive-definition.mx:78:2 ERROR: Unexpected token '26'
+tests\directive-definition.mx:82:2 ERROR: Unexpected token '12'
+tests\directive-definition.mx:87:2 ERROR: Unexpected token '5'
+tests\directive-definition.mx:106:2 ERROR: Unexpected token '()'
+tests\directive-definition.mx:116:2 ERROR: Unexpected token '{}'
+tests\directive-definition.mx:165:1 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:6:1 ERROR: Unknown instruction 'dir'
-tests\directive-definition.mx:65:1 ERROR: Unknown instruction 'name'
-tests\directive-definition.mx:131:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
-tests\directive-definition.mx:140:2 ERROR: Unknown condition 'somting'
+tests\directive-definition.mx:70:1 ERROR: Unknown instruction 'name'
+tests\directive-definition.mx:136:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
+tests\directive-definition.mx:145:2 ERROR: Unknown condition 'somting'
 
 

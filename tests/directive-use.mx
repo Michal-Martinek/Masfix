@@ -76,6 +76,14 @@ ld %defined1 %test_mac()
 %jnn(4, %defined2, %defined_)
 %jnn(%defined3, %test_mac(), 2)
 
+; macro arguments use
+%macro argUse(a, b, c) {
+	outu %a
+	outum %b()
+	outu %c ()
+}
+%argUse(1, 2, 3)
+
 %macro scope1(var, upper) {
 	outu _ %var
 	outu _ %upper
@@ -88,7 +96,11 @@ ld %defined1 %test_mac()
 
 	%scope1(9, 68)
 }
-%scope2(5, 18)
-%lower
-%scope1(485, 128)
-%upper
+%macro testScopingAndArglistExpansions(a, b, c, d) {
+	%scope2(%a, %b)
+	%lower
+	%scope1(%c, %d)
+	%upper
+}
+%define testDef 485
+%testScopingAndArglistExpansions(5, 18, %testDef, 128)

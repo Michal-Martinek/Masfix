@@ -640,17 +640,20 @@ bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token p
 	static_assert(TokenCount == 6, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("directive", false);
-	checkReturnOnFail(itr == currList.end() || !itr->continued || StrToMacro.count(name) == 1, "Unexpected continued token", *itr);
+	bool notContinued = itr == currList.end() || !itr->continued;
 	if (BuiltinDirectivesSet.count(name) == 1) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		checkReturnOnFail(!processingArglist, "Definition not allowed inside arglist", percentToken.loc);
 		checkReturnOnFail(currMacName.size() == 0, "Definition not allowed inside macro", percentToken.loc);
 		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
 	} else if (StrToDefine.count(name) == 1) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		expandDefineUse(currList, itr, percentToken, name);
 	} else if (StrToMacro.count(name) == 1) {
 		checkReturnOnFail(percentToken.firstOnLine && !processingArglist, "Unexpected macro use", percentToken.loc);
 		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, name, currMacName));
 	} else if (currMacName.size() && StrToMacro[currMacName].hasArg(name)) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		list<Token>& argField = StrToMacro[currMacName].nameToArg(name).value.top();
 		insertList(currList, itr, argField, percentToken);
 	} else {

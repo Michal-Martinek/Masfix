@@ -40,6 +40,12 @@ dir
 :here_define2 %define
 :here_macro_def %macro
 
+%macro dirsInside() {
+	%define insideDef 88
+	%macro macInside() {}
+}
+%dirsInside()
+
 ; defined name
 %define _abc
 %define ijkl
@@ -54,7 +60,6 @@ dir
 %define CONST_VAL
 %define CONST_VAL$
 %define lab:el
-
 
 %define name32
 %define name 33
