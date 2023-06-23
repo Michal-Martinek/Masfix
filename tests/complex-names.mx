@@ -1,0 +1,30 @@
+
+%define defd2 2
+
+; in label defs
+:()
+: ()
+:(lab1)
+: (lab2)
+:name(2)
+:name (3)
+: name(%defd2)
+
+; specials
+:a(b!c)d
+: _(_-_)_
+:(())
+:(a, b)
+:(u),
+
+
+; multiple fields
+:not()ok
+:it_(is)_ok
+:z1(2)3
+:n8(!)5
+
+:(rrr)name_(6)
+:(rrr)(6)
+:(7)(zaza)
+:(rrr 6)

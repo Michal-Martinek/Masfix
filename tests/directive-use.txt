@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3642
+:stderr 3584
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -34,9 +34,8 @@ tests\directive-use.mx:103:3 ERROR: Undeclared identifier 'upper'
 tests\directive-use.mx:11:1 ERROR: Unexpected token '1'
 tests\directive-use.mx:26:1 ERROR: Unexpected token '3'
 tests\directive-use.mx:27:1 ERROR: Unexpected token '()'
-tests\directive-use.mx:30:6 ERROR: Unexpected token '()'
 tests\directive-use.mx:32:9 ERROR: Unexpected token '1'
-tests\directive-use.mx:70:11 ERROR: Invalid label name ':labelInside1'
+tests\directive-use.mx:68:2 ERROR: Invalid label name ':labelInside1'
 tests\directive-use.mx:13:1 ERROR: Invalid instruction immediate 'mov defined3'
 tests\directive-use.mx:17:1 ERROR: Only simple immediates for now 'ld 8 3'
 tests\directive-use.mx:18:1 ERROR: Only simple immediates for now 'ld 1 9'

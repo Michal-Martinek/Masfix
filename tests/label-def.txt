@@ -5,30 +5,30 @@ tests\label-def.mx:6:2 ERROR: Missing label name
 tests\label-def.mx:8:1 ERROR: Missing label name
 tests\label-def.mx:9:2 ERROR: Missing label name
 tests\label-def.mx:10:2 ERROR: Missing label name
-tests\label-def.mx:18:2 ERROR: Invalid label name 'label-test'
-tests\label-def.mx:19:2 ERROR: Invalid label name 'label-'
-tests\label-def.mx:20:2 ERROR: Invalid label name 'label.here'
-tests\label-def.mx:21:2 ERROR: Invalid label name '58'
-tests\label-def.mx:22:3 ERROR: Invalid label name '58lab'
-tests\label-def.mx:24:2 ERROR: Invalid label name '05label_test'
-tests\label-def.mx:28:2 ERROR: Invalid label name ':'
-tests\label-def.mx:29:3 ERROR: Invalid label name ':'
-tests\label-def.mx:30:3 ERROR: Invalid label name 'label:'
-tests\label-def.mx:36:2 ERROR: Label redefinition '_lab1'
-tests\label-def.mx:37:2 ERROR: Label redefinition 'end'
-tests\label-def.mx:38:2 ERROR: Label redefinition 'begin'
-tests\label-def.mx:39:2 ERROR: Invalid label name '58'
-tests\label-def.mx:44:11 ERROR: Max one label per line
-tests\label-def.mx:45:11 ERROR: Max one label per line
+tests\label-def.mx:18:1 ERROR: Invalid label name 'label-test'
+tests\label-def.mx:19:1 ERROR: Invalid label name 'label-'
+tests\label-def.mx:20:1 ERROR: Invalid label name 'label.here'
+tests\label-def.mx:21:1 ERROR: Invalid label name '58'
+tests\label-def.mx:22:2 ERROR: Invalid label name '58lab'
+tests\label-def.mx:24:1 ERROR: Invalid label name '05label_test'
+tests\label-def.mx:28:1 ERROR: Invalid label name ':'
+tests\label-def.mx:29:1 ERROR: Invalid label name ':'
+tests\label-def.mx:30:1 ERROR: Invalid label name 'label:'
+tests\label-def.mx:36:1 ERROR: Label redefinition '_lab1'
+tests\label-def.mx:37:1 ERROR: Label redefinition 'end'
+tests\label-def.mx:38:1 ERROR: Label redefinition 'begin'
+tests\label-def.mx:39:1 ERROR: Invalid label name '58'
+tests\label-def.mx:44:10 ERROR: Max one label per line
+tests\label-def.mx:45:10 ERROR: Max one label per line
 tests\label-def.mx:46:10 ERROR: Missing label name
 tests\label-def.mx:50:7 ERROR: Unexpected token '5'
-tests\label-def.mx:53:3 ERROR: Name shadows an instruction 'ld'
-tests\label-def.mx:54:2 ERROR: Name shadows an instruction 'ld'
-tests\label-def.mx:56:3 ERROR: Invalid label name 'ld>r'
-tests\label-def.mx:58:2 ERROR: Name shadows an instruction 'mov'
-tests\label-def.mx:59:2 ERROR: Name shadows an instruction 'ldam'
-tests\label-def.mx:62:2 ERROR: Name shadows an instruction 'swap'
-tests\label-def.mx:63:2 ERROR: Name shadows an instruction 'swapa'
+tests\label-def.mx:53:1 ERROR: Name shadows an instruction 'ld'
+tests\label-def.mx:54:1 ERROR: Name shadows an instruction 'ld'
+tests\label-def.mx:56:1 ERROR: Invalid label name 'ld>r'
+tests\label-def.mx:58:1 ERROR: Name shadows an instruction 'mov'
+tests\label-def.mx:59:1 ERROR: Name shadows an instruction 'ldam'
+tests\label-def.mx:62:1 ERROR: Name shadows an instruction 'swap'
+tests\label-def.mx:63:1 ERROR: Name shadows an instruction 'swapa'
 tests\label-def.mx:69:2 ERROR: Missing label name
 tests\label-def.mx:14:4 ERROR: Unknown condition 'lab2'
 tests\label-def.mx:27:5 ERROR: Missing condition 'b'

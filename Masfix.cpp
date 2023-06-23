@@ -439,11 +439,35 @@ pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr,
 	}
 	return pair(out, firstEaten.loc);
 }
-pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string identPurpose, Loc prevLoc) {
+pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string identPurpose, Loc prevLoc, bool inComplex=false) {
 	string name; Loc loc;
 	tie(name, loc) = eatTokenRun(currList, itr, false);
 	if (!check(name != "", "Missing " + identPurpose + " name", prevLoc)) return pair("", Loc());
-	return isValidIdentifier(name, "Invalid " + identPurpose + " name" errorQuoted(name), loc) ? pair(name, loc) : pair("", Loc());
+	if (!inComplex && !isValidIdentifier(name, "Invalid " + identPurpose + " name" errorQuoted(name), loc)) return pair("", Loc());
+	return pair(name, loc);
+}
+bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string& ident) {
+	string fragment; Loc fragLoc = loc;
+	checkReturnOnFail(itr != currList.end() && !itr->firstOnLine, "Missing label name", loc);
+	bool first = true;
+	while (itr != currList.end() && (itr->continued || first)) {
+		first = false;
+		if (itr->type == Tlist) {
+			checkReturnOnFail(itr->tlist.size() && !itr->isSeparated() && itr->tlist.front().type != Tlist, "Unexpected ident field", itr->loc);
+			list<Token>::iterator tlistItr = itr->tlist.begin();
+			tie(fragment, fragLoc) = eatIdentifier(itr->tlist, tlistItr, "ident field", itr->loc, true);
+			returnOnFalse(fragment != "");
+			checkReturnOnFail(tlistItr == itr->tlist.end(), "Simple field expected", itr->loc);
+			++itr;
+			ident.append(fragment);
+		} else {
+			tie(fragment, fragLoc) = eatIdentifier(currList, itr, "ident field", itr->loc, true);
+			returnOnFalse(fragment != "");
+			ident.append(fragment);
+		}
+	}
+	returnOnFalse(isValidIdentifier(ident, "Invalid label name" errorQuoted(ident), loc));
+	return checkIdentRedefinitons(ident, loc, true);
 }
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
@@ -506,7 +530,7 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 					token = Token(Tlist, string(1, first), loc, continued, firstOnLine);
 					addToken(tokens, listTokens, token);
 					continued = false; // TODO should (first token in list).firstOnLine - always / never / depends?
-					continue;
+					continue; // TODO allow first token in list to continue??
 				} else if (first == ')' || first == ']' || first == '}') {
 					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
 					token = *listTokens.top();
@@ -609,7 +633,7 @@ void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token pe
 	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
-bool preprocess(list<Token>& tokens, bool processingDirectiveInsides, string directiveInsidesScope);
+bool preprocess(list<Token>& tokens, string nestingType, string nestingScope);
 bool processExpansionArglist(Token& tlist, Macro& mac, string currMacName) {
 	assert(tlist.type == Tlist);
 	auto splits = splitTlist(tlist);
@@ -618,7 +642,7 @@ bool processExpansionArglist(Token& tlist, Macro& mac, string currMacName) {
 	for (auto [currList, loc] : splits) {
 		checkReturnOnFail(currList.size() > 0, "Expansion argument expected", loc);
 		currList.front().continued = false;
-		returnOnFalse(preprocess(currList, true, currMacName)); // the hyper loop closes
+		returnOnFalse(preprocess(currList, "arglist", currMacName)); // the hyper loop closes
 		expanded.push_back(currList);
 		++idx;
 	}
@@ -636,21 +660,21 @@ bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, 
 	insertToken(currList, itr, expanded);
 	return true;
 }
-bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string currMacName, bool processingArglist) {
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string currMacName, string nestingType) {
 	static_assert(TokenCount == 6, "Exhaustive processDirective definition");
 	string name; Loc loc = percentToken.loc;
 	directiveEatIdentifier("directive", false);
 	bool notContinued = itr == currList.end() || !itr->continued;
 	if (BuiltinDirectivesSet.count(name) == 1) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		checkReturnOnFail(!processingArglist, "Definition not allowed inside arglist", percentToken.loc);
+		checkReturnOnFail(nestingType.size() == 0, "Definition not allowed inside " + nestingType, percentToken.loc);
 		checkReturnOnFail(currMacName.size() == 0, "Definition not allowed inside macro", percentToken.loc);
 		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
 	} else if (StrToDefine.count(name) == 1) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		expandDefineUse(currList, itr, percentToken, name);
 	} else if (StrToMacro.count(name) == 1) {
-		checkReturnOnFail(percentToken.firstOnLine && !processingArglist, "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine && nestingType.size() == 0, "Unexpected macro use", percentToken.loc);
 		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, name, currMacName));
 	} else if (currMacName.size() && StrToMacro[currMacName].hasArg(name)) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
@@ -662,12 +686,12 @@ bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token p
 	return true;
 }
 #define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
-bool preprocess(list<Token>& tokens, bool processingArglist=false, string arglistScope="") {
+bool preprocess(list<Token>& tokens, string nestingType="", string nestingScope="") {
 	stack<reference_wrapper<Token>> openLists;
 	stack<list<Token>::iterator> openItrs({ tokens.begin() });
 	bool errorLess = true;
 	stack<string> macroScopes;
-	if (arglistScope.size()) macroScopes.push(arglistScope);
+	if (nestingScope.size()) macroScopes.push(nestingScope);
 
 	while (openItrs.size()) {
 		list<Token>* currList = openLists.size() ? &openLists.top().get().tlist : &tokens;
@@ -678,7 +702,7 @@ bool preprocess(list<Token>& tokens, bool processingArglist=false, string arglis
 				if (currToken.data == "%") {
 					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 					Token percentToken = eraseToken(*currList, *currItr);
-					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, macroScopes.size() ? macroScopes.top() : "", processingArglist));
+					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, macroScopes.size() ? macroScopes.top() : "", nestingType));
 					continue;
 				}
 			}
@@ -686,7 +710,6 @@ bool preprocess(list<Token>& tokens, bool processingArglist=false, string arglis
 			if (currToken.type == Tlist || currToken.type == TIexpansion) {
 				if (currToken.type == TIexpansion) {
 					if (macroScopes.size() > MAX_EXPANSION_DEPTH) {
-						errorLess = false;
 						raiseError("Maximum expansion depth exceeded", currToken.loc, true);
 					}
 					macroScopes.push(currToken.data);
@@ -733,14 +756,12 @@ vector<Instr> compile(list<Token>& tokens, string fileName) {
 		++itr;
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
-			string name; Loc loc;
-			tie(name, loc) = eatIdentifier(tokens, itr, "label", top.loc);
-			continueOnFalse(name != "");
-			continueOnFalse(checkIdentRedefinitons(name, loc, true));
+			string name;
+			continueOnFalse(eatComplexIdentifier(tokens, itr, top.loc, name));
 			ignoreLine = false;
-			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
+			checkContinueOnFail(!labelOnLine, "Max one label per line", top.loc);
 			labelOnLine = true;
-			StrToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
+			StrToLabel.insert(pair(name, Label(name, instrs.size(), top.loc)));
 		} else if (top.type == Talpha) {
 			Instr instr;
 			--itr;
