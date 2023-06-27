@@ -295,6 +295,10 @@ struct Instr {
 	vector<Token> immFields;
 	
 	Instr() {}
+	Instr(string opcodeStr,	Loc opcodeLoc) {
+		this->opcodeStr = opcodeStr;
+		this->opcodeLoc = opcodeLoc;
+	}
 	bool hasImm() { return immFields.size() != 0; }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
@@ -427,46 +431,40 @@ bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Tok
 	eraseToken(currList, itr);
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
-pair<string, Loc> eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, bool canStartLine=true) {
+void eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, bool canStartLine=true) {
 	static_assert(TokenCount == 6, "Exhaustive eatTokenRun definition");
-	string out = "";
+	name = "";
+	if (itr != currList.end()) loc = itr->loc;
 	bool first = true;
-	Token firstEaten = itr != currList.end() ? *itr : Token();
 	while (itr != currList.end() && (!itr->firstOnLine || (canStartLine && first)) && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
-		out += itr->data;
+		name += itr->data;
 		eraseToken(currList, itr);
 		first = false;
 	}
-	return pair(out, firstEaten.loc);
 }
-pair<string, Loc> eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string identPurpose, Loc prevLoc, bool inComplex=false) {
-	string name; Loc loc;
-	tie(name, loc) = eatTokenRun(currList, itr, false);
-	if (!check(name != "", "Missing " + identPurpose + " name", prevLoc)) return pair("", Loc());
-	if (!inComplex && !isValidIdentifier(name, "Invalid " + identPurpose + " name" errorQuoted(name), loc)) return pair("", Loc());
-	return pair(name, loc);
+bool eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, string identPurpose, bool canStartLine=false) {
+	Loc prevLoc = loc;
+	eatTokenRun(currList, itr, name, loc, canStartLine);
+	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
-bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string& ident) {
-	string fragment; Loc fragLoc = loc;
-	checkReturnOnFail(itr != currList.end() && !itr->firstOnLine, "Missing label name", loc);
-	bool first = true;
-	while (itr != currList.end() && (itr->continued || first)) {
-		first = false;
+bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string& ident, string purpose) {
+	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
+	checkReturnOnFail(itr != currList.end() && (!itr->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
+	do {
 		if (itr->type == Tlist) {
-			checkReturnOnFail(itr->tlist.size() && !itr->isSeparated() && itr->tlist.front().type != Tlist, "Unexpected ident field", itr->loc);
+			checkReturnOnFail(itr->tlist.size() && !itr->isSeparated() && itr->tlist.front().type != Tlist, "Unexpected " + purpose + " field", itr->loc);
 			list<Token>::iterator tlistItr = itr->tlist.begin();
-			tie(fragment, fragLoc) = eatIdentifier(itr->tlist, tlistItr, "ident field", itr->loc, true);
-			returnOnFalse(fragment != "");
-			checkReturnOnFail(tlistItr == itr->tlist.end(), "Simple field expected", itr->loc);
-			++itr;
+			returnOnFalse(eatIdentifier(itr->tlist, tlistItr, fragment, fragLoc, purpose + " field", canStartLine));
+			checkReturnOnFail(tlistItr == itr->tlist.end(), "Simple " + purpose + " field expected", itr->loc);
 			ident.append(fragment);
+			++itr;
 		} else {
-			tie(fragment, fragLoc) = eatIdentifier(currList, itr, "ident field", itr->loc, true);
-			returnOnFalse(fragment != "");
+			returnOnFalse(eatIdentifier(currList, itr, fragment, itr->loc, purpose + " field", canStartLine));
 			ident.append(fragment);
 		}
-	}
-	returnOnFalse(isValidIdentifier(ident, "Invalid label name" errorQuoted(ident), loc));
+	} while (itr != currList.end() && itr->continued);
+	if (purpose == "instr") return true;
+	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitons(ident, loc, true);
 }
 // tokenization -----------------------------------------------------------------
@@ -559,8 +557,8 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 }
 // preprocess -------------------------------------------------------------------------
 #define directiveEatIdentifier(identPurpose, definiton) \
-	tie(name, loc) = eatIdentifier(currList, itr, identPurpose, loc); \
-	returnOnFalse(name != ""); \
+	returnOnFalse(eatIdentifier(currList, itr, name, loc, identPurpose, false)); \
+	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
 	if (definiton) returnOnFalse(checkIdentRedefinitons(name, loc, false));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr, sameLine));
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token& token) {
@@ -751,27 +749,23 @@ vector<Instr> compile(list<Token>& tokens, string fileName) {
 		ignoreLine = true;
 		if (itr == tokens.end()) break;
 
-		Token top = *itr;
+		Token top = *(itr++);
 		labelOnLine = labelOnLine && !top.firstOnLine;
-		++itr;
 		if (top.type == Tspecial) {
 			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
 			string name;
-			continueOnFalse(eatComplexIdentifier(tokens, itr, top.loc, name));
+			continueOnFalse(eatComplexIdentifier(tokens, itr, top.loc, name, "label"));
 			ignoreLine = false;
 			checkContinueOnFail(!labelOnLine, "Max one label per line", top.loc);
 			labelOnLine = true;
 			StrToLabel.insert(pair(name, Label(name, instrs.size(), top.loc)));
 		} else if (top.type == Talpha) {
-			Instr instr;
-			--itr;
-			tie(instr.opcodeStr, instr.opcodeLoc) = eatTokenRun(tokens, itr);
-			continueOnFalse(instr.opcodeStr != "");
+			string instrStr = "";
+			continueOnFalse(eatComplexIdentifier(tokens, --itr, top.loc, instrStr, "instr"));
+			instrs.push_back(Instr(instrStr, top.loc));
 			while (itr != tokens.end() && !itr->firstOnLine) {
-				instr.immFields.push_back(*itr);
-				++itr;
+				instrs.back().immFields.push_back(*(itr++));
 			}
-			instrs.push_back(instr);
 		} else if (top.type == TIexpansion) {
 			list<Token>::iterator expansion = --itr;
 			tokens.splice(++itr, top.tlist);
