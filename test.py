@@ -60,53 +60,22 @@ def getTestcaseDesc(test: Path, update=False) -> dict:
 			print('[NOTE] Using default testcase description\n')
 			return {'returncode': 0, 'stdout': '', 'stderr': '', 'stdin': ''}
 		raise e
-def runFile(path, stdin) -> dict:
-	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
-def runTest(path: Path) -> bool:
-	print('[TESTING]', path)
-	expected = getTestcaseDesc(path)
-	ran = runFile(path, expected['stdin'])
-	check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
-	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
-	check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
-	return True
-def runTests(dir: Path):
-	success = True
-	for file in os.listdir(dir):
-		path = Path(os.path.join(dir, file))
-		if path.suffix != '.mx':
-			continue
-		try:
-			passed = runTest(path)
-		except TestcaseException:
-			passed = False
-			print()
-		success = success and passed
+# updates -----------------------------------
+def askWhetherToDo(doWhat: str) -> bool:
+	answer = input(f'\nWould you like to {doWhat}? (y / n): ')
 	print()
-	if success:
-		print('All testcases passed')
-	else:
-		print('Some testcases failed')
-		exit(1)
-def saveDesc(file: Path, desc):
-	code = desc['returncode']
-	stdout = desc['stdout']
-	stderr = desc['stderr']
-	stdin = desc['stdin']
-	with open(file.with_suffix('.txt'), 'w') as f:
-		f.write(f':returncode {code}\n\n')
-		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
-		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
-		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
-def updateFileOutput(file: Path):
-	print('[UPDATING]', file, '\n')
+	return answer and answer[0].lower() == 'y'
+def updateFileOutput(file: Path, verbose=True):
+	print('[UPDATING]', file)
 	original = getTestcaseDesc(file, update=True)
 	ran = runFile(file, original['stdin'])
-	print('[NOTE] returncode:', ran['returncode'])
-	print('[NOTE] stdout:')
-	print(ran['stdout'])
-	print('[NOTE] stderr:')
-	print(ran['stderr'], end='')
+	if verbose:
+		print()
+		print('[NOTE] returncode:', ran['returncode'])
+		print('[NOTE] stdout:')
+		print(ran['stdout'])
+		print('[NOTE] stderr:')
+		print(ran['stderr'], end='')
 	ran['stdin'] = original['stdin']
 	saveDesc(file, ran)
 def updateInput(file: Path):
@@ -124,12 +93,54 @@ def updateInput(file: Path):
 	desc = getTestcaseDesc(file, update=True)
 	desc['stdin'] = inputed
 	saveDesc(file, desc)
-	
-	print()
-	answer = input("Would you like to update output now? (y / n): ")
-	if answer and answer[0].lower() == 'y':
-		print()
+	if askWhetherToDo('update output now'):
 		updateFileOutput(file)
+	
+# test ------------------------------------------
+def runFile(path, stdin) -> dict:
+	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
+def runTest(path: Path) -> bool:
+	print('[TESTING]', path)
+	expected = getTestcaseDesc(path)
+	ran = runFile(path, expected['stdin'])
+	check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
+	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
+	check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
+	return True
+def _handleTestResult(failedTests: list[Path]):
+	print()
+	if not len(failedTests):
+		print('All testcases passed')
+	else:
+		print('Some testcases failed')
+		if askWhetherToDo("update outputs of failed tests"):
+			for file in failedTests:
+				updateFileOutput(file, False)
+		exit(1)
+def runTests(dir: Path):
+	failedTests = []
+	for file in os.listdir(dir):
+		path = Path(os.path.join(dir, file))
+		if path.suffix != '.mx':
+			continue
+		try:
+			passed = runTest(path)
+		except TestcaseException:
+			passed = False
+			print()
+		if not passed:
+			failedTests.append(path)
+	_handleTestResult(failedTests)
+def saveDesc(file: Path, desc):
+	code = desc['returncode']
+	stdout = desc['stdout']
+	stderr = desc['stderr']
+	stdin = desc['stdin']
+	with open(file.with_suffix('.txt'), 'w') as f:
+		f.write(f':returncode {code}\n\n')
+		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
+		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
+		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
 
 # modes --------------------------------------
 def processFileArg(arg) -> Path:
