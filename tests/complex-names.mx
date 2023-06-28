@@ -28,3 +28,17 @@
 :(rrr)(6)
 :(7)(zaza)
 :(rrr 6)
+
+; wrong use in instructions
+mov ()
+str()
+swap,
+inc:
+ld (),
+jmp(,),
+huhu(tata)
+jmp%macro
+swap%dir()
+
+mov(a)(p)
+str(t)(s)
