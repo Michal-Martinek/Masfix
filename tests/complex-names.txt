@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1515
+:stderr 2099
 tests\complex-names.mx:40:4 ERROR: Directive must not continue
 tests\complex-names.mx:41:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Unexpected label field
@@ -19,11 +19,19 @@ tests\complex-names.mx:30:2 ERROR: Simple label field expected
 tests\complex-names.mx:34:4 ERROR: Unexpected instr field
 tests\complex-names.mx:35:5 ERROR: Missing instr field name
 tests\complex-names.mx:38:4 ERROR: Unexpected instr field
+tests\complex-names.mx:45:3 ERROR: Unexpected instr field
+tests\complex-names.mx:46:1 ERROR: Unexpected token '()'
+tests\complex-names.mx:48:2 ERROR: Unexpected instr field
 tests\complex-names.mx:33:1 ERROR: Invalid instruction immediate 'mov ()'
 tests\complex-names.mx:36:1 ERROR: Unknown suffix 'inc:'
 tests\complex-names.mx:37:1 ERROR: Invalid instruction immediate 'ld (),'
 tests\complex-names.mx:39:1 ERROR: Unknown instruction 'huhutata'
 tests\complex-names.mx:40:1 ERROR: Instrs must have only imm, or 1 reg for now 'jmp'
-tests\complex-names.mx:44:1 ERROR: The second suffix must be a register 'strts'
+tests\complex-names.mx:44:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
+tests\complex-names.mx:47:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
+tests\complex-names.mx:49:1 ERROR: Unknown instruction 'jm () 4'
+tests\complex-names.mx:52:1 ERROR: The second suffix must be a register 'strts'
+tests\complex-names.mx:53:1 ERROR: Instrs must have only imm, or 1 reg for now 'smge'
+tests\complex-names.mx:54:1 ERROR: Instrs must have only imm, or 1 reg for now 'bmeqm 15'
 
 

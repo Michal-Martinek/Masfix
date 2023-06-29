@@ -40,5 +40,15 @@ huhu(tata)
 jmp%macro
 swap%dir()
 
+; complex instr names
+mov
+ld()
+(mov)
+m(ov)
+l(d,)a
+jm (p) 4
+
 mov(a)(p)
 str(t)(s)
+s(m)(ge)
+b(me)qm 15

@@ -36,6 +36,12 @@
 %testArgPreprocess(48)
 :afterLab
 
-; TODO add to test when preprocess is more mature:
-; scoping - using the same macro more times
 ; substitution in complex names
+%macro testInstr(instr, reg) {
+	%instr 21845
+	outu( %reg )
+	outc 10
+}
+%testInstr(s(tr), m)
+%testInstr(str(&), m)
+%testInstr(s(tr)(a), m)
