@@ -368,13 +368,13 @@ void raiseErrors() { // TODO sort errors based on line and file
 	for (string s : errors) {
 		cerr << s;
 	}
-	if (errors.size())
-		exit(1);
+	if (errors.size()) exit(1);
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
-	if (strict || FLAG_strictErrors)
+	if (strict || FLAG_strictErrors) {
 		raiseErrors();
+	}
 }
 
 bool raiseError(string message, Token token, bool strict=false) {
@@ -1028,7 +1028,7 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		unreachable();
 	}
 }
-void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
+void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
 	// intermediate values - first - rbx, second - rcx
 	// addr of cells[0] - r13
@@ -1238,7 +1238,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		outFile << "instr_" << i << ":\n";
 		outFile << "	; " << instr.toStr() << '\n';
 		genAssembly(outFile, instr, i);
-	} 
+	}
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
 		"	jmp end\n"
@@ -1418,4 +1418,3 @@ int main(int argc, char *argv[]) {
 
 	compileAndRun(OutputFileName);
 }
-// TODO parse lists in label names
