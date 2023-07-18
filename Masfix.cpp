@@ -5,8 +5,10 @@ namespace fs = std::filesystem;
 
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 #include <list>
+#include <stack>
 
 #include <algorithm>
 #include <math.h>
@@ -17,26 +19,30 @@ namespace fs = std::filesystem;
 using namespace std;
 
 // constants -------------------------------
+#define MAX_EXPANSION_DEPTH 1024
+
 #define STDOUT_BUFF_SIZE 256
 #define STDIN_BUFF_SIZE 256
 
 #define WORD_MAX_VAL 65535
 #define CELLS WORD_MAX_VAL+1
-// globals ---------------------------------
-fs::path InputFileName = "";
-fs::path OutputFileName = "";
-
-bool FLAG_silent = false;
-bool FLAG_run = false;
-bool FLAG_keepAsm = false;
-bool FLAG_strictErrors = false;
 // enums --------------------------------
 enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tspecial,
+	Tseparator,
+	Tlist,
+
+	// intermediate preprocess tokens
+	TIexpansion,
 
 	TokenCount
+};
+constexpr int BuiltinDirectivesCount = 2;
+const set<string> BuiltinDirectivesSet = {
+	"define", 
+	"macro"
 };
 enum RegNames {
 	Rh,
@@ -168,6 +174,8 @@ struct Loc {
 struct Token {
 	TokenTypes type;
 	string data;
+	list<Token> tlist;
+
 	Loc loc;
 	bool continued;
 	bool firstOnLine;
@@ -180,9 +188,87 @@ struct Token {
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
 	}
-	int64_t asLong() {
+	char tlistCloseChar() {
+		assert(type == Tlist);
+		return data.at(0) + 2 - (data.at(0) == '(');
+	}
+	string toStr() {
+		string out = data;
+		if (type == Tlist) {
+			if (isSeparated()) out.push_back(',');
+			out.push_back(tlistCloseChar());
+		}
+		return out;
+	}
+	int64_t asLong() { // TODO report value overflows
 		assert(type == Tnumeric);
 		return stoi(data);
+	}
+	bool isSeparated() {
+		assert(type == Tlist);
+		for (Token t : tlist) {
+			if (t.type == Tseparator) return true;
+		}
+		return false;
+	}
+};
+struct Define {
+	string name;
+	Loc loc;
+	string value;
+
+	Define() {}
+	Define(string name,	Loc loc, string value) {
+		this->name = name;
+		this->loc = loc;
+		this->value = value;
+	}
+};
+struct MacroArg {
+	string name;
+	Loc loc;
+	stack<list<Token>> value; // TODO test multiple expansions inside each other
+
+	MacroArg() {}
+	MacroArg(string name, Loc loc) {
+		this->name = name;
+		this->loc = loc;
+	}
+};
+struct Macro {
+	string name;
+	Loc loc;
+
+	map<string, int> nameToArgIdx;
+	vector<MacroArg> argList;
+	list<Token> body;
+
+	Macro() {}
+	Macro(string name, Loc loc) {
+		this->name = name;
+		this->loc = loc;
+	}
+
+	bool hasArg(string name) {
+		return nameToArgIdx.count(name);
+	}
+	void addArg(string name, Loc loc) {
+		nameToArgIdx[name] = argList.size();
+		argList.push_back(MacroArg(name, loc));
+	}
+	MacroArg& nameToArg(string name) {
+		assert(nameToArgIdx.count(name));
+		return argList[nameToArgIdx[name]];
+	}
+	void addExpansionScope(vector<list<Token>>& fields) {
+		for (int i = 0; i < fields.size(); ++i) {
+			argList[i].value.push(list(fields[i].begin(), fields[i].end()));
+		}
+	}
+	void closeExpansionScope() {
+		for (int i = 0; i < argList.size(); ++i) {
+			argList[i].value.pop();
+		}
 	}
 };
 struct Suffix {
@@ -209,6 +295,10 @@ struct Instr {
 	vector<Token> immFields;
 	
 	Instr() {}
+	Instr(string opcodeStr,	Loc opcodeLoc) {
+		this->opcodeStr = opcodeStr;
+		this->opcodeLoc = opcodeLoc;
+	}
 	bool hasImm() { return immFields.size() != 0; }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
@@ -225,9 +315,9 @@ struct Instr {
 		vector<string> out;
 		for (Token t : immFields) {
 			if (t.continued) {
-				out[out.size()-1].append(t.data);
+				out[out.size()-1].append(t.toStr());
 			} else {
-				out.push_back(t.data);
+				out.push_back(t.toStr());
 			}
 		}
 		return out;
@@ -247,76 +337,137 @@ struct Label {
 		return ":" + name;
 	}
 };
-// helpers ---------------------------------
-bool validIdentChar(char c) { return isalnum(c) || c == '_'; }
-bool isValidIdentifier(string s) { // TODO: check for names too similar to an instruction
-	// TODO: add reason for invalid identifier
-	return s.size() > 0 && find_if_not(s.begin(), s.end(), validIdentChar) == s.end() && (isalpha(s.at(0)) || s.at(0) == '_');
-}
-fs::path pathFromMasfix(fs::path p) {
-	fs::path out;
-	bool found = false;
-	for (fs::path part : p) {
-		string s = part.string();
-		if (found) out.append(s);
-		if (s == "Masfix") {
-			found = true;
-		}
-	}
-	return found ? out : p;
-}
-// checks
+// globals ---------------------------------
+map<string, Define> StrToDefine;
+map<string, Macro> StrToMacro;
+map<string, Label> StrToLabel;
+
+fs::path InputFileName = "";
+fs::path OutputFileName = "";
+
+bool FLAG_silent = false;
+bool FLAG_run = false;
+bool FLAG_keepAsm = false;
+bool FLAG_strictErrors = false;
+// checks --------------------------------------------------------------------
+#define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
+
 #define continueOnFalse(cond) if (!(cond)) continue;
 #define returnOnFalse(cond) if (!(cond)) return false;
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj, false)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj, false)) return false;
-#define checkReturnValOnFail(cond, message, obj, value) if(!check(cond, message, obj, false)) return value; // TODO make checkReturnOnFail return a default value of the corresponding type making this obsolete
+
+#define check(cond, message, obj) ((cond) || raiseError(message, obj))
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+
+bool SupressErrors = false;
+#define returnOnErrSupress() if (SupressErrors) return false;
 
 vector<string> errors;
-void raiseErrors() {
+void raiseErrors() { // TODO sort errors based on line and file
 	for (string s : errors) {
 		cerr << s;
 	}
-	if (errors.size())
-		exit(1);
+	if (errors.size()) exit(1);
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
-	if (strict || FLAG_strictErrors)
+	if (strict || FLAG_strictErrors) {
 		raiseErrors();
+	}
 }
 
-#define errorQuoted(s) " '" + s + "'"
-bool check(bool cond, string message, Token token, bool strict=true) {
-	if (!cond) {
-		string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.data) "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Token token, bool strict=false) {
+	returnOnErrSupress();
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	addError(err, strict);
+	return false;
 }
-bool check(bool cond, string message, Instr instr, bool strict=true) {
-	if (!cond) {
-		string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Instr instr, bool strict=false) {
+	returnOnErrSupress();
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, strict);
+	return false;
 }
-bool check(bool cond, string message, Loc loc, bool strict=true) {
-	if (!cond) {
-		string err = loc.toStr() + " ERROR: " + message + "\n";
-		addError(err, strict);
-	}
-	return cond;
+bool raiseError(string message, Loc loc, bool strict=false) {
+	returnOnErrSupress();
+	string err = loc.toStr() + " ERROR: " + message + "\n";
+	addError(err, strict);
+	return false;
 }
-bool check(bool cond, string message, bool strict=true) {
-	if (!cond) {
-		string err = "ERROR: " + message + "\n";
-		addError(err, strict);
-	}
-	return cond;
+// helpers --------------------------------------------------------------
+bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
+bool verifyNotInstrOpcode(string name);
+bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
+	checkReturnOnFail(name.size() > 0 && find_if_not(name.begin(), name.end(), _validIdentChar) == name.end(), errInvalid, loc)
+	return check(isalpha(name.at(0)) || name.at(0) == '_', errInvalid, loc);
 }
-// tokenization ----------------------------------
+bool checkIdentRedefinitons(string name, Loc& loc, bool label) {
+	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
+	checkReturnOnFail(BuiltinDirectivesSet.count(name) == 0, "Name shadows a builtin directive" errorQuoted(name), loc)
+	if (label) {
+		checkReturnOnFail(StrToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
+	} else {
+		checkReturnOnFail(StrToDefine.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(StrToMacro.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
+	}
+	return true;
+}
+void eatLine(list<Token>& tokens, list<Token>::iterator& itr) {
+	while (itr != tokens.end() && !itr->firstOnLine) {
+		itr = tokens.erase(itr);
+	}
+}
+Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
+	Token out = *itr;
+	itr = l.erase(itr);
+	return out;
+}
+bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
+	static_assert(TokenCount == 6, "Exhaustive eatToken definition");
+	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
+	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
+	outToken = *itr;
+	eraseToken(currList, itr);
+	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
+}
+void eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, bool canStartLine=true) {
+	static_assert(TokenCount == 6, "Exhaustive eatTokenRun definition");
+	name = "";
+	if (itr != currList.end()) loc = itr->loc;
+	bool first = true;
+	while (itr != currList.end() && (!itr->firstOnLine || (canStartLine && first)) && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
+		name += itr->data;
+		eraseToken(currList, itr);
+		first = false;
+	}
+}
+bool eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, string identPurpose, bool canStartLine=false) {
+	Loc prevLoc = loc;
+	eatTokenRun(currList, itr, name, loc, canStartLine);
+	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
+}
+bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string& ident, string purpose) {
+	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
+	checkReturnOnFail(itr != currList.end() && (!itr->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
+	do {
+		if (itr->type == Tlist) {
+			checkReturnOnFail(itr->tlist.size() && !itr->isSeparated() && itr->tlist.front().type != Tlist, "Unexpected " + purpose + " field", itr->loc);
+			list<Token>::iterator tlistItr = itr->tlist.begin();
+			returnOnFalse(eatIdentifier(itr->tlist, tlistItr, fragment, fragLoc, purpose + " field", canStartLine));
+			checkReturnOnFail(tlistItr == itr->tlist.end(), "Simple " + purpose + " field expected", itr->loc);
+			ident.append(fragment);
+			++itr;
+		} else {
+			returnOnFalse(eatIdentifier(currList, itr, fragment, itr->loc, purpose + " field", canStartLine));
+			ident.append(fragment);
+		}
+	} while (itr != currList.end() && itr->continued);
+	if (purpose == "instr") return true;
+	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
+	return checkIdentRedefinitons(ident, loc, true);
+}
+// tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
 	int num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
 	if (num == 0 && alpha == 0 && space == 0) return string(1, s.at(0));
@@ -328,19 +479,35 @@ string getCharRun(string s) {
 	} while (i < s.size() && isdigit(s.at(i)) == num && isalpha(s.at(i)) == alpha && isspace(s.at(i)) == space);
 	return out;
 }
+void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
+	Token* addedPtr;
+	if (listTokens.size()) {
+		listTokens.top()->tlist.push_back(token);
+		addedPtr = &listTokens.top()->tlist.back();
+	} else {
+		tokens.push_back(token);
+		addedPtr = &tokens.back();
+	}
+	if (token.type == Tlist) {
+		listTokens.push(addedPtr);
+	}
+}
 list<Token> tokenize(ifstream& inFile, string fileName) {
-	static_assert(TokenCount == 3, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 6, "Exhaustive tokenize definition");
 	string line;
-	bool continued, firstOnLine;
+	bool continued;
+	int firstOnLine;
 
 	list<Token> tokens;
+	stack<Token*> listTokens;
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
 		continued = false;
-		firstOnLine = true;
+		firstOnLine = 2;
 		line = line.substr(0, line.find(';'));
 		int col = 1;
 
 		while (line.size()) {
+			if (firstOnLine) firstOnLine--;
 			char first = line.at(0);
 			string run = getCharRun(line);
 			Token token;
@@ -349,6 +516,7 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 			line = line.substr(run.size());
 			if (isspace(first)) {
 				continued = false;
+				firstOnLine ++;
 				continue;
 			}
 			if (isdigit(first)) {
@@ -356,103 +524,281 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 			} else if (isalpha(first)) {
 				token = Token(Talpha, run, loc, continued, firstOnLine);
 			} else if (run.size() == 1) {
-				token = Token(Tspecial, run, loc, continued, firstOnLine);
+				if (first == '(' || first == '[' || first == '{') {
+					token = Token(Tlist, string(1, first), loc, continued, firstOnLine);
+					addToken(tokens, listTokens, token);
+					continued = false; // TODO should (first token in list).firstOnLine - always / never / depends?
+					continue; // TODO allow first token in list to continue??
+				} else if (first == ')' || first == ']' || first == '}') {
+					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
+					token = *listTokens.top();
+					assert(token.type == Tlist);
+					checkContinueOnFail(first == token.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
+					listTokens.pop();
+					continued = true;
+					continue;
+				} else if (first == ',') {
+					token = Token(Tseparator, run, loc, continued, firstOnLine);
+				} else {
+					token = Token(Tspecial, run, loc, continued, firstOnLine);
+				}
 			} else {
 				assert(false);
 			}
 			continued = true;
-			firstOnLine = false;
-			tokens.push_back(token);
+			addToken(tokens, listTokens, token);
 		}
+	}
+	while (listTokens.size()) {
+		check(false, "Unclosed token list", *listTokens.top());
+		listTokens.pop();
 	}
 	return tokens;
 }
-// compilation -----------------------------------
-string joinTokens(Token top, list<Token>& tokens) {
-	string out = top.data;
-	while (tokens.size() && tokens.front().continued) {
-		out += tokens.front().data;
-		tokens.pop_front();
+// preprocess -------------------------------------------------------------------------
+#define directiveEatIdentifier(identPurpose, definiton) \
+	returnOnFalse(eatIdentifier(currList, itr, name, loc, identPurpose, false)); \
+	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
+	if (definiton) returnOnFalse(checkIdentRedefinitons(name, loc, false));
+#define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr, sameLine));
+void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token& token) {
+	itr = currList.insert(itr, token);
+}
+void insertList(list<Token>& currList, list<Token>::iterator& itr, list<Token>& tlist, Token& percentToken) {
+	assert(tlist.size());
+	list<Token>::iterator tempItr = itr;
+	itr = currList.insert(tempItr, tlist.front());
+	itr->continued = percentToken.continued;
+	itr->firstOnLine = percentToken.firstOnLine;
+	for (auto itr = ++tlist.begin(); itr != tlist.end(); ++itr) {
+		currList.insert(tempItr, *itr);
 	}
-	return out;
 }
-string joinTokens(list<Token>& tokens) {
-	Token top = tokens.front();
-	tokens.pop_front();
-	return joinTokens(top, tokens);
+vector<pair<list<Token>, Loc>> splitTlist(Token& tlist) {
+	assert(tlist.type == Tlist);
+	if (tlist.tlist.size() == 0) return vector<pair<list<Token>, Loc>>();
+	Loc lastSepLoc = tlist.loc;
+	vector<pair<list<Token>, Loc>> splits(1, pair<list<Token>, Loc>(list<Token>(), lastSepLoc));
+	for (Token& t : tlist.tlist) {
+		if (t.type == Tseparator) {
+			lastSepLoc = t.loc;
+			splits.push_back(pair<list<Token>, Loc>(list<Token>(), lastSepLoc));
+		} else {
+			splits.back().first.push_back(t);
+		}
+	}
+	return splits;
 }
-bool extractLabelName(list<Token>& tokens, map<string, Label>& strToLabel, Loc topLoc, int instrNum) {
-	string name = joinTokens(tokens);
-	checkReturnOnFail(isValidIdentifier(name), "Invalid label name" errorQuoted(name), topLoc);
-	checkReturnOnFail(strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), topLoc);
-	strToLabel.insert(pair(name, Label(name, instrNum, topLoc)));
+bool arglistFromTlist(Token& tlist, Macro& mac) {
+	assert(tlist.type == Tlist);
+	string name; list<Token> currList; Loc loc;
+	for (auto [currList, loc] : splitTlist(tlist)) {
+		list<Token>::iterator itr = currList.begin();
+
+		directiveEatIdentifier("macro arg", true);
+		checkReturnOnFail(itr == currList.end(), "Separator expected", itr->loc);
+		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
+		mac.addArg(name, loc);
+	}
 	return true;
 }
-void _ignoreLine(list<Token>& tokens) {
-	while (tokens.size() && !tokens.front().firstOnLine) {
-		tokens.pop_front();
+bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Loc percentLoc) {
+	Token token;
+	StrToMacro[name] = Macro(name, percentLoc);
+	directiveEatToken(Tlist, "Macro arglist expected", true);
+	returnOnFalse(arglistFromTlist(token, StrToMacro[name]));
+	directiveEatToken(Tlist, "Macro body expected", false);
+	checkReturnOnFail(!token.isSeparated(), "No separators expected in macro body", loc);
+	StrToMacro[name].body = list(token.tlist.begin(), token.tlist.end());
+	return true;
+}
+bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Token percentToken, Loc directiveLoc) {
+	static_assert((BuiltinDirectivesCount == 2, "Exhaustive processDirectiveDef definiton"));
+	string name; Loc loc = directiveLoc; Token token;
+	checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directive), percentToken.loc);
+	directiveEatIdentifier(directive, true);
+	if (directive == "define") {
+		directiveEatToken(Tnumeric, "Define value expected", true);
+		StrToDefine[name] = Define(name, percentToken.loc, token.data);
+	} else if (directive == "macro") {
+		returnOnFalse(processMacroDef(currList, itr, name, loc, percentToken.loc));
+	} else {
+		unreachable();
+	}
+	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
+}
+void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string identifier) {
+	Token expanded = Token(Tnumeric, StrToDefine[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
+	insertToken(currList, itr, expanded);
+}
+bool preprocess(list<Token>& tokens, string nestingType, string nestingScope);
+bool processExpansionArglist(Token& tlist, Macro& mac, string currMacName) {
+	assert(tlist.type == Tlist);
+	auto splits = splitTlist(tlist);
+	checkReturnOnFail(splits.size() == mac.argList.size(), "Unexpected number of expansion arguments", tlist.loc);
+	list<Token> currList; Loc loc; int idx = 0; vector<list<Token>> expanded;
+	for (auto [currList, loc] : splits) {
+		checkReturnOnFail(currList.size() > 0, "Expansion argument expected", loc);
+		currList.front().continued = false;
+		returnOnFalse(preprocess(currList, "arglist", currMacName)); // the hyper loop closes
+		expanded.push_back(currList);
+		++idx;
+	}
+	mac.addExpansionScope(expanded);
+	return true;
+}
+bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string identifier, string currMacName) {
+	Macro& mac = StrToMacro[identifier]; Token token;
+	directiveEatToken(Tlist, "Expansion arglist expected", true);
+	returnOnFalse(processExpansionArglist(token, mac, currMacName));
+	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
+	
+	Token expanded = Token(TIexpansion, identifier, mac.loc, false, true);
+	expanded.tlist = list(mac.body.begin(), mac.body.end());
+	insertToken(currList, itr, expanded);
+	return true;
+}
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, string currMacName, string nestingType) {
+	static_assert(TokenCount == 6, "Exhaustive processDirective definition");
+	string name; Loc loc = percentToken.loc;
+	directiveEatIdentifier("directive", false);
+	bool notContinued = itr == currList.end() || !itr->continued;
+	if (BuiltinDirectivesSet.count(name) == 1) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
+		checkReturnOnFail(nestingType.size() == 0, "Definition not allowed inside " + nestingType, percentToken.loc);
+		checkReturnOnFail(currMacName.size() == 0, "Definition not allowed inside macro", percentToken.loc);
+		returnOnFalse(processDirectiveDef(currList, itr, name, percentToken, loc));
+	} else if (StrToDefine.count(name) == 1) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
+		expandDefineUse(currList, itr, percentToken, name);
+	} else if (StrToMacro.count(name) == 1) {
+		checkReturnOnFail(percentToken.firstOnLine && nestingType.size() == 0, "Unexpected macro use", percentToken.loc);
+		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, name, currMacName));
+	} else if (currMacName.size() && StrToMacro[currMacName].hasArg(name)) {
+		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
+		list<Token>& argField = StrToMacro[currMacName].nameToArg(name).value.top();
+		insertList(currList, itr, argField, percentToken);
+	} else {
+		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(name), loc);
+	}
+	return true;
+}
+#define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
+bool preprocess(list<Token>& tokens, string nestingType="", string nestingScope="") {
+	stack<reference_wrapper<Token>> openLists;
+	stack<list<Token>::iterator> openItrs({ tokens.begin() });
+	bool errorLess = true;
+	stack<string> macroScopes;
+	if (nestingScope.size()) macroScopes.push(nestingScope);
+
+	while (openItrs.size()) {
+		list<Token>* currList = openLists.size() ? &openLists.top().get().tlist : &tokens;
+		list<Token>::iterator* currItr = &openItrs.top();
+		while (*currItr != currList->end()) {
+			Token& currToken = **currItr;
+			if (currToken.type == Tspecial) {
+				if (currToken.data == "%") {
+					eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
+					Token percentToken = eraseToken(*currList, *currItr);
+					eatLineOnFalse(processDirective(*currList, *currItr, percentToken, macroScopes.size() ? macroScopes.top() : "", nestingType));
+					continue;
+				}
+			}
+			++ (*currItr);
+			if (currToken.type == Tlist || currToken.type == TIexpansion) {
+				if (currToken.type == TIexpansion) {
+					if (macroScopes.size() > MAX_EXPANSION_DEPTH) {
+						raiseError("Maximum expansion depth exceeded", currToken.loc, true);
+					}
+					macroScopes.push(currToken.data);
+				}
+				openLists.push(currToken);
+				openItrs.push(currToken.tlist.begin());
+				currList = &openLists.top().get().tlist;
+				currItr = &openItrs.top();
+			}
+		}
+		if (openLists.size()) {
+			if (openLists.top().get().type == TIexpansion) {
+				StrToMacro[macroScopes.top()].closeExpansionScope();
+				macroScopes.pop();
+			}
+			openLists.pop();
+		}
+		openItrs.pop();
+	}
+	return errorLess;
+}
+// compilation -----------------------------------
+void initStrToLabel(list<Token>& tokens, string fileName) {
+	StrToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
+	if (tokens.size()) {
+		StrToLabel["begin"].loc = tokens.front().loc;
+		StrToLabel["end"].loc = tokens.back().loc;
 	}
 }
-pair<vector<Instr>, map<string, Label>> compile(list<Token>& tokens, string fileName) {
+vector<Instr> compile(list<Token>& tokens, string fileName) {
+	list<Token>::iterator itr = tokens.begin();
 	vector<Instr> instrs;
-	map<string, Label> strToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
-	if (tokens.size()) {
-		strToLabel["begin"].loc = tokens.front().loc;
-		strToLabel["end"].loc = tokens.back().loc;
-	}
+	initStrToLabel(tokens, fileName);
 	
 	bool ignoreLine = false;
+	bool labelOnLine;
 	while (true) {
-		if (ignoreLine) _ignoreLine(tokens);
+		if (ignoreLine) eatLine(tokens, itr);
 		ignoreLine = true;
-		if (tokens.size() == 0) break;
+		if (itr == tokens.end()) break;
 
-		Token top = tokens.front();
-		tokens.pop_front();
+		Token top = *(itr++);
+		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tspecial) {
-			checkContinueOnFail(top.data == ":", "Unsupported special character", top);
-			checkContinueOnFail(tokens.size() && !tokens.front().firstOnLine, "Label name expected after", top);
+			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
+			string name;
+			continueOnFalse(eatComplexIdentifier(tokens, itr, top.loc, name, "label"));
 			ignoreLine = false;
-			continueOnFalse(extractLabelName(tokens, strToLabel, top.loc, instrs.size()));
+			checkContinueOnFail(!labelOnLine, "Max one label per line", top.loc);
+			labelOnLine = true;
+			StrToLabel.insert(pair(name, Label(name, instrs.size(), top.loc)));
 		} else if (top.type == Talpha) {
-			Instr instr;
-			instr.opcodeStr = joinTokens(top, tokens);
-			instr.opcodeLoc = top.loc;
-			while (tokens.size() && !tokens.front().firstOnLine) {
-				instr.immFields.push_back(tokens.front());
-				tokens.pop_front();
+			string instrStr = "";
+			continueOnFalse(eatComplexIdentifier(tokens, --itr, top.loc, instrStr, "instr"));
+			instrs.push_back(Instr(instrStr, top.loc));
+			while (itr != tokens.end() && !itr->firstOnLine) {
+				instrs.back().immFields.push_back(*(itr++));
 			}
-			instrs.push_back(instr);
+		} else if (top.type == TIexpansion) {
+			list<Token>::iterator expansion = --itr;
+			tokens.splice(++itr, top.tlist);
+			itr = ++expansion;
 		} else {
-			checkContinueOnFail(false, "Expected instruction", top);
+			checkContinueOnFail(false, "Unexpected token", top);
 		}
 		ignoreLine = false;
 	}
-	strToLabel["end"].addr = instrs.size();
-	return pair(instrs, strToLabel);
+	StrToLabel["end"].addr = instrs.size();
+	return instrs;
 }
-// parsing of instructions -----------------------------------------
-pair<bool, string> parseCond(Instr& instr, string s) {
-	checkReturnValOnFail(s.size() >= 1, "Missing condition", instr, pair(false, ""));
+// parsing -------------------------------------------------------------------
+bool parseCond(Instr& instr, string& s) {
+	checkReturnOnFail(s.size() >= 1, "Missing condition", instr);
 	char reg = s.at(0);
 	if (CharToReg.count(reg) == 1) {
-		checkReturnValOnFail(reg == 'r' || reg == 'm', "Conditions can test only r/m", instr, pair(false, ""));
+		checkReturnOnFail(reg == 'r' || reg == 'm', "Conditions can test only r/m", instr);
 		instr.suffixes.condReg = CharToReg[reg];
 		s = s.substr(1);
 	}
-	checkReturnValOnFail(s.size() >= 2, "Missing condition", instr, pair(false, ""));
+	checkReturnOnFail(s.size() >= 2, "Missing condition", instr);
 	string cond = s.substr(0, 2);
-	checkReturnValOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr, pair(false, ""));
+	s = s.substr(2);
+	checkReturnOnFail(StrToCond.count(cond) == 1, "Unknown condition", instr);
 	instr.suffixes.cond = StrToCond[cond];
-	return pair(true, s.substr(2));
+	return true;
 }
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
-		auto ret = parseCond(instr, s);
-		returnOnFalse(ret.first);
-		s = ret.second;
+		returnOnFalse(parseCond(instr, s));
 	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
 	if (s.size() == 1) {
@@ -482,26 +828,32 @@ bool parseInstrOpcode(Instr& instr) {
 			return parseSuffixes(instr, suffix, instr.instr == Ib || instr.instr == Il || instr.instr == Is);
 		}
 	}
-	checkReturnOnFail(false, "Unknown instruction", instr);
-	return false;
+	return check(false, "Unknown instruction", instr);
 }
-bool parseInstrImmediate(Instr& instr, map<string, Label> &stringToLabel) {
+bool verifyNotInstrOpcode(string name) {
+	Instr instr;
+	instr.opcodeStr = name;
+	SupressErrors = true;
+	bool ans = !parseInstrOpcode(instr);
+	SupressErrors = false;
+	return ans;
+}
+bool parseInstrImmediate(Instr& instr) {
 	vector<string> immWords = instr.immAsWords();
-	checkReturnOnFail(immWords.size() == 1, "This line has too many fields", instr);
-	if (stringToLabel.count(immWords[0]) > 0) {
-		instr.immediate = stringToLabel[immWords[0]].addr;
+	checkReturnOnFail(immWords.size() == 1, "Only simple immediates for now", instr);
+	if (StrToLabel.count(immWords[0]) > 0) {
+		instr.immediate = StrToLabel[immWords[0]].addr;
 		return true;
 	}
 	checkReturnOnFail(isdigit(immWords[0].at(0)), "Invalid instruction immediate", instr);
 	instr.immediate = stoi(immWords[0]);
 	checkReturnOnFail(to_string(instr.immediate) == immWords[0], "Invalid instruction immediate", instr);
-	checkReturnOnFail(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
-	return true;
+	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
-bool parseInstrFields(Instr& instr, map<string, Label> &stringToLabel) {
+bool parseInstrFields(Instr& instr) {
 	returnOnFalse(parseInstrOpcode(instr));
 	if (instr.hasImm()) {
-		returnOnFalse(parseInstrImmediate(instr, stringToLabel));
+		returnOnFalse(parseInstrImmediate(instr));
 	}
 	return true;
 }
@@ -530,13 +882,14 @@ bool checkValidity(Instr& instr) {
 	}
 	return true;
 }
-void parseInstrs(vector<Instr>& instrs, map<string, Label>& strToLabel) {
+void parseInstrs(vector<Instr>& instrs) {
 	for (int i = 0; i < instrs.size(); ++i) {
 		Instr instr = instrs[i];
-		continueOnFalse(parseInstrFields(instr, strToLabel));
+		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
 		instrs[i] = instr;
 	}
+	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -675,7 +1028,7 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		unreachable();
 	}
 }
-void genAssembly(ofstream& outFile, Instr instr, int instrNum) {	
+void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
 	// intermediate values - first - rbx, second - rcx
 	// addr of cells[0] - r13
@@ -885,7 +1238,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		outFile << "instr_" << i << ":\n";
 		outFile << "	; " << instr.toStr() << '\n';
 		genAssembly(outFile, instr, i);
-	} 
+	}
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
 		"	jmp end\n"
@@ -925,7 +1278,6 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	instruction_count: EQU " << instrs.size() << "\n"
 		"	instruction_offsets: dq ";
 	
-	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL));
 	outFile << "instr_0";
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
@@ -948,6 +1300,12 @@ void checkUsage(bool cond, string message) {
 		cerr << "ERROR: " << message << "\n\n";
 		printUsage();
 		exit(1);
+	}
+}
+void checkCond(bool cond, string message) {
+	if (!cond) {
+		string err = "ERROR: " + message + "\n";
+		addError(err, true);
 	}
 }
 vector<string> getLineArgs(int argc, char *argv[]) {
@@ -976,22 +1334,22 @@ void processLineArgs(int argc, char *argv[]) {
 		} else if (s == "--strict-errors") {
 			FLAG_strictErrors = true;
 		} else {
-			checkUsage(false, "Unknown command line arg '" + s + "'");
+			checkUsage(false, "Unknown command line arg" errorQuoted(s));
 		}
 	}
 	genFileNames(args[args.size()-1]);
 }
 ifstream getInputFile() {
 	ifstream inFile;
-	check(fs::exists(InputFileName), "The input file '" + InputFileName.string() + "' couldn't be found");
+	checkCond(fs::exists(InputFileName), "The input file" errorQuoted(InputFileName.string()) " couldn't be found");
 	inFile.open(InputFileName);
-	check(inFile.good(), "The input file '" + InputFileName.string() + "' couldn't be opened");
+	checkCond(inFile.good(), "The input file" errorQuoted(InputFileName.string()) " couldn't be opened");
 	return inFile;
 }
 ofstream getOutputFile() {
 	ofstream outFile;
 	outFile.open(OutputFileName);
-	check(outFile.good(), "The output file '" + OutputFileName.string() + "' couldn't be opened");
+	checkCond(outFile.good(), "The output file" errorQuoted(OutputFileName.string()) " couldn't be opened");
 	return outFile;
 }
 void runCmdEchoed(string command) {
@@ -1027,6 +1385,18 @@ void compileAndRun(fs::path asmPath) {
 		runCmdEchoed(exePath.string());
 	}
 }
+fs::path pathFromMasfix(fs::path p) {
+	fs::path out;
+	bool found = false;
+	for (fs::path part : p) {
+		string s = part.string();
+		if (found) out.append(s);
+		if (s == "Masfix") {
+			found = true;
+		}
+	}
+	return found ? out : p;
+}
 int main(int argc, char *argv[]) {
 	processLineArgs(argc, argv);
 	string fileName = pathFromMasfix(InputFileName).string();
@@ -1035,12 +1405,12 @@ int main(int argc, char *argv[]) {
 	list<Token> tokens = tokenize(inFile, fileName);
 	inFile.close();
 	
-	auto compiled = compile(tokens, fileName);
-	vector<Instr> instrs = compiled.first;
-	map<string, Label> strToLabel = compiled.second;
+	preprocess(tokens);
 
-	parseInstrs(instrs, strToLabel);
-	raiseErrors(); // TODO come up with good error continuation strategies for all compilation stages
+	vector<Instr> instrs = compile(tokens, fileName);
+
+	parseInstrs(instrs);
+	raiseErrors();
 
 	ofstream outFile = getOutputFile();
 	generate(outFile, instrs);

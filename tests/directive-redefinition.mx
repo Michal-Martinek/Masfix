@@ -1,0 +1,80 @@
+; tests redefinitions against each other - labels, defines, macros, macro args; instructions, builtins
+
+; define, macro, macro arg
+%define prep1 5
+
+%macro prep1() {}
+%macro prep2() {}
+%macro prep2() {}
+
+%macro arg1(prep1) {}
+%macro arg2(prep2) {}
+%macro arg3(prep3) {}
+
+%macro arg4(prep3, arg3) {}
+%macro prep3(prep2)
+%macro prep4(prep1)
+
+%macro arg5(hutu, tutu, hutu, tutu)
+%macro PREP3() {}
+
+%define prep1 11
+%define arg5 55
+%define prep3 33
+%define Arg1 111
+
+; label vs. preprocessed
+:lvp1
+:lvp2
+%define lvp1 11
+%macro lvp2() {}
+
+%define lvp3 33
+%macro lvp4() { 44 }
+:lvp3
+:lvp4
+
+:lvp5
+%macro mac1(lvp5) {}
+%macro mac2(labvar) {
+	:labvar
+}
+%mac2(15)
+
+; against builtins, default names
+:begin
+:END
+:define
+:macro
+
+%macro arg_redef(end, begin, macro) {}
+
+%define end 5
+%define macro 6
+%define Macro 83
+
+%macro begin() {}
+%macro define() {}
+%macro MACRO() {5454}
+
+; against instructions
+:outu
+:str
+:s
+:seq
+:swap
+:swAp
+:in
+:inc
+
+%define mov 5
+%define lgt 6
+%define lnee 5
+%define str| 8
+
+%macro inu() {}
+%macro bmletr() {}
+bmletr
+
+%macro AGI1(outcp) ; these macros will soon take over the world, even though they have no body
+%macro AGI2(swap_, ldam)

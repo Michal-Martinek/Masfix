@@ -1,0 +1,170 @@
+; wrong directive definitions - defining directives
+
+; percent token
+%
+%
+dir
+%%
+%lulw
+% lulw
+
+%()
+%(arg)
+%89
+%_
+% _
+
+; directive identifier
+%define
+% define
+%define_abc
+%defne
+%aaaa bbbb
+
+%macro
+% macro_
+% macro$
+
+; directive context
+%macro %define
+%macro brb %define
+%brb(a)
+%define %macro
+%define hidden_mac %macro hidden_unga_bunga()
+%hidden_mac()
+%macro dsa(){
+	%macro inside_peek[] ; prohibited, but doesn't fail
+}
+
+:here_define%define
+:here_define2 %define
+:here_macro_def %macro
+
+%macro dirsInside() {
+	%define insideDef 88
+	%macro macInside() {}
+}
+%dirsInside()
+
+; defined name
+%define _abc
+%define ijkl
+	64
+%ijkl
+
+%define()
+%define ()
+%macro $
+ 
+%define 59var
+%define CONST_VAL
+%define CONST_VAL$
+%define lab:el
+
+%define name32
+%define name 33
+
+%macro _
+%macro _^
+%macro
+name
+
+; defined directive value
+%define def1 19
+%define def2_20 21
+%define def3 22 23
+	%def3
+%define def4 24 25
+	26
+%define def5 27 28 29 _
+%define def6 30_
+%define def7
+	12
+%define def8 abc 12
+	%def8
+%define testee 5 ld m
+%define a 5 %define b 6
+	%a
+	%b
+%define hash #
+
+%define lab :here_label
+%define lab2 here_macro_def
+
+%define used_var %def1
+
+; macro arglist
+%macro noArglist
+%macro validArglist1() {}
+%macro validArglist2 (x) {}
+%macro validArglist3(x, y) {}
+%macro validArglist4(x,y) {}
+%macro validArglist5(x ,y) {}
+%macro validArglist6(x, y, z, w) {}
+
+%macro nonInline1
+	(x) {}
+%macro nonInline2 (
+	x
+)
+%macro nonInline3 (
+	) {}
+%macro nonInline4(x
+	, y) {}
+%macro nonInline5(x,
+	y)
+	{}
+
+%macro badArglist1(x y)
+%macro badArglist2(,)
+%macro badArglist3(,x)
+%macro badArglist4(x,)
+%macro badArglist5(x, y,)
+%macro badArglist6 (x, y, z w)
+%macro badArglist7(x, ,y, z)
+
+%macro badArgName1(12)
+%macro badArgName2(x, x^)
+%macro badArgName3(%define arg 5)
+%macro badArgName4(x, x)
+%macro badArgName5(x, y, z, x)
+%macro badArgName6(badArgName6)
+
+; macro body
+%macro noBody()
+%macro afterNobody() {}
+ldbad
+	%noBody()
+	%afterNobody()
+
+%macro first(){}
+%macro second() {}
+%macro third()
+()
+%macro fourth() {
+	somting
+}
+	%second()
+	%fourth()
+%macro sepInBody() {
+	ld 5,
+	outur
+} %hello
+
+%macro unexAfter() {
+
+} 9
+	%unexAfter()
+%macro unexDirAfter()
+{
+} %define here
+	%unexDirAfter()
+	%here
+%macro unexMacDefAfter() {
+} %macro m
+{}
+	%unexMacDefAfter()
+	%m
+
+; trailing define
+%define

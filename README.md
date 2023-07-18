@@ -8,12 +8,13 @@ Also the language specifications described here may not be fully implemented in 
   
 * [How to set up the enviroment?](#setup)
 * [Code examples?](./examples)
+* [And the macro system?](#macro-system)
 
 ## Architecture description
 
 The execution model resembles a [Turing machine](https://en.wikipedia.org/wiki/Turing_machine) in that it has a read-write head moving along a memory array.
 The memory is divided into memory cells each being 16 bits wide. Additionally the head has an internal 16 bit general purpose register called **r**.
-Masfix code is compiled directly into x64 nasm assembly, hence it currently works only on x64 Intel Windows systems.
+Masfix code is compiled directly into x64 nasm assembly, and it currently works only on x64 Intel Windows systems.
 
 # Language specifications
 
@@ -24,7 +25,6 @@ Line comments start with `;`. Masfix has no block comments.
 ## Registers
 
 Masfix has 4 so called "registers":
-
 
 * `h` - position of the read-write head, effecfivelly the current memory address
 * `m` - contents of the currently selected memory cell (by the h register)
@@ -79,7 +79,7 @@ examples could be `lda 1 ; r += 1` or `strtrs 5 ; m *= r - 5`.
 Only the [4 basic instructions](#basic-instructions) are allowed a modifier.
 
 #### Immediate
-Immediate value supplied to the instruction. It's forms: 
+Immediate value supplied to the instruction. It's possible forms are: 
 * A numerical value in the range [0, <the maximum value which can fit inside 16 bit unsigned int> = 65535]
 * A [label](#labels) name, gets replaced with the address of the label
 
@@ -90,7 +90,7 @@ The default condition register is **r**.
 
 #### Conditions
 
-In conditions the number are interpretted as signed 2's complement numbers.
+In conditions the numbers are interpreted as signed 2's complement numbers.
 
 | cond | meaning | description |
 | :---: | :---: | --- |
@@ -186,7 +186,7 @@ but we recommend using the letter in [instruction suffixes](#suffixes) and the s
 * `>` - binary shift right
 * `.` - bit
 
-**Note**: The last three instructions are defined only for shifts of `0 - 16` (technically `0 - 63`) bits due to underlying implementation of bit shifts.
+**Note**: The last three operations are defined only for shifts of `0 - 16` (technically `0 - 63`) bits due to underlying implementation of bit shifts.
 
 Examples:
 ```
@@ -203,10 +203,41 @@ ld. 1   ; r = 0
 ### Labels
 
 Labels are used to simplify addressing of instructions in the source code. On use in [instruction immediates](#immediate), they are replaced with the exact address of the instruction directly following them.  
-They need to be alone on a line, **starting** with `:` followed with the label name.  
+They need to be first on a line, **starting** with `:` followed with the label name.  
 There are two predefined labels:
 * `begin` - address 0
 * `end` - address after the last instruction
+
+## Macro system
+As stated previously Masfix has a very powerful [macro](https://en.wikipedia.org/wiki/Macro_(computer_science)) system.  
+Although Masfix is whitespace insensitive we recommend using common indentation rules.
+
+### Token lists
+Token lists are simply groups of tokens grouped by matching brackets `()`, `[]` or `{}`.
+The bracket types are fully interchangeable, but we recommend using common bracket conventions as we do in all examples.  
+Token lists are used exclusivelly in the macro system's directives.
+
+### Defining directives
+Defining directives define a [constant](#directive-define) or a [macro](#macro-directive).  
+They always start with `%` at the start of a line.
+
+#### Define directive
+The `%define` directive is a way to define a global numeric constant like this: `%define a_name 15`  
+The constant can be used like `%a_name`, which replaces the expression with the constant value.
+
+#### Macro directive
+The `%macro` directive is a way to define a global parametrized macro like this:
+```
+%macro mac_name(x, y) {
+	ld %x ; some body
+	outur
+	outc %y
+}
+```  
+The macro can be used like `%mac_name(5, 8)` on a separate line.  
+This replaces the expression with the macro body as text substitutuion.  
+The macro arguments must be numerical-value-reducible expressions.  
+Any occurences of macro parameters (`%x` and `%y` in this case) in the macro body will get replaced with the supplied values (here 5 and 8).  
 
 # Setup
 This command sequence should help you set up your enviroment.
@@ -234,8 +265,6 @@ Here is a list of what I'm using:
 
 <!---
 Todos
-
-add link to #labels for label name <a #identifier> for identifier clarification
 
 test examples
 blobs like - 'build passing', 'code quality'

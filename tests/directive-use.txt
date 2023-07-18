@@ -1,0 +1,56 @@
+:returncode 1
+
+:stderr 3584
+tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
+tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
+tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
+tests\directive-use.mx:21:4 ERROR: Unexpected directive here 'define'
+tests\directive-use.mx:24:10 ERROR: Unexpected continued token '()'
+tests\directive-use.mx:25:2 ERROR: Invalid directive name 'defined1%defined2'
+tests\directive-use.mx:29:6 ERROR: Directive must not continue
+tests\directive-use.mx:34:9 ERROR: Unexpected macro use
+tests\directive-use.mx:36:5 ERROR: Unexpected macro use
+tests\directive-use.mx:37:13 ERROR: Unexpected token after macro use '%'
+tests\directive-use.mx:38:5 ERROR: Unexpected macro use
+tests\directive-use.mx:39:14 ERROR: Unexpected macro use
+tests\directive-use.mx:45:1 ERROR: Expansion arglist expected
+tests\directive-use.mx:46:7 ERROR: Unexpected number of expansion arguments
+tests\directive-use.mx:48:7 ERROR: Unexpected number of expansion arguments
+tests\directive-use.mx:50:5 ERROR: Unexpected number of expansion arguments
+tests\directive-use.mx:52:5 ERROR: Unexpected number of expansion arguments
+tests\directive-use.mx:55:8 ERROR: Definition not allowed inside arglist
+tests\directive-use.mx:56:9 ERROR: Definition not allowed inside arglist
+tests\directive-use.mx:58:2 ERROR: Definition not allowed inside arglist
+tests\directive-use.mx:60:2 ERROR: Definition not allowed inside arglist
+tests\directive-use.mx:64:2 ERROR: Unexpected macro use
+tests\directive-use.mx:76:21 ERROR: Undeclared identifier 'defined_'
+tests\directive-use.mx:77:17 ERROR: Unexpected macro use
+tests\directive-use.mx:82:10 ERROR: Unexpected continued token '()'
+tests\directive-use.mx:95:3 ERROR: Undeclared identifier 'upper'
+tests\directive-use.mx:90:3 ERROR: Undeclared identifier 'lower'
+tests\directive-use.mx:101:3 ERROR: Undeclared identifier 'lower'
+tests\directive-use.mx:90:3 ERROR: Undeclared identifier 'lower'
+tests\directive-use.mx:103:3 ERROR: Undeclared identifier 'upper'
+tests\directive-use.mx:11:1 ERROR: Unexpected token '1'
+tests\directive-use.mx:26:1 ERROR: Unexpected token '3'
+tests\directive-use.mx:27:1 ERROR: Unexpected token '()'
+tests\directive-use.mx:32:9 ERROR: Unexpected token '1'
+tests\directive-use.mx:68:2 ERROR: Invalid label name ':labelInside1'
+tests\directive-use.mx:13:1 ERROR: Invalid instruction immediate 'mov defined3'
+tests\directive-use.mx:17:1 ERROR: Only simple immediates for now 'ld 8 3'
+tests\directive-use.mx:18:1 ERROR: Only simple immediates for now 'ld 1 9'
+tests\directive-use.mx:19:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\directive-use.mx:21:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\directive-use.mx:36:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
+tests\directive-use.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'str'
+tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu _'
+tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu labelInside1'
+tests\directive-use.mx:83:2 ERROR: Only simple immediates for now 'outu 3 ()'
+tests\directive-use.mx:93:2 ERROR: Only simple immediates for now 'outu _ 5'
+tests\directive-use.mx:94:2 ERROR: Only simple immediates for now 'outu _ 18'
+tests\directive-use.mx:88:2 ERROR: Only simple immediates for now 'outu _ 9'
+tests\directive-use.mx:89:2 ERROR: Only simple immediates for now 'outu _ 68'
+tests\directive-use.mx:88:2 ERROR: Only simple immediates for now 'outu _ 485'
+tests\directive-use.mx:89:2 ERROR: Only simple immediates for now 'outu _ 128'
+
+
