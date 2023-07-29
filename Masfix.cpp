@@ -500,27 +500,30 @@ Token eraseToken(list<Token>& l, list<Token>::iterator& itr) {
 	return out;
 }
 bool eatToken(list<Token>& currList, list<Token>::iterator& itr, Loc errLoc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
-	static_assert(TokenCount == 7, "Exhaustive eatToken definition");
+	static_assert(TokenCount == 8, "Exhaustive eatToken definition");
 	checkReturnOnFail(itr != currList.end(), errMissing, errLoc);
 	if (sameLine) checkReturnOnFail(!itr->firstOnLine, errMissing, errLoc);
 	outToken = *itr;
 	eraseToken(currList, itr);
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
-void eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, bool canStartLine=true) {
-	static_assert(TokenCount == 7, "Exhaustive eatTokenRun definition");
-	name = "";
+void eatTokenRun(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
+	static_assert(TokenCount == 8, "Exhaustive eatTokenRun definition");
 	if (itr != currList.end()) loc = itr->loc;
-	bool first = true;
-	while (itr != currList.end() && (!itr->firstOnLine || (canStartLine && first)) && (first || itr->continued) && (itr->type == Tnumeric || itr->type == Talpha || itr->type == Tspecial)) {
-		name += itr->data;
+	bool first = true; name = "";
+
+	set<TokenTypes> allowedTypes = {Tnumeric, Talpha, Tspecial};
+	if (eatAnything >= 1) allowedTypes.merge(set({Tcolon, Tseparator}));
+	if (eatAnything == 2) allowedTypes.insert(Tlist);
+	while (itr != currList.end() && (!itr->firstOnLine || (canStartLine && first)) && (first || itr->continued) && allowedTypes.count(itr->type)) {
+		name += itr->toStr();
 		eraseToken(currList, itr);
 		first = false;
 	}
 }
-bool eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, string identPurpose, bool canStartLine=false) {
+bool eatIdentifier(list<Token>& currList, list<Token>::iterator& itr, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
 	Loc prevLoc = loc;
-	eatTokenRun(currList, itr, name, loc, canStartLine);
+	eatTokenRun(currList, itr, name, loc, canStartLine, eatAnything);
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
 bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc loc, string& ident, string purpose) {
@@ -528,14 +531,14 @@ bool eatComplexIdentifier(list<Token>& currList, list<Token>::iterator& itr, Loc
 	checkReturnOnFail(itr != currList.end() && (!itr->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
 	do {
 		if (itr->type == Tlist) {
-			checkReturnOnFail(itr->tlist.size() && !itr->isSeparated() && itr->tlist.front().type != Tlist, "Unexpected " + purpose + " field", itr->loc);
+			checkReturnOnFail(itr->tlist.size(), "Expected " + purpose + " field", itr->loc);
 			list<Token>::iterator tlistItr = itr->tlist.begin();
-			returnOnFalse(eatIdentifier(itr->tlist, tlistItr, fragment, fragLoc, purpose + " field", canStartLine));
+			returnOnFalse(eatIdentifier(itr->tlist, tlistItr, fragment, fragLoc, purpose + " field", canStartLine, 2));
 			checkReturnOnFail(tlistItr == itr->tlist.end(), "Simple " + purpose + " field expected", itr->loc);
 			ident.append(fragment);
 			++itr;
 		} else {
-			returnOnFalse(eatIdentifier(currList, itr, fragment, itr->loc, purpose + " field", canStartLine));
+			returnOnFalse(eatIdentifier(currList, itr, fragment, itr->loc, purpose + " field", canStartLine, 1));
 			ident.append(fragment);
 		}
 	} while (itr != currList.end() && itr->continued);
