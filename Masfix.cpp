@@ -284,17 +284,22 @@ struct Namespace {
 	map<string, Define> defines;
 	map<string, Macro> macros;
 
+	map<string, int> innerNamespaces;
+	int upperNamespaceId;
+
 	Namespace() {}
-	Namespace(string name, Loc loc) {
+	Namespace(string name, Loc loc, int upperNamespaceId) {
 		this->name = name;
 		this->loc = loc;
+		this->upperNamespaceId = upperNamespaceId;
 	}
 };
-map<string, Namespace> StrToNamespace;
+int LastNamespaceId = 0;
+map<int, Namespace> IdToNamespace;
 bool raiseError(string message, Loc loc, bool strict);
 struct Scope {
 private:
-	stack<string> namespaces = stack<string>({ TOP_NAMESPACE_NAME });
+	stack<int> namespaces = stack<int>({ LastNamespaceId });
 	stack<pair<string, string>> macros;
 	// TODO better max depth checks - maybe add depth counter
 public:
@@ -305,12 +310,11 @@ public:
 		return macros.size();
 	}
 	Namespace& currNamespace() {
-		return StrToNamespace[namespaces.top()];
+		return IdToNamespace[namespaces.top()];
 	}
 	Namespace& namespaceFromPrefix(string prefix) {
 		if (prefix == "") return currNamespace();
-		assert(StrToNamespace.count(prefix));
-		return StrToNamespace[prefix];
+		return IdToNamespace[currNamespace().innerNamespaces[prefix]];
 	}
 	Macro& currMacro() {
 		assert(insideMacro());
@@ -337,9 +341,11 @@ public:
 		currMacro().closeExpansionScope();
 		macros.pop();
 	}
-	void enterNamespace(string currNamespaceName) {
+	void addInnerNamespace(string& name, Loc percentLoc) {
 		assert(!insideMacro());
-		namespaces.push(currNamespaceName);
+		IdToNamespace[LastNamespaceId + 1] = Namespace(name, percentLoc, LastNamespaceId);
+		currNamespace().innerNamespaces[name] = ++LastNamespaceId;
+		namespaces.push(LastNamespaceId);
 	}
 	void exitNamespace() {
 		assert(namespaces.size() > 1);
@@ -475,17 +481,16 @@ bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
 	checkReturnOnFail(name.size() > 0 && find_if_not(name.begin(), name.end(), _validIdentChar) == name.end(), errInvalid, loc)
 	return check(isalpha(name.at(0)) || name.at(0) == '_', errInvalid, loc);
 }
-bool checkIdentRedefinitons(string name, Loc& loc, bool label, string currNamespaceName="") {
+bool checkIdentRedefinitons(string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
 	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
 	checkReturnOnFail(BuiltinDirectivesSet.count(name) == 0, "Name shadows a builtin directive" errorQuoted(name), loc)
 	if (label) {
 		checkReturnOnFail(StrToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
 	} else {
-		assert(currNamespaceName != "");
-		Namespace& currNamespace = StrToNamespace[currNamespaceName];
-		checkReturnOnFail(currNamespace.defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
-		checkReturnOnFail(currNamespace.macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
-		checkReturnOnFail(StrToNamespace.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc);
+		assert(currNamespace);
+		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc);
 	}
 	return true;
 }
@@ -640,7 +645,7 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 #define directiveEatIdentifier(identPurpose, definiton) \
 	returnOnFalse(eatIdentifier(currList, itr, name, loc, identPurpose, false)); \
 	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
-	if (definiton) returnOnFalse(checkIdentRedefinitons(name, loc, false, scope.currNamespace().name));
+	if (definiton) returnOnFalse(checkIdentRedefinitons(name, loc, false, &scope.currNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(currList, itr, loc, token, type, missingErr, sameLine));
 void insertToken(list<Token>& currList, list<Token>::iterator& itr, Token& token) {
 	itr = currList.insert(itr, token);
@@ -697,12 +702,12 @@ bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, Scope& s
 	mac.body = list(token.tlist.begin(), token.tlist.end());
 	return true;
 }
-bool processNamespaceDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Loc percentLoc) {
-	StrToNamespace[name] = Namespace(name, percentLoc);
+bool processNamespaceDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Loc percentLoc, Scope& scope) {
 	Token token;
 	directiveEatToken(Tlist, "Namespace body expected", true);
 	insertToken(currList, itr, Token(TInamespace, name, percentLoc, false, true));
 	itr->tlist = token.tlist;
+	scope.addInnerNamespace(name, percentLoc);
 	return true;
 }
 bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Token percentToken, Loc directiveLoc) {
@@ -716,7 +721,7 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	} else if (directive == "macro") {
 		returnOnFalse(processMacroDef(currList, itr, scope, name, loc, percentToken.loc));
 	} else if (directive == "namespace") {
-		returnOnFalse(processNamespaceDef(currList, itr, name, loc, percentToken.loc));
+		returnOnFalse(processNamespaceDef(currList, itr, name, loc, percentToken.loc, scope));
 	} else {
 		unreachable();
 	}
@@ -759,7 +764,7 @@ bool processDirectivePrefix(list<Token>& currList, list<Token>::iterator& itr, s
 	string name; namespaceName = "";
 	directiveEatIdentifier("directive", false);
 	if (itr != currList.end() && itr->type == Tcolon && !itr->firstOnLine) {
-		checkReturnOnFail(StrToNamespace.count(name), "Invalid namespace" errorQuoted(name), loc);
+		checkReturnOnFail(scope.currNamespace().innerNamespaces.count(name), "Invalid namespace" errorQuoted(name), loc);
 		namespaceName = name;
 		eraseToken(currList, itr);
 		directiveEatIdentifier("directive", false);
@@ -816,12 +821,7 @@ bool preprocessImpl(list<Token>& tokens, Scope& scope) {
 				continue;
 			}
 			++ (*currItr);
-			if (currToken.type == Tlist) {
-				addNewList();
-			} else if (currToken.type == TIexpansion) {
-				addNewList();
-			} else if (currToken.type == TInamespace) {
-				scope.enterNamespace(currToken.data);
+			if (currToken.type == Tlist || currToken.type == TIexpansion || currToken.type == TInamespace) {
 				addNewList();
 			}
 		}
@@ -844,7 +844,7 @@ bool recursivelyProcessArglist(list<Token>& tokens, Scope& scope) {
 	return preprocessRetval;
 }
 void preprocess(list<Token>& tokens, string fileName) {
-	StrToNamespace[TOP_NAMESPACE_NAME] = Namespace(TOP_NAMESPACE_NAME, Loc(fileName, 0, 0));
+	IdToNamespace[LastNamespaceId] = Namespace(TOP_NAMESPACE_NAME, Loc(fileName, 0, 0), -1);
 	Scope scope;
 	preprocessImpl(tokens, scope);
 }
