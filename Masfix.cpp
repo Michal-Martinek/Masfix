@@ -32,7 +32,9 @@ using namespace std;
 enum TokenTypes {
 	Tnumeric,
 	Talpha,
+
 	Tspecial,
+	Tcolon,
 	Tseparator,
 	Tlist,
 
@@ -293,7 +295,7 @@ bool raiseError(string message, Loc loc, bool strict);
 struct Scope {
 private:
 	stack<string> namespaces = stack<string>({ TOP_NAMESPACE_NAME });
-	stack<string> macros;
+	stack<pair<string, string>> macros;
 	// TODO better max depth checks - maybe add depth counter
 public:
 	bool insideArglist=false;
@@ -305,29 +307,34 @@ public:
 	Namespace& currNamespace() {
 		return StrToNamespace[namespaces.top()];
 	}
+	Namespace& namespaceFromPrefix(string prefix) {
+		if (prefix == "") return currNamespace();
+		assert(StrToNamespace.count(prefix));
+		return StrToNamespace[prefix];
+	}
 	Macro& currMacro() {
 		assert(insideMacro());
-		return currNamespace().macros[macros.top()];
+		return namespaceFromPrefix(macros.top().first).macros[macros.top().second];
 	}
 
-	bool hasDefine(string& name) {
-		return currNamespace().defines.count(name);
+	bool hasDefine(string& namespaceName, string& defineName) {
+		return namespaceFromPrefix(namespaceName).defines.count(defineName);
 	}
-	bool hasMacro(string& name) {
-		return currNamespace().macros.count(name);
+	bool hasMacro(string& namespaceName, string& macroName) {
+		return namespaceFromPrefix(namespaceName).macros.count(macroName);
 	}
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
 	}
 
-	void addMacroExpansion(Token& expansionToken) {
+	void addMacroExpansion(string& namespaceName, Token& expansionToken) {
 		if (macros.size() > MAX_EXPANSION_DEPTH) {
 			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
 		}
-		macros.push(expansionToken.data);
+		macros.push(pair(namespaceName, expansionToken.data));
 	}
 	void endMacroExpansion() {
-		currNamespace().macros[macros.top()].closeExpansionScope();
+		currMacro().closeExpansionScope();
 		macros.pop();
 	}
 	void enterNamespace(string currNamespaceName) {
@@ -562,7 +569,7 @@ void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
 	}
 }
 list<Token> tokenize(ifstream& inFile, string fileName) {
-	static_assert(TokenCount == 7, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 8, "Exhaustive tokenize definition");
 	string line;
 	bool continued;
 	int firstOnLine;
@@ -606,6 +613,8 @@ list<Token> tokenize(ifstream& inFile, string fileName) {
 					listTokens.pop();
 					continued = true;
 					continue;
+				} else if (first == ':') {
+					token = Token(Tcolon, run, loc, continued, firstOnLine);
 				} else if (first == ',') {
 					token = Token(Tseparator, run, loc, continued, firstOnLine);
 				} else {
@@ -710,8 +719,9 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	}
 	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
-void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope, string identifier) {
-	Token expanded = Token(Tnumeric, scope.currNamespace().defines[identifier].value, percentToken.loc, false, percentToken.firstOnLine);
+void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope, string namespaceName, string defineName) {
+	Define& define = scope.namespaceFromPrefix(namespaceName).defines[defineName];
+	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
 bool recursivelyProcessArglist(list<Token> &tokens, Scope &scope);
@@ -730,39 +740,54 @@ bool processExpansionArglist(Token& tlist, Scope& scope, Macro& mac) {
 	mac.addExpansionScope(expanded);
 	return true;
 }
-bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope, string identifier) {
-	Macro& mac = scope.currNamespace().macros[identifier]; Token token;
+bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope, string namespaceName, string macroName) {
+	Macro& mac = scope.namespaceFromPrefix(namespaceName).macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac));
 	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
 	
-	Token expanded = Token(TIexpansion, identifier, mac.loc, false, true);
+	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
+	scope.addMacroExpansion(namespaceName, expanded);
 	insertToken(currList, itr, expanded);
 	return true;
 }
-bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 7, "Exhaustive processDirective definition");
-	string name; Loc loc = percentToken.loc;
+bool processDirectivePrefix(list<Token>& currList, list<Token>::iterator& itr, string& namespaceName, string& directiveName, Loc& loc, Scope& scope, bool& notContinued) {
+	string name; namespaceName = "";
 	directiveEatIdentifier("directive", false);
-	bool notContinued = itr == currList.end() || !itr->continued;
-	if (BuiltinDirectivesSet.count(name) == 1) {
+	if (itr != currList.end() && itr->type == Tcolon && !itr->firstOnLine) {
+		checkReturnOnFail(StrToNamespace.count(name), "Invalid namespace" errorQuoted(name), loc);
+		namespaceName = name;
+		eraseToken(currList, itr);
+		directiveEatIdentifier("directive", false);
+	}
+	directiveName = name;
+	notContinued = itr == currList.end() || !itr->continued;
+	return true;
+}
+bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope) {
+	static_assert(TokenCount == 8, "Exhaustive processDirective definition");
+	string namespaceName, directiveName; Loc loc = percentToken.loc; bool notContinued;
+	returnOnFalse(processDirectivePrefix(currList, itr, namespaceName, directiveName, loc, scope, notContinued));	
+	if (BuiltinDirectivesSet.count(directiveName)) {
+		checkReturnOnFail(namespaceName == "", "Unexpected namespace prefix", percentToken.loc);
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		checkReturnOnFail(!scope.insideArglist, "Definition not allowed inside arglist", percentToken.loc);
 		checkReturnOnFail(!scope.insideMacro(), "Definition not allowed inside macro", percentToken.loc);
-		returnOnFalse(processDirectiveDef(currList, itr, name, scope, percentToken, loc));
-	} else if (scope.hasDefine(name)) {
+		returnOnFalse(processDirectiveDef(currList, itr, directiveName, scope, percentToken, loc));
+	} else if (scope.hasDefine(namespaceName, directiveName)) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		expandDefineUse(currList, itr, percentToken, scope, name);
-	} else if (scope.hasMacro(name)) {
+		expandDefineUse(currList, itr, percentToken, scope, namespaceName, directiveName);
+	} else if (scope.hasMacro(namespaceName, directiveName)) {
 		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist, "Unexpected macro use", percentToken.loc);
-		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, scope, name));
-	} else if (scope.hasMacroArg(name)) {
+		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, scope, namespaceName, directiveName));
+	} else if (scope.hasMacroArg(directiveName)) {
+		checkReturnOnFail(namespaceName == "", "Unexpected namespace prefix", percentToken.loc);
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		list<Token>& argField = scope.currMacro().nameToArg(name).value.top();
+		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
 		insertList(currList, itr, argField, percentToken);
 	} else {
-		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(name), loc);
+		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(directiveName), loc);
 	}
 	return true;
 }
@@ -791,7 +816,6 @@ bool preprocessImpl(list<Token>& tokens, Scope& scope) {
 			if (currToken.type == Tlist) {
 				addNewList();
 			} else if (currToken.type == TIexpansion) {
-				scope.addMacroExpansion(currToken);
 				addNewList();
 			} else if (currToken.type == TInamespace) {
 				scope.enterNamespace(currToken.data);
@@ -843,8 +867,7 @@ vector<Instr> compile(list<Token>& tokens, string fileName) {
 
 		Token top = *(itr++);
 		labelOnLine = labelOnLine && !top.firstOnLine;
-		if (top.type == Tspecial) {
-			checkContinueOnFail(top.data == ":", "Unexpected special character", top);
+		if (top.type == Tcolon) {
 			string name;
 			continueOnFalse(eatComplexIdentifier(tokens, itr, top.loc, name, "label"));
 			ignoreLine = false;
