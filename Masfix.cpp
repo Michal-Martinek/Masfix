@@ -294,13 +294,14 @@ struct Namespace {
 		this->upperNamespaceId = upperNamespaceId;
 	}
 };
+
 int LastNamespaceId = 0;
 map<int, Namespace> IdToNamespace;
 bool raiseError(string message, Loc loc, bool strict);
 struct Scope {
 private:
-	stack<int> namespaces = stack<int>({ LastNamespaceId });
-	stack<pair<string, string>> macros;
+	stack<int> namespaces = stack<int>({ 0 });
+	stack<pair<int, string>> macros;
 	// TODO better max depth checks - maybe add depth counter
 public:
 	bool insideArglist=false;
@@ -309,33 +310,33 @@ public:
 	bool insideMacro() {
 		return macros.size();
 	}
-	Namespace& currNamespace() {
-		return IdToNamespace[namespaces.top()];
+	int currNamespaceId() {
+		return macros.size() ? macros.top().first : namespaces.top();
 	}
-	Namespace& namespaceFromPrefix(string prefix) {
-		if (prefix == "") return currNamespace();
-		return IdToNamespace[currNamespace().innerNamespaces[prefix]];
+	Namespace& currNamespace() {
+		return IdToNamespace[currNamespaceId()];
 	}
 	Macro& currMacro() {
 		assert(insideMacro());
-		return namespaceFromPrefix(macros.top().first).macros[macros.top().second];
+		return IdToNamespace[macros.top().first].macros[macros.top().second];
 	}
 
-	bool hasDefine(string& namespaceName, string& defineName) {
-		return namespaceFromPrefix(namespaceName).defines.count(defineName);
+	// TODO maybe add name lookup in upper namespaces in the same module
+	bool hasDefine(int& namespaceId, string& defineName) {
+		return IdToNamespace[namespaceId].defines.count(defineName);
 	}
-	bool hasMacro(string& namespaceName, string& macroName) {
-		return namespaceFromPrefix(namespaceName).macros.count(macroName);
+	bool hasMacro(int& namespaceId, string& macroName) {
+		return IdToNamespace[namespaceId].macros.count(macroName);
 	}
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
 	}
 
-	void addMacroExpansion(string& namespaceName, Token& expansionToken) {
+	void addMacroExpansion(int namespaceId, Token& expansionToken) {
 		if (macros.size() > MAX_EXPANSION_DEPTH) {
 			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
 		}
-		macros.push(pair(namespaceName, expansionToken.data));
+		macros.push(pair(namespaceId, expansionToken.data));
 	}
 	void endMacroExpansion() {
 		currMacro().closeExpansionScope();
@@ -727,8 +728,8 @@ bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	}
 	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
-void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope, string namespaceName, string defineName) {
-	Define& define = scope.namespaceFromPrefix(namespaceName).defines[defineName];
+void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope, int namespaceId, string defineName) {
+	Define& define = IdToNamespace[namespaceId].defines[defineName];
 	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
 	insertToken(currList, itr, expanded);
 }
@@ -748,53 +749,57 @@ bool processExpansionArglist(Token& tlist, Scope& scope, Macro& mac) {
 	mac.addExpansionScope(expanded);
 	return true;
 }
-bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope, string namespaceName, string macroName) {
-	Macro& mac = scope.namespaceFromPrefix(namespaceName).macros[macroName]; Token token;
+bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope, int namespaceId, string macroName) {
+	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac));
 	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
 	
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
-	scope.addMacroExpansion(namespaceName, expanded);
+	scope.addMacroExpansion(namespaceId, expanded);
 	insertToken(currList, itr, expanded);
 	return true;
 }
-bool processDirectivePrefix(list<Token>& currList, list<Token>::iterator& itr, string& namespaceName, string& directiveName, Loc& loc, Scope& scope, bool& notContinued) {
-	string name; namespaceName = "";
-	directiveEatIdentifier("directive", false);
-	if (itr != currList.end() && itr->type == Tcolon && !itr->firstOnLine) {
-		checkReturnOnFail(scope.currNamespace().innerNamespaces.count(name), "Invalid namespace" errorQuoted(name), loc);
-		namespaceName = name;
-		eraseToken(currList, itr);
+bool processDirectivePrefixes(list<Token>& currList, list<Token>::iterator& itr, int& namespaceId, vector<int>& prefixNamespaces, string& directiveName, Loc& loc, Scope& scope, bool& notContinued) {
+	string name; Namespace* currNamespace = &scope.currNamespace();
+	while (true) {
 		directiveEatIdentifier("directive", false);
+		if (itr == currList.end() || itr->type != Tcolon || itr->firstOnLine) break;
+		loc = itr->loc;
+		eraseToken(currList, itr);
+		checkReturnOnFail(currNamespace->innerNamespaces.count(name), "Namespace could not be found" errorQuoted(name), loc);
+		prefixNamespaces.push_back(currNamespace->innerNamespaces[name]);
+		currNamespace = &IdToNamespace[prefixNamespaces.back()];
 	}
+	namespaceId = prefixNamespaces.size() ? prefixNamespaces.back() : scope.currNamespaceId();
 	directiveName = name;
 	notContinued = itr == currList.end() || !itr->continued;
 	return true;
 }
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope) {
 	static_assert(TokenCount == 8, "Exhaustive processDirective definition");
-	string namespaceName, directiveName; Loc loc = percentToken.loc; bool notContinued;
-	returnOnFalse(processDirectivePrefix(currList, itr, namespaceName, directiveName, loc, scope, notContinued));	
+	int namespaceId; vector<int> prefixNamespaces; string directiveName; Loc loc = percentToken.loc; bool notContinued;
+	returnOnFalse(processDirectivePrefixes(currList, itr, namespaceId, prefixNamespaces, directiveName, loc, scope, notContinued));	
 	if (BuiltinDirectivesSet.count(directiveName)) {
-		checkReturnOnFail(namespaceName == "", "Unexpected namespace prefix", percentToken.loc);
+		checkReturnOnFail(prefixNamespaces.size() == 0, "Unexpected namespace prefix", percentToken.loc);
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		checkReturnOnFail(!scope.insideArglist, "Definition not allowed inside arglist", percentToken.loc);
 		checkReturnOnFail(!scope.insideMacro(), "Definition not allowed inside macro", percentToken.loc);
 		returnOnFalse(processDirectiveDef(currList, itr, directiveName, scope, percentToken, loc));
-	} else if (scope.hasDefine(namespaceName, directiveName)) {
+	} else if (scope.hasDefine(namespaceId, directiveName)) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		expandDefineUse(currList, itr, percentToken, scope, namespaceName, directiveName);
-	} else if (scope.hasMacro(namespaceName, directiveName)) {
+		expandDefineUse(currList, itr, percentToken, scope, namespaceId, directiveName);
+	} else if (scope.hasMacro(namespaceId, directiveName)) {
 		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist, "Unexpected macro use", percentToken.loc);
-		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, scope, namespaceName, directiveName));
+		returnOnFalse(expandMacroUse(currList, itr, percentToken.loc, scope, namespaceId, directiveName));
 	} else if (scope.hasMacroArg(directiveName)) {
-		checkReturnOnFail(namespaceName == "", "Unexpected namespace prefix", percentToken.loc);
+		checkReturnOnFail(prefixNamespaces.size() == 0, "Unexpected namespace prefix", percentToken.loc);
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
 		insertList(currList, itr, argField, percentToken);
 	} else {
+		checkReturnOnFail(!IdToNamespace[namespaceId].innerNamespaces.count(directiveName), "Namespace used as directive" errorQuoted(directiveName), loc);
 		checkReturnOnFail(false, "Undeclared identifier" errorQuoted(directiveName), loc);
 	}
 	return true;
