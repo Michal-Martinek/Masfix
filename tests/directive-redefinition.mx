@@ -1,6 +1,6 @@
 ; tests redefinitions against each other - labels, defines, macros, macro args; instructions, builtins
 
-; define, macro, macro arg
+; define, macro, macro arg, namespace
 %define prep1 5
 
 %macro prep1() {}
@@ -18,21 +18,28 @@
 %macro arg5(hutu, tutu, hutu, tutu)
 %macro PREP3() {}
 
+%namespace prep1 {}
+%namespace prep4b {}
+
 %define prep1 11
 %define arg5 55
 %define prep3 33
 %define Arg1 111
+%define prep4 89
 
 ; label vs. preprocessed
 :lvp1
 :lvp2
 %define lvp1 11
 %macro lvp2() {}
+%namespace lvp2 {}
 
 %define lvp3 33
 %macro lvp4() { 44 }
+%namespace lvn {}
 :lvp3
 :lvp4
+:lvn
 
 :lvp5
 %macro mac1(lvp5) {}
@@ -46,6 +53,8 @@
 :END
 :define
 :macro
+:namespace
+:__main
 
 %macro arg_redef(end, begin, macro) {}
 
@@ -56,6 +65,13 @@
 %macro begin() {}
 %macro define() {}
 %macro MACRO() {5454}
+%macro __main() {}
+
+%namespace namespace {}
+%namespace __main {}
+%namespace main {
+	%namespace __main {}
+}
 
 ; against instructions
 :outu
@@ -78,3 +94,26 @@ bmletr
 
 %macro AGI1(outcp) ; these macros will soon take over the world, even though they have no body
 %macro AGI2(swap_, ldam)
+
+%namespace inc{}
+%namespace out{}
+
+; inside different namespace
+%namespace upper {
+	%define def 8
+	%define def2 11
+	%macro mac() {}
+	:namespace_lab
+
+	%namespace inner {
+		%define def 9
+		%macro mac() {}
+		:namespace_lab
+
+		commit %def %def2
+	}
+	%define mac 9
+	%macro def() {}
+	
+	outu %def %def2 %inner:def %inner:def2
+}

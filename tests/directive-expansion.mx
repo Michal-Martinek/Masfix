@@ -45,3 +45,50 @@
 %testInstr(s(tr), m)
 %testInstr(str(&), m)
 %testInstr(s(tr)(a), m)
+
+; macro scoping
+%macro print(num) { ; output 012, A55, B15
+	outu %num
+}
+outc 10
+%print(0)
+
+%namespace Foo {
+	%define value 15
+	%define CapA 65
+	%define newline 10
+
+	%namespace Printer {
+		%macro printLn(num) {
+			%print(%num)
+			outc %newline
+		}
+	}
+	%namespace Mem {
+		%define char 4
+
+		mov %char
+		str %CapA
+		%print(1)
+
+		%macro increment() {
+			mov %char
+			stra 1
+		}
+		%macro printChar() {
+			mov %char
+			outcm
+			%increment()
+		}
+	}
+
+	%macro mac(x) {
+		%Mem:printChar()
+		%Printer:printLn(%x)
+	}
+}
+%define localConst 55
+%Foo:Printer:printLn(2)
+
+%Foo:mac(%localConst)
+%Foo:mac(%Foo:value)

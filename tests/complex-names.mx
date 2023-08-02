@@ -28,6 +28,7 @@
 :(rrr)(6)
 :(7)(zaza)
 :(rrr 6)
+:(a,):(b),((o,o))!
 
 ; wrong use in instructions
 mov ()
@@ -39,6 +40,7 @@ jmp(,),
 huhu(tata)
 jmp%macro
 swap%dir()
+ld((),):a(t)$
 
 ; complex instr names
 mov

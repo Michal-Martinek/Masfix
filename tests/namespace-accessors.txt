@@ -1,0 +1,38 @@
+:returncode 1
+
+:stderr 2233
+tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
+tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
+tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
+tests\namespace-accessors.mx:6:6 ERROR: Missing directive name
+tests\namespace-accessors.mx:7:9 ERROR: Missing directive name
+tests\namespace-accessors.mx:8:2 ERROR: Undeclared identifier 'again'
+tests\namespace-accessors.mx:11:7 ERROR: Missing directive name
+tests\namespace-accessors.mx:12:8 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:13:7 ERROR: Missing directive name
+tests\namespace-accessors.mx:14:11 ERROR: Missing directive name
+tests\namespace-accessors.mx:15:12 ERROR: Missing directive name
+tests\namespace-accessors.mx:16:12 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:17:14 ERROR: Missing directive name
+tests\namespace-accessors.mx:18:11 ERROR: Missing directive name
+tests\namespace-accessors.mx:29:6 ERROR: Undeclared identifier 'macro'
+tests\namespace-accessors.mx:30:8 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:31:2 ERROR: Namespace not found 'mac'
+tests\namespace-accessors.mx:33:2 ERROR: Undeclared identifier 'foo'
+tests\namespace-accessors.mx:34:5 ERROR: Missing directive name
+tests\namespace-accessors.mx:35:2 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:36:5 ERROR: Missing directive name
+tests\namespace-accessors.mx:37:2 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:38:2 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:39:2 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:41:7 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:43:6 ERROR: Undeclared identifier 'bar'
+tests\namespace-accessors.mx:44:6 ERROR: Namespace used as directive 'Bar'
+tests\namespace-accessors.mx:45:5 ERROR: Missing directive name
+tests\namespace-accessors.mx:46:9 ERROR: Missing directive name
+tests\namespace-accessors.mx:47:6 ERROR: Namespace used as directive 'Bar'
+tests\namespace-accessors.mx:48:10 ERROR: Undeclared identifier 'kk'
+tests\namespace-accessors.mx:50:9 ERROR: Invalid define name '%Foo'
+tests\namespace-accessors.mx:51:9 ERROR: Unexpected token after macro use '%'
+
+
