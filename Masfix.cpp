@@ -305,6 +305,7 @@ private:
 	stack<int> namespaces = stack<int>({ 0 });
 	stack<pair<int, string>> macros;
 	// TODO better max depth checks - maybe add depth counter
+	// TODO maybe enclose preprocess state variables - currList, itr, notContinued, percentToken in here
 public:
 	bool insideArglist=false;
 	Scope() {}

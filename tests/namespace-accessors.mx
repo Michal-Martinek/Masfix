@@ -1,0 +1,51 @@
+
+; missing accessors
+%:
+%^:oh
+% : not
+%this:
+%time:ah:
+%again hello?
+
+; colon with builtin
+%macro:
+%macro:somting
+%macro:,
+%namespace:
+%namespace :
+%namespace:ss
+%namespace:ss:
+%namespace:()
+
+; wrong name or use
+%macro mac(param) {}
+%namespace Foo {
+	%define pp 88
+	%namespace Bar {
+		%macro mac() {}
+	}
+}
+
+%Foo:macro
+%macro:Foo
+%mac:Foo
+
+%foo
+%foo:
+%Foo
+%Foo:
+%Foo()
+%Foo():
+%Foo(hh):
+%mac(Foo)
+%mac(%Foo)
+
+%Foo:bar
+%Foo:Bar
+%Foo:,Bar
+%Foo:Bar:
+%Foo:Bar()
+%Foo:Bar:kk
+
+%define %Foo
+%mac(5) %Foo
