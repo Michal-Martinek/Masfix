@@ -44,11 +44,15 @@ enum TokenTypes {
 
 	TokenCount
 };
-constexpr int BuiltinDirectivesCount = 3;
-const set<string> BuiltinDirectivesSet = {
-	"define", 
+constexpr int DefiningDirectivesCount = 3;
+const set<string> DefiningDirectivesSet = {
+	"define",
 	"macro",
 	"namespace"
+};
+constexpr int BuiltinDirectivesCount = 1;
+const set<string> BuiltinDirectivesSet = {
+	"using"
 };
 enum RegNames {
 	Rh,
@@ -285,6 +289,7 @@ struct Namespace {
 	map<string, Macro> macros;
 
 	map<string, int> innerNamespaces;
+	set<int> usedNamespaces;
 	int upperNamespaceId;
 	bool isUpperAccesible;
 
@@ -479,7 +484,7 @@ bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
 }
 bool checkIdentRedefinitons(string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
 	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
-	checkReturnOnFail(BuiltinDirectivesSet.count(name) == 0, "Name shadows a builtin directive" errorQuoted(name), loc)
+	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
 	if (label) {
 		checkReturnOnFail(StrToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
 	} else {
@@ -707,9 +712,8 @@ bool processNamespaceDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	return true;
 }
 bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Token percentToken, Loc directiveLoc) {
-	static_assert((BuiltinDirectivesCount == 3, "Exhaustive processDirectiveDef definiton"));
+	static_assert(DefiningDirectivesCount == 3, "Exhaustive processDirectiveDef definiton");
 	string name; Loc loc = directiveLoc; Token token;
-	checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directive), percentToken.loc);
 	directiveEatIdentifier(directive, true, 1);
 	if (directive == "define") {
 		directiveEatToken(Tnumeric, "Define value expected", true);
@@ -769,74 +773,134 @@ bool getDirectivePrefixes(list<Token>& currList, list<Token>::iterator& itr, lis
 	notContinued = itr == currList.end() || !itr->continued;
 	return true;
 }
-bool existsUseDirective(string directiveName, int namespaceId) {
-	return IdToNamespace[namespaceId].defines.count(directiveName) || IdToNamespace[namespaceId].macros.count(directiveName);
+bool defineDefined(string& name, int& namespaceId) {
+	if (IdToNamespace[namespaceId].defines.count(name)) return true;
+	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+		if (IdToNamespace[id].defines.count(name)) {
+			namespaceId = id;
+			return true;
+		}
+	}
+	return false;
+}
+bool macroDefined(string& name, int& namespaceId) {
+	if (IdToNamespace[namespaceId].macros.count(name)) return true;
+	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+		if (IdToNamespace[id].macros.count(name)) {
+			namespaceId = id;
+			return true;
+		}
+	}
+	return false;
+}
+bool namespaceDefined(string& name, int& namespaceId) {
+	if (IdToNamespace[namespaceId].innerNamespaces.count(name)) {
+		namespaceId = IdToNamespace[namespaceId].innerNamespaces[name];
+		return true;
+	}
+	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+		if (IdToNamespace[id].innerNamespaces.count(name)) {
+			namespaceId = IdToNamespace[id].innerNamespaces[name];
+			return true;
+		}
+	}
+	return false;
+}
+bool processUsing(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Scope& scope) {
+	int namespaceId = scope.currNamespaceId();
+	while(true) {
+		checkReturnOnFail(IdToNamespace[namespaceId].innerNamespaces.count(name), "Namespace not found" errorQuoted(name), loc);
+		namespaceId = IdToNamespace[namespaceId].innerNamespaces[name];
+		if (!currList.size() || itr->firstOnLine || itr->type != Tcolon) break;
+		loc = itr->loc;
+		eraseToken(currList, itr);
+		directiveEatIdentifier("namespace", false, 1);
+	}
+	scope.currNamespace().usedNamespaces.insert(namespaceId);
+	return true;
+}
+bool processBuiltinUse(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Token percentToken, Loc directiveLoc) {
+	static_assert(BuiltinDirectivesCount == 1, "Exhaustive processBuiltinUse definiton");
+	string name; Loc loc = directiveLoc; Token token;
+	directiveEatIdentifier(directive, false, 1);
+	if (directive == "using") {
+		returnOnFalse(processUsing(currList, itr, name, loc, scope));
+	} else {
+		unreachable();
+	}
+	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
 }
 #define processUseDirective(currList, itr, directiveName, loc, percentToken, namespaceId, notContinued, scope) \
 	int _retVal = processUseDirectiveImpl(currList, itr, directiveName, loc, percentToken, namespaceId, notContinued, scope); \
 	if (_retVal != 2) return _retVal;
 int processUseDirectiveImpl(list<Token>& currList, list<Token>::iterator& itr, string directiveName, Loc loc, Token& percentToken, int namespaceId, bool notContinued, Scope& scope) {
-	if (IdToNamespace[namespaceId].defines.count(directiveName)) {
+	if (defineDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		expandDefineUse(currList, itr, percentToken, scope, namespaceId, directiveName);
 		return true;
-	} else if (IdToNamespace[namespaceId].macros.count(directiveName)) {
+	} else if (macroDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist, "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(currList, itr, loc, scope, namespaceId, directiveName);
 	}
-	return 2; // not fount
+	return 2; // not found
 }
-void lookupAbove(string directiveName, int& namespaceId, bool& namespaceSeen, bool isFinal) {
+bool lookupAbove(string directiveName, int& namespaceId, bool& namespaceSeen, bool isFinal, Loc& loc) {
 	Namespace* currNamespace; // TODO prohibit going down the tree from where I came
 	while (true) {
 		currNamespace = &IdToNamespace[namespaceId];
-		if (isFinal && existsUseDirective(directiveName, namespaceId)) {
-			return;
+		if (isFinal && (defineDefined(directiveName, namespaceId) || macroDefined(directiveName, namespaceId))) {
+			return true;
 		}
-		if (currNamespace->innerNamespaces.count(directiveName)) {
-			if (isFinal) {
-				namespaceSeen = true;
-				return;
-			}
-			else {
-				return;
-			}
+		if (namespaceDefined(directiveName, namespaceId)) {
+			if (isFinal) namespaceSeen = true;
+			return true;
 		}
-		if (!currNamespace->isUpperAccesible) return;
+		if (!currNamespace->isUpperAccesible) break;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
+	if (!isFinal) checkReturnOnFail(false, "Namespace not found" errorQuoted(directiveName), loc);
+	return true;
 }
 bool lookupName(list<Token>& currList, list<Token>::iterator& itr, Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, bool notContinued, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
-	lookupAbove(directiveName, namespaceId, namespaceSeen, !prefixes.size());
+	returnOnFalse(lookupAbove(directiveName, namespaceId, namespaceSeen, !prefixes.size(), locs.front()));
+	if (prefixes.size()) { directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front(); }
 	while (prefixes.size()) {
 		checkReturnOnFail(IdToNamespace[namespaceId].innerNamespaces.count(directiveName), "Namespace not found" errorQuoted(directiveName), locs.front());
 		namespaceId = IdToNamespace[namespaceId].innerNamespaces[directiveName];
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
-	checkReturnOnFail(!namespaceSeen && !IdToNamespace[namespaceId].innerNamespaces.count(directiveName), "Namespace used as directive" errorQuoted(directiveName), locs.front());
+	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId), "Namespace used as directive" errorQuoted(directiveName), locs.front());
 	processUseDirective(currList, itr, directiveName, percentToken.loc, percentToken, namespaceId, notContinued, scope);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), locs.front());
 }
+#define processDirectiveSituationChecks(type) \
+	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
+	checkReturnOnFail(notContinued, "Unexpected continued token", *itr); \
+	if (type != "macro arg") { \
+		checkReturnOnFail(!scope.insideArglist, type " not allowed inside arglist", percentToken.loc); \
+		checkReturnOnFail(!scope.insideMacro(), type " not allowed inside macro", percentToken.loc); \
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
+	}
 bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope) {
 	static_assert(TokenCount == 8, "Exhaustive processDirective definition");
 	list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
 	returnOnFalse(getDirectivePrefixes(currList, itr, prefixes, locs, loc, scope, notContinued));
 	string directiveName = prefixes.front(); prefixes.pop_front();
-	if (BuiltinDirectivesSet.count(directiveName) || scope.hasMacroArg(directiveName)) {
-		checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin()));
-		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		if (BuiltinDirectivesSet.count(directiveName)) {
-			checkReturnOnFail(!scope.insideArglist, "Definition not allowed inside arglist", percentToken.loc);
-			checkReturnOnFail(!scope.insideMacro(), "Definition not allowed inside macro", percentToken.loc);
-			returnOnFalse(processDirectiveDef(currList, itr, directiveName, scope, percentToken, loc));
-		} else {
-			list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
-			insertList(currList, itr, argField, percentToken);
-		}
-		return true;
+	if (DefiningDirectivesSet.count(directiveName)) {
+		processDirectiveSituationChecks("Definition");
+		returnOnFalse(processDirectiveDef(currList, itr, directiveName, scope, percentToken, loc));
+	} else if (BuiltinDirectivesSet.count(directiveName)) {
+		processDirectiveSituationChecks("Directive");
+		returnOnFalse(processBuiltinUse(currList, itr, directiveName, scope, percentToken, loc));
+	} else if (!prefixes.size() && scope.hasMacroArg(directiveName)) {
+		processDirectiveSituationChecks("macro arg");
+		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
+		insertList(currList, itr, argField, percentToken);
+	} else {
+		return lookupName(currList, itr, percentToken, directiveName, prefixes, locs, notContinued, scope);
 	}
-	return lookupName(currList, itr, percentToken, directiveName, prefixes, locs, notContinued, scope);
+	return true;
 }
 #define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
 #define addNewList() openLists.push(currToken); \
