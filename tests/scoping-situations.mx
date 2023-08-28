@@ -1,0 +1,53 @@
+%macro test(name) {}
+
+%define top_def 1
+%namespace top_inner {
+	%define top_inner_def 2
+	%namespace deep {
+		%define deep_def 3
+	}
+}
+%namespace test_space {
+	%define same_scope_def 4
+	%namespace local_inner {
+		%define local_inner_def 5
+	}
+	%namespace namespace_inline_test {
+		%test(%top_def) ; OK
+		%test(%top_inner_def) ; NO
+		%using top_inner
+		%test(%top_inner_def) ; OK
+		%test(%deep_def) ; NO
+		%test(%deep:deep_def) ; OK
+		%test(%same_scope_def) ; OK
+		%test(%local_inner_def) ; NO
+		%test(%local_inner:local_inner_def) ; OK
+	}
+	%**scope_sep
+	%macro scope_test() {
+		%test(%top_def) ; OK
+		%test(%top_inner_def) ; NEVER
+		%test(%top_inner:top_inner_def) ; OK
+		%test(%deep_def) ; NEVER
+		%test(%top_inner:deep:deep_def) ; OK
+		%test(%same_scope_def) ; OK
+		%test(%local_inner_def) ; SECOND
+		%test(%local_inner:local_inner_def) ; OK
+		%test(%undefd:undefd_def) ; SECOND
+	}
+	%scope_test()
+	%using local_inner
+}
+
+%**scope_sep
+%namespace undefd {
+	%define undefd_def 6
+}
+; the %using shouldn't make the tested accesible - it would create unstable performance on expansions in different expansion scenarios (with / witout using)
+%namespace second_test { ; must be wrapped so we don't use them in the __main which is accesible from the test_space
+	%using top_inner
+	%using deep
+
+	%test_space:scope_test()	
+}
+%using test_space:namespace_inline_test:top_inner

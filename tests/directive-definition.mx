@@ -17,17 +17,29 @@ dir
 ; directive identifier
 %define
 % define
+% define^
+%define:
 %define_abc
 %defne
 %aaaa bbbb
 
 %macro
 % macro_
+%macro,
 % macro$
 
 %namespace
 %namespace,
-%namespace ()
+%namespace%
+%namespace *
+%namespace()
+
+%using
+% using_
+%using ,
+%	using%
+%using*
+	% using()
 
 ; directive context
 %macro %define
@@ -36,6 +48,8 @@ dir
 %define %macro
 %define hidden_mac %macro hidden_unga_bunga()
 %hidden_mac()
+%using %macro
+%define %using
 %macro dsa(){
 	%macro inside_peek[] ; prohibited, but doesn't fail
 }
@@ -45,11 +59,14 @@ dir
 :here_define2 %define
 :here_macro_def %macro
 :here_namespace %namespace
+:here_using %using
+%using:after_using
 
 %macro dirsInside() {
 	%define insideDef 88
 	%macro macInside() {}
 	%namespace insdee
+	%using bumblebee
 }
 %dirsInside()
 
@@ -62,6 +79,7 @@ dir
 %define()
 %define ()
 %macro $
+%macro :
  
 %define 59var
 %define CONST_VAL

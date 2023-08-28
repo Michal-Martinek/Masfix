@@ -1,0 +1,17 @@
+:returncode 1
+
+:stderr 918
+tests\scoping-situations.mx:17:10 ERROR: Undeclared identifier 'top_inner_def'
+tests\scoping-situations.mx:20:10 ERROR: Undeclared identifier 'deep_def'
+tests\scoping-situations.mx:23:10 ERROR: Undeclared identifier 'local_inner_def'
+tests\scoping-situations.mx:26:3 ERROR: Invalid directive name '**scope_sep'
+tests\scoping-situations.mx:29:10 ERROR: Undeclared identifier 'top_inner_def'
+tests\scoping-situations.mx:31:10 ERROR: Undeclared identifier 'deep_def'
+tests\scoping-situations.mx:34:10 ERROR: Undeclared identifier 'local_inner_def'
+tests\scoping-situations.mx:36:10 ERROR: Namespace not found 'undefd'
+tests\scoping-situations.mx:42:2 ERROR: Invalid directive name '**scope_sep'
+tests\scoping-situations.mx:29:10 ERROR: Undeclared identifier 'top_inner_def'
+tests\scoping-situations.mx:31:10 ERROR: Undeclared identifier 'deep_def'
+tests\scoping-situations.mx:53:41 ERROR: Namespace not found 'top_inner'
+
+

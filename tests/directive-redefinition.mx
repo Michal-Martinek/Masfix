@@ -54,24 +54,33 @@
 :define
 :macro
 :namespace
+:using
 :__main
 
 %macro arg_redef(end, begin, macro) {}
+%macro arg_redef2(using) {}
 
 %define end 5
 %define macro 6
 %define Macro 83
+%define namespace 1
+%define using 55
 
 %macro begin() {}
 %macro define() {}
+%macro macro()
 %macro MACRO() {5454}
+%macro using()
+%macro uSing() {}
 %macro __main() {}
 
+%namespace define
 %namespace namespace {}
 %namespace __main {}
 %namespace main {
 	%namespace __main {}
 }
+%namespace using
 
 ; against instructions
 :outu
@@ -117,3 +126,46 @@ bmletr
 	
 	outu %def %def2 %inner:def %inner:def2
 }
+
+; defining shadowing name + resolution order test
+%define a 7
+%macro m() { A }
+%namespace N {
+	%define v1 0
+}
+%namespace M {
+	%define v2 4
+}
+%namespace names {
+	%define a 8
+	%macro m() { B }
+	%namespace N {
+		%define v1 1
+	}
+	%namespace M {
+		%define v2 5
+	}
+}
+%namespace before_after_using {
+	%define a 9
+	%namespace N {
+		%define v1 2
+	}
+
+	%using names
+	
+	%define a 10
+	%macro m() { C }
+	%namespace N {
+		%define v1 3
+	}
+}
+%a
+%m()
+%before_after_using:a
+%before_after_using:m()
+%before_after_using:N:v1
+%before_after_using:M:v2
+%using before_after_using
+%a
+%N:v1
