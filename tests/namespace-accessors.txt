@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4346
+:stderr 4650
 tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
 tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
 tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
@@ -53,6 +53,7 @@ tests\namespace-accessors.mx:74:15 ERROR: Invalid namespace name '/'
 tests\namespace-accessors.mx:75:15 ERROR: Invalid namespace name '8'
 tests\namespace-accessors.mx:78:21 ERROR: Missing namespace name
 tests\namespace-accessors.mx:79:16 ERROR: Invalid namespace name 'time%'
+tests\namespace-accessors.mx:80:15 ERROR: Namespace already imported 'time'
 tests\namespace-accessors.mx:80:20 ERROR: Unexpected token after directive '%'
 tests\namespace-accessors.mx:81:15 ERROR: Invalid namespace name 'time?'
 tests\namespace-accessors.mx:83:9 ERROR: Namespace not found 'macro'
@@ -61,8 +62,11 @@ tests\namespace-accessors.mx:85:9 ERROR: Namespace not found 'using'
 tests\namespace-accessors.mx:86:15 ERROR: Namespace not found 'define'
 tests\namespace-accessors.mx:88:15 ERROR: Missing namespace name
 tests\namespace-accessors.mx:89:15 ERROR: Unexpected token after directive '!'
+tests\namespace-accessors.mx:90:9 ERROR: Namespace already imported 'space'
 tests\namespace-accessors.mx:90:15 ERROR: Unexpected token after directive '%'
+tests\namespace-accessors.mx:91:16 ERROR: Namespace already imported 'time'
 tests\namespace-accessors.mx:91:21 ERROR: Unexpected token after directive '%'
+tests\namespace-accessors.mx:92:15 ERROR: Namespace already imported 'time'
 tests\namespace-accessors.mx:92:20 ERROR: Unexpected token after directive '15'
 
 

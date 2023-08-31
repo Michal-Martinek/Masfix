@@ -774,9 +774,9 @@ bool getDirectivePrefixes(list<Token>& currList, list<Token>::iterator& itr, lis
 	notContinued = itr == currList.end() || !itr->continued;
 	return true;
 }
-bool defineDefined(string& name, int& namespaceId) {
+bool defineDefined(string& name, int& namespaceId, bool firstPrefix=false) {
 	if (IdToNamespace[namespaceId].defines.count(name)) return true;
-	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+	if (firstPrefix) for (int id : IdToNamespace[namespaceId].usedNamespaces) {
 		if (IdToNamespace[id].defines.count(name)) {
 			namespaceId = id;
 			return true;
@@ -784,9 +784,9 @@ bool defineDefined(string& name, int& namespaceId) {
 	}
 	return false;
 }
-bool macroDefined(string& name, int& namespaceId) {
+bool macroDefined(string& name, int& namespaceId, bool firstPrefix=false) {
 	if (IdToNamespace[namespaceId].macros.count(name)) return true;
-	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+	if (firstPrefix) for (int id : IdToNamespace[namespaceId].usedNamespaces) {
 		if (IdToNamespace[id].macros.count(name)) {
 			namespaceId = id;
 			return true;
@@ -794,12 +794,12 @@ bool macroDefined(string& name, int& namespaceId) {
 	}
 	return false;
 }
-bool namespaceDefined(string& name, int& namespaceId) {
+bool namespaceDefined(string& name, int& namespaceId, bool firstPrefix=false) { 
 	if (IdToNamespace[namespaceId].innerNamespaces.count(name)) {
 		namespaceId = IdToNamespace[namespaceId].innerNamespaces[name];
 		return true;
 	}
-	for (int id : IdToNamespace[namespaceId].usedNamespaces) {
+	if (firstPrefix) for (int id : IdToNamespace[namespaceId].usedNamespaces) {
 		if (IdToNamespace[id].innerNamespaces.count(name)) {
 			namespaceId = IdToNamespace[id].innerNamespaces[name];
 			return true;
@@ -807,24 +807,27 @@ bool namespaceDefined(string& name, int& namespaceId) {
 	}
 	return false;
 }
-bool lookupAbove(string directiveName, int& namespaceId, bool& namespaceSeen, bool isFinal, Loc& loc) {
+void lookupFinalAbove(string directiveName, int& namespaceId, bool& namespaceSeen) {
 	Namespace* currNamespace;
 	while (true) {
 		currNamespace = &IdToNamespace[namespaceId];
-		if (isFinal && (defineDefined(directiveName, namespaceId) || macroDefined(directiveName, namespaceId))) {
-			return true;
-		}
-		if (namespaceDefined(directiveName, namespaceId)) {
-			if (isFinal) namespaceSeen = true;
-			return true;
-		}
+		if (defineDefined(directiveName, namespaceId, true) || macroDefined(directiveName, namespaceId, true)) return;
+		namespaceSeen = namespaceSeen || IdToNamespace[namespaceId].innerNamespaces.count(directiveName);
+		if (!currNamespace->isUpperAccesible) return;
+		namespaceId = currNamespace->upperNamespaceId;
+	}
+}
+bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
+	Namespace* currNamespace;
+	while (true) {
+		currNamespace = &IdToNamespace[namespaceId];
+		if (namespaceDefined(directiveName, namespaceId, true)) return true;
 		if (!currNamespace->isUpperAccesible) break;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
-	if (!isFinal) checkReturnOnFail(false, "Namespace not found" errorQuoted(directiveName), loc);
-	return true;
+	return check(false, "Namespace not found" errorQuoted(directiveName), loc);
 }
-bool processUseDirective(list<Token>& currList, list<Token>::iterator& itr, string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool notContinued, Scope& scope) {
+bool processUseDirective(list<Token>& currList, list<Token>::iterator& itr, string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool notContinued, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
 		expandDefineUse(currList, itr, percentToken, scope, namespaceId, directiveName);
@@ -833,32 +836,35 @@ bool processUseDirective(list<Token>& currList, list<Token>::iterator& itr, stri
 		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist, "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(currList, itr, percentToken.loc, scope, namespaceId, directiveName);
 	}
+	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
 }
 bool lookupName(list<Token>& currList, list<Token>::iterator& itr, Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, bool notContinued, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
-	returnOnFalse(lookupAbove(directiveName, namespaceId, namespaceSeen, !prefixes.size(), locs.front()));
-	if (prefixes.size()) { directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front(); }
+	if (prefixes.size()) {
+		returnOnFalse(lookupNamespaceAbove(directiveName, namespaceId, locs.front()));
+		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
+	} else {
+		lookupFinalAbove(directiveName, namespaceId, namespaceSeen);
+	}
 	while (prefixes.size()) {
-		checkReturnOnFail(IdToNamespace[namespaceId].innerNamespaces.count(directiveName), "Namespace not found" errorQuoted(directiveName), locs.front());
-		namespaceId = IdToNamespace[namespaceId].innerNamespaces[directiveName];
+		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" errorQuoted(directiveName), locs.front());
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
-	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId), "Namespace used as directive" errorQuoted(directiveName), locs.front());
-	return processUseDirective(currList, itr, directiveName, percentToken, locs.front(), namespaceId, notContinued, scope);
+	return processUseDirective(currList, itr, directiveName, percentToken, locs.front(), namespaceId, notContinued, namespaceSeen, scope);
 }
 bool processUsing(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope) {
-	int namespaceId = scope.currNamespaceId(); string name; bool __dummy;
+	int namespaceId = scope.currNamespaceId(); string name;
 	directiveEatIdentifier("namespace", false, 0);
-	returnOnFalse(lookupAbove(name, namespaceId, __dummy, false, loc));
+	// NOTE the first namespace can be used, others down the using chain must be defined inside one another
+	returnOnFalse(lookupNamespaceAbove(name, namespaceId, loc));
 	while (itr != currList.end() && !itr->firstOnLine && itr->type == Tcolon) {
 		loc = itr->loc;
 		eraseToken(currList, itr);
 		directiveEatIdentifier("namespace", false, 0);
-		checkReturnOnFail(IdToNamespace[namespaceId].innerNamespaces.count(name), "Namespace not found" errorQuoted(name), loc);
-		namespaceId = IdToNamespace[namespaceId].innerNamespaces[name];
+		checkReturnOnFail(namespaceDefined(name, namespaceId), "Namespace not found" errorQuoted(name), loc);
 	}
-	scope.currNamespace().usedNamespaces.insert(namespaceId);
+	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already imported" errorQuoted(name), loc);
 	return true;
 }
 bool processBuiltinUse(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Loc directiveLoc) {
@@ -899,10 +905,6 @@ bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token p
 	return true;
 }
 #define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
-#define addNewList() openLists.push(currToken); \
-	openItrs.push(currToken.tlist.begin()); \
-	currList = &openLists.top().get().tlist; \
-	currItr = &openItrs.top();
 bool preprocessImpl(list<Token>& tokens, Scope& scope) {
 	stack<reference_wrapper<Token>> openLists;
 	stack<list<Token>::iterator> openItrs({ tokens.begin() });
@@ -921,7 +923,10 @@ bool preprocessImpl(list<Token>& tokens, Scope& scope) {
 			}
 			++ (*currItr);
 			if (currToken.type == Tlist || currToken.type == TIexpansion || currToken.type == TInamespace) {
-				addNewList();
+				openLists.push(currToken);
+				openItrs.push(currToken.tlist.begin());
+				currList = &openLists.top().get().tlist;
+				currItr = &openItrs.top();
 			}
 		}
 		if (openLists.size()) {
