@@ -270,10 +270,9 @@ struct Macro {
 		assert(nameToArgIdx.count(name));
 		return argList[nameToArgIdx[name]];
 	}
-	void addExpansionScope(vector<list<Token>>& fields) {
-		for (int i = 0; i < fields.size(); ++i) {
-			argList[i].value.push(list(fields[i].begin(), fields[i].end()));
-		}
+	void addExpansionArg(int argIdx, list<Token>::iterator from, list<Token>::iterator to) {
+		if (argIdx >= argList.size()) return;
+		argList[argIdx].value.push(list<Token>(from, to));
 	}
 	void closeExpansionScope() {
 		for (int i = 0; i < argList.size(); ++i) {
@@ -314,22 +313,67 @@ private:
 public:
 	bool insideArglist=false;
 	Scope() {}
+	Scope(Token& tlistToken) {
+		tlists.push(tlistToken);
+		init();
+	}
+	void init() {
+		itrs = stack<list<Token>::iterator>({tlists.top().get().tlist.begin()});
+	}
+	bool currListContinues() {
+		return itrs.top() != currList().end();
+	}
+	list<Token>& currList() {
+	}
+	Token& currToken() {
+		return *itrs.top();
+	}
 
 	bool insideMacro() {
 		return macros.size();
 	}
 	int currNamespaceId() {
-		return macros.size() ? macros.top().first : namespaces.top();
+		return insideMacro() ? macros.top().first : namespaces.top();
 	}
 	Namespace& currNamespace() {
 		return IdToNamespace[currNamespaceId()];
 	}
 	Macro& currMacro() {
 		assert(insideMacro());
-		return IdToNamespace[macros.top().first].macros[macros.top().second];
+		return currNamespace().macros[macros.top().second];
 	}
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
+	}
+	Token erasedToken() {
+		Token t = currToken();
+		itrs.top() = currList().erase(itrs.top());
+		return t;
+	}
+	void eatLine() {
+		while (currListContinues() && !currToken().firstOnLine) {
+			erasedToken();
+		}
+	}
+	void advanceItr(Token& currToken) {
+		++itrs.top();
+		if (currToken.type == Tlist || currToken.type == TIexpansion || currToken.type == TInamespace) {
+			arglists.size() ? arglists.push(currToken) : tlists.push(currToken);
+			itrs.push(currToken.tlist.begin());
+		}
+	}
+	void closeList() {
+		if (arglists.size() == 1) return;
+		if (tlists.top().get().type == TIexpansion) {
+			endMacroExpansion();
+		} else if (tlists.top().get().type == TInamespace) {
+			exitNamespace();
+		}
+		tlists.pop(); itrs.pop();
+	}
+	bool continuePreprocess() {
+		if (arglists.size()) return itrs.top() != arglists.top().get().tlist.end();
+		return tlists.size();
 	}
 
 	void addMacroExpansion(int namespaceId, Token& expansionToken) {
@@ -351,6 +395,16 @@ public:
 	void exitNamespace() {
 		assert(namespaces.size() > 1);
 		namespaces.pop();
+	}
+	void enterArglist(Token& tlist) {
+		assert(arglists.size() == 0);
+		arglists.push(tlist);
+		itrs.push(tlist.tlist.begin());
+	}
+	void exitArglist() {
+		assert(arglists.size() == 1);
+		arglists.pop();
+		itrs.pop();
 	}
 };
 struct Suffix {
@@ -679,31 +733,39 @@ vector<pair<list<Token>, Loc>> splitTlist(Token& tlist) {
 	}
 	return splits;
 }
-bool arglistFromTlist(Token& tlist, Scope& scope, Macro& mac) {
-	assert(tlist.type == Tlist);
-	string name; list<Token> currList; Loc loc;
-	for (auto [currList, loc] : splitTlist(tlist)) {
-		list<Token>::iterator itr = currList.begin();
-
+bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
+	string name; bool first = true;
+	while (scope.currListContinues()) {
+		if (!first) {
+			Token sep = scope.erasedToken(); loc = sep.loc;
+			checkReturnOnFail(sep.type == Tseparator, "Separator expected", loc);
+		}
+		first = false;
 		directiveEatIdentifier("macro arg", true, 1);
-		checkReturnOnFail(itr == currList.end(), "Separator expected", itr->loc);
 		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
 		mac.addArg(name, loc);
 	}
 	return true;
 }
-bool processMacroDef(list<Token>& currList, list<Token>::iterator& itr, Scope& scope, string name, Loc loc, Loc percentLoc) {
+bool processArglist(Token& token, Scope& scope, Loc loc, Macro& mac) {
+	if (!token.tlist.size()) return true;
+	scope.enterArglist(token);
+	bool retval = arglistFromTlist(scope, loc, mac);
+	scope.exitArglist();
+	return retval;
+}
+bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	Token token;
 	scope.currNamespace().macros[name] = Macro(name, percentLoc);
 	Macro& mac = scope.currNamespace().macros[name];
 	directiveEatToken(Tlist, "Macro arglist expected", true);
-	returnOnFalse(arglistFromTlist(token, scope, mac));
+	returnOnFalse(processArglist(token, scope, loc, mac));
 	directiveEatToken(Tlist, "Macro body expected", false);
 	checkReturnOnFail(!token.isSeparated(), "No separators expected in macro body", loc);
 	mac.body = list(token.tlist.begin(), token.tlist.end());
 	return true;
 }
-bool processNamespaceDef(list<Token>& currList, list<Token>::iterator& itr, string name, Loc loc, Loc percentLoc, Scope& scope) {
+bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
 	Token token;
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	insertToken(currList, itr, Token(TInamespace, name, percentLoc, false, true));
@@ -711,48 +773,45 @@ bool processNamespaceDef(list<Token>& currList, list<Token>::iterator& itr, stri
 	scope.addInnerNamespace(name, percentLoc);
 	return true;
 }
-bool processDirectiveDef(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Token percentToken, Loc directiveLoc) {
+bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
 	static_assert(DefiningDirectivesCount == 3, "Exhaustive processDirectiveDef definition");
-	string name; Loc loc = directiveLoc; Token token;
+	string name; Token token;
 	directiveEatIdentifier(directive, true, 1);
 	if (directive == "define") {
 		directiveEatToken(Tnumeric, "Define value expected", true);
 		scope.currNamespace().defines[name] = Define(name, percentToken.loc, token.data);
 	} else if (directive == "macro") {
-		returnOnFalse(processMacroDef(currList, itr, scope, name, loc, percentToken.loc));
+		returnOnFalse(processMacroDef(scope, name, loc, percentToken.loc));
 	} else if (directive == "namespace") {
-		returnOnFalse(processNamespaceDef(currList, itr, name, loc, percentToken.loc, scope));
+		returnOnFalse(processNamespaceDef(name, loc, percentToken.loc, scope));
 	} else {
 		unreachable();
 	}
-	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
+	return check(!scope.currListContinues() || scope.currToken().firstOnLine, "Unexpected token after directive", scope.currToken());
 }
-void expandDefineUse(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope, int namespaceId, string defineName) {
+void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
 	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
-	insertToken(currList, itr, expanded);
+	insertToken(scope, expanded);
 }
-bool recursivelyProcessArglist(list<Token> &tokens, Scope &scope);
-bool processExpansionArglist(Token& tlist, Scope& scope, Macro& mac) {
+bool preprocessImpl(Scope& scope);
+bool processExpansionArglist(Token& tlist, Scope& scope, Macro& mac, Loc loc) {
 	assert(tlist.type == Tlist);
-	auto splits = splitTlist(tlist);
-	checkReturnOnFail(splits.size() == mac.argList.size(), "Unexpected number of expansion arguments", tlist.loc);
-	list<Token> currList; Loc loc; int idx = 0; vector<list<Token>> expanded;
-	for (auto [currList, loc] : splits) {
-		checkReturnOnFail(currList.size() > 0, "Expansion argument expected", loc);
-		currList.front().continued = false;
-		returnOnFalse(recursivelyProcessArglist(currList, scope)); // the hyper loop closes
-		expanded.push_back(currList);
-		++idx;
+	bool retval = true; int count = 0;
+	if (tlist.tlist.size()) {
+		scope.enterArglist(tlist);
+		retval = preprocessImpl(scope);
+		scope.itrs.top() = scope.arglists.top().get().tlist.begin();
+		count = scope.sliceArglist(mac, loc);
+		scope.exitArglist();
 	}
-	mac.addExpansionScope(expanded);
-	return true;
+	return retval && check(count == mac.argList.size(), "Unexpected number of expansion arguments", tlist.loc);
 }
-bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope, int namespaceId, string macroName) {
+bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
-	returnOnFalse(processExpansionArglist(token, scope, mac));
-	checkReturnOnFail(itr == currList.end() || itr->firstOnLine, "Unexpected token after macro use", *itr);
+	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
+	checkReturnOnFail(!scope.currListContinues() || scope.currToken().firstOnLine, "Unexpected token after macro use", scope.currToken());
 	
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -760,18 +819,19 @@ bool expandMacroUse(list<Token>& currList, list<Token>::iterator& itr, Loc loc, 
 	insertToken(currList, itr, expanded);
 	return true;
 }
-bool getDirectivePrefixes(list<Token>& currList, list<Token>::iterator& itr, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued) {
-	static_assert(TokenCount == 8, "Exhaustive getDirectivePrefixes definition");
-	string name;
+bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
+	static_assert(TokenCount == 9, "Exhaustive getDirectivePrefixes definition");
+	string name; bool first = true;
 	while (true) {
-		directiveEatIdentifier("directive", false, 0);
-		prefixes.push_back(name);
+		directiveEatIdentifier(identPurpose, false, 0);
+		if (first) {
+			firstName = name; first = false;
+		} else prefixes.push_back(name);
 		locs.push_back(loc);
-		if (itr == currList.end() || itr->type != Tcolon || itr->firstOnLine) break;
-		loc = itr->loc;
-		eraseToken(currList, itr);
+		if (!scope.currListContinues() || scope.currToken().type != Tcolon || scope.currToken().firstOnLine) break;
+		loc = scope.erasedToken().loc;
 	}
-	notContinued = itr == currList.end() || !itr->continued;
+	notContinued = !scope.currListContinues() || !scope.currToken().continued;
 	return true;
 }
 bool defineDefined(string& name, int& namespaceId, bool firstPrefix=false) {
@@ -794,7 +854,7 @@ bool macroDefined(string& name, int& namespaceId, bool firstPrefix=false) {
 	}
 	return false;
 }
-bool namespaceDefined(string& name, int& namespaceId, bool firstPrefix=false) { 
+bool namespaceDefined(string& name, int& namespaceId, bool firstPrefix=false) {
 	if (IdToNamespace[namespaceId].innerNamespaces.count(name)) {
 		namespaceId = IdToNamespace[namespaceId].innerNamespaces[name];
 		return true;
@@ -812,7 +872,7 @@ void lookupFinalAbove(string directiveName, int& namespaceId, bool& namespaceSee
 	while (true) {
 		currNamespace = &IdToNamespace[namespaceId];
 		if (defineDefined(directiveName, namespaceId, true) || macroDefined(directiveName, namespaceId, true)) return;
-		namespaceSeen = namespaceSeen || IdToNamespace[namespaceId].innerNamespaces.count(directiveName);
+		namespaceSeen = namespaceSeen || currNamespace->innerNamespaces.count(directiveName);
 		if (!currNamespace->isUpperAccesible) return;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
@@ -827,19 +887,19 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
 	}
 	return check(false, "Namespace not found" errorQuoted(directiveName), loc);
 }
-bool processUseDirective(list<Token>& currList, list<Token>::iterator& itr, string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool notContinued, bool namespaceSeen, Scope& scope) {
+bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool notContinued, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(notContinued, "Unexpected continued token", *itr);
-		expandDefineUse(currList, itr, percentToken, scope, namespaceId, directiveName);
+		checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken());
+		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist, "Unexpected macro use", percentToken.loc);
-		return expandMacroUse(currList, itr, percentToken.loc, scope, namespaceId, directiveName);
+		checkReturnOnFail(percentToken.firstOnLine && !scope.arglists.size(), "Unexpected macro use", percentToken.loc);
+		return expandMacroUse(percentToken.loc, scope, namespaceId, directiveName);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
 }
-bool lookupName(list<Token>& currList, list<Token>::iterator& itr, Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, bool notContinued, Scope& scope) {
+bool lookupName(Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, bool notContinued, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
 	if (prefixes.size()) {
 		returnOnFalse(lookupNamespaceAbove(directiveName, namespaceId, locs.front()));
@@ -851,105 +911,80 @@ bool lookupName(list<Token>& currList, list<Token>::iterator& itr, Token& percen
 		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" errorQuoted(directiveName), locs.front());
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
-	return processUseDirective(currList, itr, directiveName, percentToken, locs.front(), namespaceId, notContinued, namespaceSeen, scope);
+	return processUseDirective(directiveName, percentToken, locs.front(), namespaceId, notContinued, namespaceSeen, scope);
 }
-bool processUsing(list<Token>& currList, list<Token>::iterator& itr, Loc loc, Scope& scope) {
-	int namespaceId = scope.currNamespaceId(); string name;
-	directiveEatIdentifier("namespace", false, 0);
+bool processUsing(Loc loc, Scope& scope) {
+	int namespaceId = scope.currNamespaceId();
+	string firstName; list<string> prefixes; list<Loc> locs; bool notContinued;
+	returnOnFalse(getDirectivePrefixes(firstName, prefixes, locs, loc, scope, notContinued, "namespace"));
 	// NOTE the first namespace can be used, others down the using chain must be defined inside one another
-	returnOnFalse(lookupNamespaceAbove(name, namespaceId, loc));
-	while (itr != currList.end() && !itr->firstOnLine && itr->type == Tcolon) {
-		loc = itr->loc;
-		eraseToken(currList, itr);
-		directiveEatIdentifier("namespace", false, 0);
-		checkReturnOnFail(namespaceDefined(name, namespaceId), "Namespace not found" errorQuoted(name), loc);
+	returnOnFalse(lookupNamespaceAbove(firstName, namespaceId, locs.front()));
+	while (prefixes.size()) {
+		firstName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
+		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" errorQuoted(firstName), locs.front());
 	}
-	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already imported" errorQuoted(name), loc);
+	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already imported" errorQuoted(firstName), locs.back());
 	return true;
 }
-bool processBuiltinUse(list<Token>& currList, list<Token>::iterator& itr, string directive, Scope& scope, Loc directiveLoc) {
+bool processBuiltinUse(string directive, Scope& scope, Loc directiveLoc) {
 	static_assert(BuiltinDirectivesCount == 1, "Exhaustive processBuiltinUse definition");
 	if (directive == "using") {
-		returnOnFalse(processUsing(currList, itr, directiveLoc, scope));
+		returnOnFalse(processUsing(directiveLoc, scope));
 	} else {
 		unreachable();
 	}
-	return check(itr == currList.end() || itr->firstOnLine, "Unexpected token after directive", *itr);
+	return check(!scope.currListContinues() || scope.currToken().firstOnLine, "Unexpected token after directive", scope.currToken());
 }
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
-	checkReturnOnFail(notContinued, "Unexpected continued token", *itr); \
+	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
-		checkReturnOnFail(!scope.insideArglist, type " not allowed inside arglist", percentToken.loc); \
+		checkReturnOnFail(!scope.arglists.size(), type " not allowed inside arglist", percentToken.loc); \
 		checkReturnOnFail(!scope.insideMacro(), type " not allowed inside macro", percentToken.loc); \
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
-bool processDirective(list<Token>& currList, list<Token>::iterator& itr, Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 8, "Exhaustive processDirective definition");
-	list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
-	returnOnFalse(getDirectivePrefixes(currList, itr, prefixes, locs, loc, scope, notContinued));
-	string directiveName = prefixes.front(); prefixes.pop_front();
+bool processDirective(Token percentToken, Scope& scope) {
+	static_assert(TokenCount == 9, "Exhaustive processDirective definition");
+	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
+	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
 	if (DefiningDirectivesSet.count(directiveName)) {
 		processDirectiveSituationChecks("Definition");
-		returnOnFalse(processDirectiveDef(currList, itr, directiveName, scope, percentToken, loc));
+		returnOnFalse(processDirectiveDef(directiveName, scope, percentToken, loc));
 	} else if (BuiltinDirectivesSet.count(directiveName)) {
 		processDirectiveSituationChecks("Directive");
-		returnOnFalse(processBuiltinUse(currList, itr, directiveName, scope, loc));
+		returnOnFalse(processBuiltinUse(directiveName, scope, loc));
 	} else if (!prefixes.size() && scope.hasMacroArg(directiveName)) {
 		processDirectiveSituationChecks("macro arg");
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
-		insertList(currList, itr, argField, percentToken);
+		insertList(scope, argField, percentToken);
 	} else {
-		return lookupName(currList, itr, percentToken, directiveName, prefixes, locs, notContinued, scope);
+		return lookupName(percentToken, directiveName, prefixes, locs, notContinued, scope);
 	}
 	return true;
 }
-#define eatLineOnFalse(cond) if (!(cond)) { eatLine(*currList, *currItr); errorLess = false; continue; }
-bool preprocessImpl(list<Token>& tokens, Scope& scope) {
-	stack<reference_wrapper<Token>> openLists;
-	stack<list<Token>::iterator> openItrs({ tokens.begin() });
+#define eatLineOnFalse(cond) if (!(cond)) { scope.eatLine(); errorLess = false; continue; }
+bool preprocessImpl(Scope& scope) {
 	bool errorLess = true;
 
 	while (openItrs.size()) {
-		list<Token>* currList = openLists.size() ? &openLists.top().get().tlist : &tokens;
-		list<Token>::iterator* currItr = &openItrs.top();
+	while (scope.continuePreprocess()) {
+		while (scope.currListContinues()) {
 		while (*currItr != currList->end()) {
-			Token& currToken = **currItr;
+			Token& currToken = scope.currToken();
 			if (currToken.type == Tspecial && currToken.data == "%") {
 				eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
-				Token percentToken = eraseToken(*currList, *currItr);
-				eatLineOnFalse(processDirective(*currList, *currItr, percentToken, scope));
+				eatLineOnFalse(processDirective(scope.erasedToken(), scope));
 				continue;
 			}
-			++ (*currItr);
-			if (currToken.type == Tlist || currToken.type == TIexpansion || currToken.type == TInamespace) {
-				openLists.push(currToken);
-				openItrs.push(currToken.tlist.begin());
-				currList = &openLists.top().get().tlist;
-				currItr = &openItrs.top();
-			}
+			scope.advanceItr(currToken);
 		}
-		if (openLists.size()) {
-			if (openLists.top().get().type == TIexpansion) {
-				scope.endMacroExpansion();
-			} else if (openLists.top().get().type == TInamespace) {
-				scope.exitNamespace();
-			}
-			openLists.pop();
-		}
-		openItrs.pop();
+		scope.closeList();
 	}
 	return errorLess;
 }
-bool recursivelyProcessArglist(list<Token>& tokens, Scope& scope) {
-	scope.insideArglist = true;
-	bool preprocessRetval = preprocessImpl(tokens, scope);
-	scope.insideArglist = false;
-	return preprocessRetval;
-}
-void preprocess(list<Token>& tokens, string fileName) {
+void preprocess(Scope& scope, string fileName) {
 	IdToNamespace[NextNamespaceId] = Namespace(TOP_NAMESPACE_NAME, Loc(fileName, 0, 0), -1, false); NextNamespaceId++;
-	Scope scope;
+	preprocessImpl(scope);
 	preprocessImpl(tokens, scope);
 }
 // compilation -----------------------------------
