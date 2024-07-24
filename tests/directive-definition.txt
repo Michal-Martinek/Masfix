@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8869
+:stderr 8836
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -20,16 +20,16 @@ tests\directive-definition.mx:23:2 ERROR: Undeclared identifier 'defne'
 tests\directive-definition.mx:24:2 ERROR: Undeclared identifier 'aaaa'
 tests\directive-definition.mx:26:2 ERROR: Missing macro name
 tests\directive-definition.mx:27:3 ERROR: Undeclared identifier 'macro_'
-tests\directive-definition.mx:28:2 ERROR: Invalid directive name 'macro,'
+tests\directive-definition.mx:28:2 ERROR: Missing macro name
 tests\directive-definition.mx:29:3 ERROR: Invalid directive name 'macro$'
 tests\directive-definition.mx:31:2 ERROR: Missing namespace name
-tests\directive-definition.mx:32:2 ERROR: Invalid directive name 'namespace,'
+tests\directive-definition.mx:32:2 ERROR: Missing namespace name
 tests\directive-definition.mx:33:2 ERROR: Invalid directive name 'namespace%'
 tests\directive-definition.mx:34:12 ERROR: Invalid namespace name '*'
 tests\directive-definition.mx:35:11 ERROR: Unexpected continued token '()'
 tests\directive-definition.mx:37:2 ERROR: Missing namespace name
 tests\directive-definition.mx:38:3 ERROR: Undeclared identifier 'using_'
-tests\directive-definition.mx:39:8 ERROR: Invalid namespace name ','
+tests\directive-definition.mx:39:2 ERROR: Missing namespace name
 tests\directive-definition.mx:40:3 ERROR: Invalid directive name 'using%'
 tests\directive-definition.mx:41:2 ERROR: Invalid directive name 'using*'
 tests\directive-definition.mx:42:9 ERROR: Unexpected continued token '()'
@@ -102,7 +102,7 @@ tests\directive-definition.mx:159:29 ERROR: Macro argument redefinition 'x'
 tests\directive-definition.mx:160:20 ERROR: Macro redefinition 'badArgName6'
 tests\directive-definition.mx:164:1 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:167:3 ERROR: Undeclared identifier 'afterNobody'
-tests\directive-definition.mx:178:8 ERROR: No separators expected in macro body
+tests\directive-definition.mx:178:20 ERROR: No separators expected in macro body
 tests\directive-definition.mx:185:3 ERROR: Unexpected token after directive '9'
 tests\directive-definition.mx:189:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:191:3 ERROR: Undeclared identifier 'here'
@@ -110,7 +110,7 @@ tests\directive-definition.mx:193:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:196:3 ERROR: Undeclared identifier 'm'
 tests\directive-definition.mx:203:17 ERROR: Unexpected token type ':'
 tests\directive-definition.mx:204:17 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:205:13 ERROR: Invalid namespace name 'sep,'
+tests\directive-definition.mx:205:16 ERROR: Unexpected token type ','
 tests\directive-definition.mx:206:17 ERROR: Unexpected token type ':'
 tests\directive-definition.mx:207:17 ERROR: Unexpected token type '8'
 tests\directive-definition.mx:212:2 ERROR: Missing define name

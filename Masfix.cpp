@@ -444,9 +444,10 @@ public:
 		return t;
 	}
 	/// eats tokens upto EOL or separator 
-	void eatLine() {
-		while (hasNext() && !currToken().firstOnLine && currToken().type != Tseparator) {
+	void eatLine(bool surelyEat=false) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(insideArglist() && currToken().type == Tseparator)) {
 			eatenToken();
+			surelyEat = false;
 		}
 	}
 
@@ -460,14 +461,11 @@ public:
 		bool errorLess = true;
 		// TODO inject error checking for arg count
 		while (hasNext()) {
+			loc = currToken().loc;
 			if (currToken().type == Tseparator) {
 				_addMacroArg();
-				loc = currToken().loc;
 				argStart = next();
-			} else {	
-				loc = currToken().loc;
-				next();
-			}
+			} else next();
 		}
 		_addMacroArg();
 		return errorLess;
@@ -803,7 +801,7 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc loc) {
 	if (token.tlist.size()) {
 		processArglistWrapper(
 			bool retval = preprocessImpl(scope);
-			retval &= scope.sliceArglist(mac, loc, count);
+			retval = retval && scope.sliceArglist(mac, loc, count);
 		);
 	}
 	return check(count == mac.argList.size(), "Unexpected number of expansion arguments", token.loc);
@@ -988,15 +986,16 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 	do {
 		Token& token = scope.currToken();
 		if (token.type == Tlist) {
-			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", token.loc);
+			fragLoc = token.loc;
+			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
 			processArglistWrapper(
 				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2);
-				retval &= check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
+				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
 			ident.append(fragment);
 			scope.next();
 		} else {
-			returnOnFalse(eatIdentifier(scope, fragment, token.loc, purpose + " field", canStartLine, 1));
+			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 1));
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope.currToken().continued);
@@ -1036,7 +1035,7 @@ vector<Instr> compile(Scope& scope, string fileName) {
 			scope.next(top);
 		} else {
 			raiseError("Unexpected token", top);
-			scope.eatLine();
+			scope.eatLine(true);
 		}
 	}
 	StrToLabel["end"].addr = instrs.size();
