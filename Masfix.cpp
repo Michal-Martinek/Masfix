@@ -167,6 +167,26 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ijmp, Rp},
 	// others don't have modifiable destination
 };
+// globals ---------------------------------
+fs::path InputFileName = "";
+fs::path OutputFileName = "";
+
+bool FLAG_silent = false;
+bool FLAG_run = false;
+bool FLAG_keepAsm = false;
+bool FLAG_strictErrors = false;
+
+// checks --------------------------------------------------------------------
+#define errorQuoted(s) " '" + (s) + "'"
+#define unreachable() assert(("Unreachable", false));
+
+#define continueOnFalse(cond) if (!(cond)) continue;
+#define returnOnFalse(cond) if (!(cond)) return false;
+
+#define check(cond, message, obj) ((cond) || raiseError(message, obj))
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+
 // structs -------------------------------
 struct Loc {
 	string file;
@@ -189,7 +209,7 @@ struct Token {
 	list<Token> tlist;
 
 	Loc loc;
-	bool continued;
+	bool continued; // continues meaning of previous token
 	bool firstOnLine;
 
 	Token() {}
@@ -305,7 +325,8 @@ struct Namespace {
 
 int NextNamespaceId = 0;
 map<int, Namespace> IdToNamespace;
-bool raiseError(string message, Loc loc, bool strict);
+bool raiseError(string message, Token token, bool strict=false);
+bool raiseError(string message, Loc loc, bool strict=false);
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
 struct Scope {
@@ -352,6 +373,10 @@ public:
 	Token& currToken() {
 		return *itrs.top();
 	}
+	Token* operator->() {
+		return &currToken();
+	}
+	// iteration ----------------------------------------------------------
 
 	/// whether currList has any next token
 	bool hasNext() {
@@ -424,7 +449,28 @@ public:
 		assert(insideArglist());
 		closeList();
 	}
-
+// tokenization -----------------------------------------
+	bool tokenizeHasTlist() {
+		return tlists.size() && tlists.top().get().type == Tlist;
+	}
+	void tokenizeInsert(Token&& token) {
+		insertToken((Token&&)token);
+		next(currToken());
+	}
+	bool tokenizeCloseList(char closeChar, Loc& loc) {
+		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
+		checkReturnOnFail(closeChar == tlists.top().get().tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, closeChar)), loc);
+		closeList();
+		return true;
+	}
+	void tokenizeEnd() {
+		while (tokenizeHasTlist()) {
+			raiseError("Unclosed token list", tlists.top().get());
+			closeList();
+		}
+		assert(tlists.size() == 1 && tlists.top().get().type == TImodule);
+		closeList();
+	}
 // helpers -------------------------------------------------
 	void insertToken(Token& token) {
 		itrs.top() = currList().insert(itrs.top(), token);
@@ -537,27 +583,8 @@ struct Label {
 		return ":" + name;
 	}
 };
-// globals ---------------------------------
+// checks implementation ----------------------------------------------
 map<string, Label> StrToLabel;
-
-fs::path InputFileName = "";
-fs::path OutputFileName = "";
-
-bool FLAG_silent = false;
-bool FLAG_run = false;
-bool FLAG_keepAsm = false;
-bool FLAG_strictErrors = false;
-// checks --------------------------------------------------------------------
-#define errorQuoted(s) " '" + (s) + "'"
-#define unreachable() assert(("Unreachable", false));
-
-#define continueOnFalse(cond) if (!(cond)) continue;
-#define returnOnFalse(cond) if (!(cond)) return false;
-
-#define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
-
 bool SupressErrors = false;
 #define returnOnErrSupress() if (SupressErrors) return false;
 
@@ -575,7 +602,7 @@ void addError(string message, bool strict=true) {
 	}
 }
 
-bool raiseError(string message, Token token, bool strict=false) {
+bool raiseError(string message, Token token, bool strict) {
 	returnOnErrSupress();
 	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
 	addError(err, strict);
@@ -587,7 +614,7 @@ bool raiseError(string message, Instr instr, bool strict=false) {
 	addError(err, strict);
 	return false;
 }
-bool raiseError(string message, Loc loc, bool strict=false) {
+bool raiseError(string message, Loc loc, bool strict) {
 	returnOnErrSupress();
 	string err = loc.toStr() + " ERROR: " + message + "\n";
 	addError(err, strict);
@@ -595,93 +622,64 @@ bool raiseError(string message, Loc loc, bool strict=false) {
 }
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
-	int num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
-	if (num == 0 && alpha == 0 && space == 0) return string(1, s.at(0));
+	bool num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
+	if (!num && !alpha && !space) return string(1, s.at(0));
 	string out;
 	int i = 0;
 	do {
 		out.push_back(s.at(i));
 		i++;
-	} while (i < s.size() && isdigit(s.at(i)) == num && isalpha(s.at(i)) == alpha && isspace(s.at(i)) == space);
+	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
-void addToken(list<Token>& tokens, stack<Token*>& listTokens, Token token) {
-	Token* addedPtr;
-	if (listTokens.size()) {
-		listTokens.top()->tlist.push_back(token);
-		addedPtr = &listTokens.top()->tlist.back();
-	} else {
-		tokens.push_back(token);
-		addedPtr = &tokens.back();
-	}
-	if (token.type == Tlist) {
-		listTokens.push(addedPtr);
-	}
-}
-list<Token> tokenize(ifstream& inFile, string fileName) {
-	static_assert(TokenCount == 8, "Exhaustive tokenize definition");
+#define addToken(type) scope.tokenizeInsert(Token(type, run, loc, continued, firstOnLine));
+void tokenize(ifstream& inFile, string fileName, Scope& scope) {
+	static_assert(TokenCount == 10, "Exhaustive tokenize definition");
 	string line;
-	bool continued;
-	int firstOnLine;
-
-	list<Token> tokens;
-	stack<Token*> listTokens;
+	bool continued, firstOnLine, keepContinued;
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
-		continued = false;
-		firstOnLine = 2;
+		continued = false; firstOnLine = true;
 		line = line.substr(0, line.find(';'));
 		int col = 1;
-
 		while (line.size()) {
-			if (firstOnLine) firstOnLine--;
 			char first = line.at(0);
 			string run = getCharRun(line);
-			Token token;
+			line = line.substr(run.size());
+
 			Loc loc = Loc(fileName, lineNum, col);
 			col += run.size();
-			line = line.substr(run.size());
+			keepContinued = true;
 			if (isspace(first)) {
 				continued = false;
-				firstOnLine ++;
 				continue;
 			}
 			if (isdigit(first)) {
-				token = Token(Tnumeric, run, loc, continued, firstOnLine);
+				addToken(Tnumeric);
 			} else if (isalpha(first)) {
-				token = Token(Talpha, run, loc, continued, firstOnLine);
+				addToken(Talpha);
 			} else if (run.size() == 1) {
 				if (first == '(' || first == '[' || first == '{') {
-					token = Token(Tlist, string(1, first), loc, continued, firstOnLine);
-					addToken(tokens, listTokens, token);
-					continued = false; // TODO should (first token in list).firstOnLine - always / never / depends?
-					continue; // TODO allow first token in list to continue??
+					addToken(Tlist);
+					keepContinued = false;
 				} else if (first == ')' || first == ']' || first == '}') {
-					checkContinueOnFail(listTokens.size() >= 1, "Unexpected token list termination" errorQuoted(string(1, first)), loc);
-					token = *listTokens.top();
-					assert(token.type == Tlist);
-					checkContinueOnFail(first == token.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, first)), loc);
-					listTokens.pop();
-					continued = true;
-					continue;
+					continueOnFalse(scope.tokenizeCloseList(first, loc));
 				} else if (first == ':') {
-					token = Token(Tcolon, run, loc, continued, firstOnLine);
+					addToken(Tcolon);
 				} else if (first == ',') {
-					token = Token(Tseparator, run, loc, continued, firstOnLine);
+					continued = false;
+					addToken(Tseparator);
+					keepContinued = false;
 				} else {
-					token = Token(Tspecial, run, loc, continued, firstOnLine);
+					addToken(Tspecial);
 				}
 			} else {
 				assert(false);
 			}
-			continued = true;
-			addToken(tokens, listTokens, token);
+			continued = keepContinued;
+			firstOnLine = false;
 		}
 	}
-	while (listTokens.size()) {
-		check(false, "Unclosed token list", *listTokens.top());
-		listTokens.pop();
-	}
-	return tokens;
+	scope.tokenizeEnd();
 }
 // preprocess -------------------------------------------------------------------------
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
@@ -711,19 +709,19 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
 	static_assert(TokenCount == 10, "Exhaustive eatToken definition");
 	checkReturnOnFail(scope.hasNext(), errMissing, loc);
-	if (sameLine) checkReturnOnFail(!scope.currToken().firstOnLine, errMissing, loc);
+	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
 	static_assert(TokenCount == 10, "Exhaustive eatTokenRun definition");
-	if (scope.hasNext()) loc = scope.currToken().loc;
+	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
 	set<TokenTypes> allowedTypes = {Tnumeric, Talpha, Tspecial};
 	if (eatAnything >= 1) allowedTypes.insert(Tcolon);
 	if (eatAnything == 2) allowedTypes.insert(Tlist);
-	while (scope.hasNext() && (!scope.currToken().firstOnLine || (canStartLine && first)) && (first || scope.currToken().continued) && allowedTypes.count(scope.currToken().type)) {
+	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
 		name += scope.eatenToken().toStr();
 		first = false;
 	}
@@ -769,7 +767,7 @@ bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
 	Token token;
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
-	scope.currToken().tlist = token.tlist;
+	scope->tlist = token.tlist;
 	scope.addInnerNamespace(name, percentLoc);
 	return true;
 }
@@ -787,7 +785,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 	} else {
 		unreachable();
 	}
-	return check(!scope.hasNext() || scope.currToken().firstOnLine, "Unexpected token after directive", scope.currToken());
+	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
 void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
@@ -810,7 +808,7 @@ bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || scope.currToken().firstOnLine, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine, "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -827,10 +825,10 @@ bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& 
 			firstName = name; first = false;
 		} else prefixes.push_back(name);
 		locs.push_back(loc);
-		if (!scope.hasNext() || scope.currToken().type != Tcolon || scope.currToken().firstOnLine) break;
+		if (!scope.hasNext() || scope->type != Tcolon || scope->firstOnLine) break;
 		loc = scope.eatenToken().loc;
 	}
-	notContinued = !scope.hasNext() || !scope.currToken().continued;
+	notContinued = !scope.hasNext() || !scope->continued;
 	return true;
 }
 bool defineDefined(string& name, int& namespaceId, bool firstPrefix=false) {
@@ -932,7 +930,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc directiveLoc) {
 	} else {
 		unreachable();
 	}
-	return check(!scope.hasNext() || scope.currToken().firstOnLine, "Unexpected token after directive", scope.currToken());
+	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
@@ -982,7 +980,7 @@ void preprocess(Scope& scope, string fileName) {
 // compilation -----------------------------------
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
 	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
-	checkReturnOnFail(scope.hasNext() && (!scope.currToken().firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
+	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
 	do {
 		Token& token = scope.currToken();
 		if (token.type == Tlist) {
@@ -998,7 +996,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 1));
 			ident.append(fragment);
 		}
-	} while (scope.hasNext() && scope.currToken().continued);
+	} while (scope.hasNext() && scope->continued);
 	if (purpose == "instr") return true;
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitions(ident, loc, true);
@@ -1028,7 +1026,7 @@ vector<Instr> compile(Scope& scope, string fileName) {
 			string instrStr = "";
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, instrStr, "instr"));
 			instrs.push_back(Instr(instrStr, loc));
-			for (; scope.hasNext() && !scope.currToken().firstOnLine; scope.next()) {
+			for (; scope.hasNext() && !scope->firstOnLine; scope.next()) {
 				instrs.back().immFields.push_back(scope.currToken());
 			}
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
@@ -1665,11 +1663,13 @@ int main(int argc, char *argv[]) {
 	string fileName = pathFromMasfix(InputFileName).string();
 
 	Token module = Token(TImodule, TOP_NAMESPACE_NAME, Loc(fileName, 1, 1), false, true);
-	ifstream inFile = getInputFile();
-	tokenize(inFile, fileName, module.tlist);
-	inFile.close();
 	Scope scope(module);
 
+	ifstream inFile = getInputFile();
+	tokenize(inFile, fileName, scope);
+	inFile.close();
+
+	scope.init(module);
 	preprocess(scope, fileName);
 	scope.init(module);
 	vector<Instr> instrs = compile(scope, fileName);
