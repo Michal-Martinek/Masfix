@@ -292,9 +292,11 @@ struct Macro {
 		assert(nameToArgIdx.count(name));
 		return argList[nameToArgIdx[name]];
 	}
-	void addExpansionArg(int argIdx, list<Token>::iterator from, list<Token>::iterator to) {
-		if (argIdx >= argList.size()) return;
-		argList[argIdx].value.push(list<Token>(from, to));
+	void addExpansionArgs(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans) {
+		assert(argSpans.size() == argList.size());
+		for (int idx = 0; idx < argSpans.size(); ++idx) {
+			argList[idx].value.push(list<Token>(argSpans[idx].first, argSpans[idx].second));
+		}
 	}
 	void closeExpansionScope() {
 		for (int i = 0; i < argList.size(); ++i) {
@@ -497,24 +499,27 @@ public:
 		}
 	}
 
-	#define _addMacroArg() \
-		if (argStart != itrs.top()) mac.addExpansionArg(count++, argStart, itrs.top()); \
-		else errorLess = raiseError("Argument expected", loc, false);
-	bool sliceArglist(Macro& mac, Loc& loc, int& count) {
-		// TODO inconsistent macro arg values on error
-		itrs.top() = currList().begin();
-		list<Token>::iterator argStart = itrs.top();
-		bool errorLess = true;
-		// TODO inject error checking for arg count
+	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& argStart, Loc loc) {
+		checkReturnOnFail(argStart != itrs.top(), "Argument expected", loc);
+		argSpans.push_back(pair(argStart, itrs.top()));
+		return true;
+	}
+	bool sliceArglist(Macro& mac, Loc loc, bool retval=true) {
+		itrs.top() = currList().begin(); list<Token>::iterator argStart = itrs.top();
+		vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
 		while (hasNext()) {
 			loc = currToken().loc;
+			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
-				_addMacroArg();
+				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
+				retval &= _addMacroArg(argSpans, argStart, loc);
 				argStart = next();
 			} else next();
 		}
-		_addMacroArg();
-		return errorLess;
+		retval &= _addMacroArg(argSpans, argStart, loc);
+		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc));
+		mac.addExpansionArgs(argSpans);
+		return true;
 	}
 };
 struct Suffix {
@@ -746,7 +751,7 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 		first = false;
 		directiveEatIdentifier("macro arg", true, 1);
 		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
-		mac.addArg(name, loc);
+		mac.addArg(name, loc); // TODO macArg.loc not checked nor used
 	}
 	return true;
 }
@@ -764,7 +769,7 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	return true;
 }
 bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
-	Token token;
+	Token token; // TODO no seps in namespace body
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
 	scope->tlist = token.tlist;
@@ -793,16 +798,16 @@ void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string d
 	scope.insertToken(expanded);
 }
 bool preprocessImpl(Scope& scope);
-bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc loc) {
+bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	assert(token.type == Tlist);
-	int count = 0;
 	if (token.tlist.size()) {
 		processArglistWrapper(
 			bool retval = preprocessImpl(scope);
-			retval = retval && scope.sliceArglist(mac, loc, count);
+			retval = retval && scope.sliceArglist(mac, loc);
 		);
-	}
-	return check(count == mac.argList.size(), "Unexpected number of expansion arguments", token.loc);
+	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+	return true;
+;
 }
 bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;

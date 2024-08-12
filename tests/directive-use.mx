@@ -104,3 +104,29 @@ ld %defined1 %test_mac()
 }
 %define testDef 485
 %testScopingAndArglistExpansions(5, 18, %testDef, 128)
+
+
+; #ARGS ERRORS
+%macro zeroArg() {}
+%macro oneArg(a) {}
+%macro twoArg(a, b) {}
+%macro threeArg(a, b, c) {}
+%zeroArg()
+%zeroArg(,)
+%zeroArg(4)
+%oneArg()
+%oneArg(,)
+%oneArg(5)
+%oneArg(5,)
+%oneArg(5, 6, 7)
+%twoArg(,)
+%twoArg(5)
+%twoArg(5,)
+%twoArg(5,6)
+%twoArg(5,6,7)
+%twoArg(,6)
+%twoArg(,6,7,8)
+%twoArg(6,  ,7)
+%threeArg(6,  ,7)
+%threeArg(,,7)
+%threeArg(1, ,4,5,6)

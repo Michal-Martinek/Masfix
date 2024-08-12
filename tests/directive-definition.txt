@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8836
+:stderr 8823
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -35,7 +35,7 @@ tests\directive-definition.mx:41:2 ERROR: Invalid directive name 'using*'
 tests\directive-definition.mx:42:9 ERROR: Unexpected continued token '()'
 tests\directive-definition.mx:45:8 ERROR: Invalid macro name '%define'
 tests\directive-definition.mx:46:12 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:47:5 ERROR: Unexpected number of expansion arguments
+tests\directive-definition.mx:47:6 ERROR: Excesive expansion argument
 tests\directive-definition.mx:48:9 ERROR: Invalid define name '%macro'
 tests\directive-definition.mx:49:20 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:50:2 ERROR: Undeclared identifier 'hidden_mac'
