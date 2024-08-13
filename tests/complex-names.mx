@@ -28,7 +28,7 @@
 :(rrr)(6)
 :(7)(zaza)
 :(rrr 6)
-:(a,):(b),((o,o))!
+:(a):(b)$((o,o))!
 
 ; wrong use in instructions
 mov ()

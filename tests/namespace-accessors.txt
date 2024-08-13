@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4650
+:stderr 4709
 tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
 tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
 tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
@@ -9,7 +9,7 @@ tests\namespace-accessors.mx:7:9 ERROR: Missing directive name
 tests\namespace-accessors.mx:8:2 ERROR: Undeclared identifier 'again'
 tests\namespace-accessors.mx:11:7 ERROR: Missing directive name
 tests\namespace-accessors.mx:12:8 ERROR: Unexpected accessor
-tests\namespace-accessors.mx:13:8 ERROR: Invalid directive name ','
+tests\namespace-accessors.mx:13:7 ERROR: Missing directive name
 tests\namespace-accessors.mx:14:11 ERROR: Missing directive name
 tests\namespace-accessors.mx:15:12 ERROR: Missing directive name
 tests\namespace-accessors.mx:16:12 ERROR: Unexpected accessor
@@ -28,7 +28,7 @@ tests\namespace-accessors.mx:39:2 ERROR: Namespace used as directive 'Foo'
 tests\namespace-accessors.mx:41:7 ERROR: Namespace used as directive 'Foo'
 tests\namespace-accessors.mx:43:6 ERROR: Undeclared identifier 'bar'
 tests\namespace-accessors.mx:44:6 ERROR: Namespace used as directive 'Bar'
-tests\namespace-accessors.mx:45:6 ERROR: Invalid directive name ',Bar'
+tests\namespace-accessors.mx:45:5 ERROR: Missing directive name
 tests\namespace-accessors.mx:46:9 ERROR: Missing directive name
 tests\namespace-accessors.mx:47:6 ERROR: Namespace used as directive 'Bar'
 tests\namespace-accessors.mx:48:10 ERROR: Undeclared identifier 'kk'
@@ -36,8 +36,8 @@ tests\namespace-accessors.mx:50:9 ERROR: Invalid define name '%Foo'
 tests\namespace-accessors.mx:51:9 ERROR: Unexpected token after macro use '%'
 tests\namespace-accessors.mx:58:3 ERROR: Missing namespace name
 tests\namespace-accessors.mx:59:9 ERROR: Invalid namespace name '_-'
-tests\namespace-accessors.mx:60:9 ERROR: Invalid namespace name ','
-tests\namespace-accessors.mx:61:9 ERROR: Invalid namespace name 'hle,'
+tests\namespace-accessors.mx:60:3 ERROR: Missing namespace name
+tests\namespace-accessors.mx:61:9 ERROR: Namespace not found 'hle'
 tests\namespace-accessors.mx:62:9 ERROR: Missing directive name
 tests\namespace-accessors.mx:63:9 ERROR: Namespace not found '_'
 tests\namespace-accessors.mx:64:9 ERROR: Missing directive name
@@ -46,9 +46,9 @@ tests\namespace-accessors.mx:66:9 ERROR: Invalid namespace name '%'
 tests\namespace-accessors.mx:67:9 ERROR: Invalid namespace name '4'
 tests\namespace-accessors.mx:68:8 ERROR: Unexpected continued token '()'
 tests\namespace-accessors.mx:69:3 ERROR: Missing namespace name
-tests\namespace-accessors.mx:71:9 ERROR: Invalid namespace name 'space,'
+tests\namespace-accessors.mx:71:14 ERROR: Unexpected token after directive ','
 tests\namespace-accessors.mx:72:14 ERROR: Missing namespace name
-tests\namespace-accessors.mx:73:15 ERROR: Invalid namespace name ','
+tests\namespace-accessors.mx:73:14 ERROR: Missing namespace name
 tests\namespace-accessors.mx:74:15 ERROR: Invalid namespace name '/'
 tests\namespace-accessors.mx:75:15 ERROR: Invalid namespace name '8'
 tests\namespace-accessors.mx:78:21 ERROR: Missing namespace name
@@ -61,6 +61,7 @@ tests\namespace-accessors.mx:84:9 ERROR: Namespace not found 'define'
 tests\namespace-accessors.mx:85:9 ERROR: Namespace not found 'using'
 tests\namespace-accessors.mx:86:15 ERROR: Namespace not found 'define'
 tests\namespace-accessors.mx:88:15 ERROR: Missing namespace name
+tests\namespace-accessors.mx:89:9 ERROR: Namespace already imported 'space'
 tests\namespace-accessors.mx:89:15 ERROR: Unexpected token after directive '!'
 tests\namespace-accessors.mx:90:9 ERROR: Namespace already imported 'space'
 tests\namespace-accessors.mx:90:15 ERROR: Unexpected token after directive '%'

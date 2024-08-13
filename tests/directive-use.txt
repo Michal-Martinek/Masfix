@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3584
+:stderr 4736
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -14,10 +14,10 @@ tests\directive-use.mx:37:13 ERROR: Unexpected token after macro use '%'
 tests\directive-use.mx:38:5 ERROR: Unexpected macro use
 tests\directive-use.mx:39:14 ERROR: Unexpected macro use
 tests\directive-use.mx:45:1 ERROR: Expansion arglist expected
-tests\directive-use.mx:46:7 ERROR: Unexpected number of expansion arguments
-tests\directive-use.mx:48:7 ERROR: Unexpected number of expansion arguments
-tests\directive-use.mx:50:5 ERROR: Unexpected number of expansion arguments
-tests\directive-use.mx:52:5 ERROR: Unexpected number of expansion arguments
+tests\directive-use.mx:46:7 ERROR: Missing expansion arguments
+tests\directive-use.mx:48:9 ERROR: Excesive expansion argument
+tests\directive-use.mx:50:9 ERROR: Missing expansion arguments
+tests\directive-use.mx:52:12 ERROR: Excesive expansion argument
 tests\directive-use.mx:55:8 ERROR: Definition not allowed inside arglist
 tests\directive-use.mx:56:9 ERROR: Definition not allowed inside arglist
 tests\directive-use.mx:58:2 ERROR: Definition not allowed inside arglist
@@ -31,6 +31,26 @@ tests\directive-use.mx:90:3 ERROR: Undeclared identifier 'lower'
 tests\directive-use.mx:101:3 ERROR: Undeclared identifier 'lower'
 tests\directive-use.mx:90:3 ERROR: Undeclared identifier 'lower'
 tests\directive-use.mx:103:3 ERROR: Undeclared identifier 'upper'
+tests\directive-use.mx:115:10 ERROR: Excesive expansion argument
+tests\directive-use.mx:116:10 ERROR: Excesive expansion argument
+tests\directive-use.mx:117:8 ERROR: Missing expansion arguments
+tests\directive-use.mx:118:9 ERROR: Excesive expansion argument
+tests\directive-use.mx:120:10 ERROR: Excesive expansion argument
+tests\directive-use.mx:121:10 ERROR: Excesive expansion argument
+tests\directive-use.mx:122:9 ERROR: Argument expected
+tests\directive-use.mx:122:9 ERROR: Argument expected
+tests\directive-use.mx:123:9 ERROR: Missing expansion arguments
+tests\directive-use.mx:124:10 ERROR: Argument expected
+tests\directive-use.mx:126:12 ERROR: Excesive expansion argument
+tests\directive-use.mx:127:9 ERROR: Argument expected
+tests\directive-use.mx:128:9 ERROR: Argument expected
+tests\directive-use.mx:128:13 ERROR: Excesive expansion argument
+tests\directive-use.mx:129:13 ERROR: Excesive expansion argument
+tests\directive-use.mx:130:15 ERROR: Argument expected
+tests\directive-use.mx:131:11 ERROR: Argument expected
+tests\directive-use.mx:131:12 ERROR: Argument expected
+tests\directive-use.mx:132:14 ERROR: Argument expected
+tests\directive-use.mx:132:18 ERROR: Excesive expansion argument
 tests\directive-use.mx:11:1 ERROR: Unexpected token '1'
 tests\directive-use.mx:26:1 ERROR: Unexpected token '3'
 tests\directive-use.mx:27:1 ERROR: Unexpected token '()'
