@@ -32,6 +32,7 @@ using namespace std;
 enum TokenTypes {
 	Tnumeric,
 	Talpha,
+	Tstring,
 
 	Tspecial,
 	Tcolon,
@@ -229,6 +230,8 @@ struct Token {
 		if (type == Tlist) {
 			if (isSeparated()) out.push_back(',');
 			out.push_back(tlistCloseChar());
+		} else if (type == Tstring) {
+			return "\"\"";
 		}
 		return out;
 	}
@@ -639,7 +642,7 @@ string getCharRun(string s) {
 }
 #define addToken(type) scope.tokenizeInsert(Token(type, run, loc, continued, firstOnLine));
 void tokenize(ifstream& inFile, string fileName, Scope& scope) {
-	static_assert(TokenCount == 10, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued;
 	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
@@ -674,6 +677,13 @@ void tokenize(ifstream& inFile, string fileName, Scope& scope) {
 					continued = false;
 					addToken(Tseparator);
 					keepContinued = false;
+				} else if (first == '"') {
+					size_t quotePos = line.find('"');
+					checkContinueOnFail(quotePos != string::npos, "Expected string termination", loc); // TODO ignore line
+					run = line.substr(0, quotePos);
+					addToken(Tstring);
+					line = line.substr(quotePos + 1);
+					keepContinued = false; // TODO before & after
 				} else {
 					addToken(Tspecial);
 				}
