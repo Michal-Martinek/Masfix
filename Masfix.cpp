@@ -11,6 +11,7 @@ namespace fs = std::filesystem;
 #include <stack>
 
 #include <algorithm>
+#include <numeric>
 #include <math.h>
 #include <assert.h>
 #include <functional>
@@ -19,7 +20,7 @@ namespace fs = std::filesystem;
 using namespace std;
 
 // constants -------------------------------
-#define TOP_NAMESPACE_NAME "__main"
+#define TOP_MODULE_NAME "__main"
 
 #define MAX_EXPANSION_DEPTH 1024
 
@@ -168,15 +169,6 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ijmp, Rp},
 	// others don't have modifiable destination
 };
-// globals ---------------------------------
-fs::path InputFileName = "";
-fs::path OutputFileName = "";
-
-bool FLAG_silent = false;
-bool FLAG_run = false;
-bool FLAG_keepAsm = false;
-bool FLAG_strictErrors = false;
-
 // checks --------------------------------------------------------------------
 #define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
@@ -320,7 +312,7 @@ struct Namespace {
 	bool isUpperAccesible;
 
 	Namespace() {}
-	Namespace(string name, Loc loc, int upperNamespaceId, bool isUpperAccesible=true) {
+	Namespace(string name, Loc loc, int upperNamespaceId, bool isUpperAccesible) {
 		this->name = name;
 		this->loc = loc;
 		this->upperNamespaceId = upperNamespaceId;
@@ -328,8 +320,16 @@ struct Namespace {
 	}
 };
 
-int NextNamespaceId = 0;
 map<int, Namespace> IdToNamespace;
+
+struct Module {
+	fs::path abspath;
+	Token contents; // TImodule
+
+	Module(fs::path path) {
+		abspath = path;
+	}
+};
 bool raiseError(string message, Token token, bool strict=false);
 bool raiseError(string message, Loc loc, bool strict=false);
 /// responsible for iterating tokens and nested tlists,
@@ -341,7 +341,9 @@ private:
 	// TODO better max depth checks - maybe add depth counter
 	stack<reference_wrapper<Token>> tlists;
 	stack<list<Token>::iterator> itrs;
-
+	vector<Module> modules;
+	vector<Module>::iterator currModule;
+	
 	/// opens new tlist for iteration
 	void openList(Token& tlist) {
 		tlists.push(tlist);
@@ -354,24 +356,14 @@ private:
 			endMacroExpansion();
 		} else if (tlists.top().get().type == TInamespace) {
 			exitNamespace();
+		} else if (tlists.top().get().type == TImodule) {
+			exitNamespace();
 		}
 		tlists.pop(); itrs.pop();
 	}
 
 public:
 	Scope() {}
-	Scope(Token& tlistToken) {
-		init(tlistToken);
-	}
-	void init(Token& tlistToken) {
-		static_assert(sizeof(Scope) == 320, "Exhaustive Scope.init definition");
-		assert(!tlists.size());
-		assert(!itrs.size());
-		assert(!macros.size());
-		assert(namespaces.size() == 1);
-		tlists.push(tlistToken);
-		itrs.push(currList().begin());
-	}
 	list<Token>& currList() {
 		return tlists.top().get().tlist;
 	}
@@ -380,6 +372,24 @@ public:
 	}
 	Token* operator->() {
 		return &currToken();
+	}
+
+	void prepareForCompile() {
+		static_assert(sizeof(Scope) == 352, "Exhaustive Scope sanity checks definition");
+		assert(!tlists.size());
+		assert(!itrs.size());
+		assert(!macros.size());
+		assert(namespaces.size() == 1);
+		assert(currModule == modules.end());
+		currModule = modules.begin();
+		openList(currModule->contents);
+	}
+	void addModule(fs::path abspath, string relPath, string moduleName) {
+		Loc loc = Loc(relPath, 1, 1);
+		currModule = modules.insert(currModule, Module(abspath));
+		currModule->contents = Token(TImodule, moduleName, loc, false, true);
+		openList(currModule->contents);
+		addNamespace(moduleName, loc, false);
 	}
 	// iteration ----------------------------------------------------------
 
@@ -435,11 +445,12 @@ public:
 		currMacro().closeExpansionScope();
 		macros.pop();
 	}
-	void addInnerNamespace(string& name, Loc percentLoc) {
+	void addNamespace(string& name, Loc loc, bool isUpperAccesible) {
 		assert(!insideMacro());
-		IdToNamespace[NextNamespaceId] = Namespace(name, percentLoc, currNamespaceId());
-		currNamespace().innerNamespaces[name] = NextNamespaceId;
-		namespaces.push(NextNamespaceId++);
+		int newId = IdToNamespace.size();
+		if (newId != 0) currNamespace().innerNamespaces[name] = newId;
+		IdToNamespace[newId] = Namespace(name, loc, isUpperAccesible ? currNamespaceId() : -1, isUpperAccesible);
+		namespaces.push(newId);
 	}
 	void exitNamespace() {
 		assert(namespaces.size() > 1);
@@ -474,7 +485,7 @@ public:
 			closeList();
 		}
 		assert(tlists.size() == 1 && tlists.top().get().type == TImodule);
-		closeList();
+		itrs.top() = currList().begin();
 	}
 // helpers -------------------------------------------------
 	void insertToken(Token& token) {
@@ -593,6 +604,8 @@ struct Label {
 };
 // checks implementation ----------------------------------------------
 map<string, Label> StrToLabel;
+
+bool FLAG_strictErrors = false;
 bool SupressErrors = false;
 #define returnOnErrSupress() if (SupressErrors) return false;
 
@@ -641,11 +654,11 @@ string getCharRun(string s) {
 	return out;
 }
 #define addToken(type) scope.tokenizeInsert(Token(type, run, loc, continued, firstOnLine));
-void tokenize(ifstream& inFile, string fileName, Scope& scope) {
+void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued;
-	for (int lineNum = 1; getline(inFile, line); ++lineNum) {
+	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
 		continued = false; firstOnLine = true;
 		line = line.substr(0, line.find(';'));
 		int col = 1;
@@ -654,7 +667,7 @@ void tokenize(ifstream& inFile, string fileName, Scope& scope) {
 			string run = getCharRun(line);
 			line = line.substr(run.size());
 
-			Loc loc = Loc(fileName, lineNum, col);
+			Loc loc = Loc(relPath, lineNum, col);
 			col += run.size();
 			keepContinued = true;
 			if (isspace(first)) {
@@ -696,7 +709,7 @@ void tokenize(ifstream& inFile, string fileName, Scope& scope) {
 	}
 	scope.tokenizeEnd();
 }
-// preprocess -------------------------------------------------------------------------
+// preprocess helpers -------------------------------------------------------------------------
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool verifyNotInstrOpcode(string name);
 bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
@@ -722,7 +735,6 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 	scope.exitArglist(); \
 	returnOnFalse(retval);
 bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
-	static_assert(TokenCount == 10, "Exhaustive eatToken definition");
 	checkReturnOnFail(scope.hasNext(), errMissing, loc);
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
@@ -751,6 +763,34 @@ bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bo
 	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
 	if (definition) returnOnFalse(checkIdentRedefinitions(name, loc, false, &scope.currNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
+
+string relPathFromMasfix(fs::path p) {
+	fs::path out;
+	bool found = false;
+	for (fs::path part : p) {
+		string s = part.string();
+		if (found) out.append(s);
+		if (s == "Masfix") {
+			found = true;
+		}
+	}
+	return (found ? out : p).string();
+}
+void _openNewModule(fs::path path, string relPath, Scope& scope, bool mainModule=false) {
+	string moduleName = mainModule ? TOP_MODULE_NAME : path.filename().replace_extension("").string();
+	scope.addModule(path, relPath, moduleName);
+}
+ifstream openInputFile(fs::path path);
+string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) {
+	string relPath = relPathFromMasfix(abspath);
+	_openNewModule(abspath, relPath, scope, mainModule);
+	ifstream ifs = openInputFile(abspath);
+	tokenize(ifs, relPath, scope);
+	ifs.close();
+	return relPath;
+}
+
+// preprocess -------------------------------------------------------------------------
 bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
 	while (scope.hasNext()) {
@@ -783,7 +823,7 @@ bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
 	scope->tlist = token.tlist;
-	scope.addInnerNamespace(name, percentLoc);
+	scope.addNamespace(name, percentLoc, true);
 	return true;
 }
 bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
@@ -807,12 +847,12 @@ void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string d
 	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
 	scope.insertToken(expanded);
 }
-bool preprocessImpl(Scope& scope);
+bool preprocess(Scope& scope);
 bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	assert(token.type == Tlist);
 	if (token.tlist.size()) {
 		processArglistWrapper(
-			bool retval = preprocessImpl(scope);
+			bool retval = preprocess(scope);
 			retval = retval && scope.sliceArglist(mac, loc);
 		);
 	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
@@ -832,7 +872,7 @@ bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
-	static_assert(TokenCount == 10, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 11, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -956,7 +996,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc directiveLoc) {
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 10, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 11, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
 	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
 	if (DefiningDirectivesSet.count(directiveName)) {
@@ -975,7 +1015,7 @@ bool processDirective(Token percentToken, Scope& scope) {
 	return true;
 }
 #define eatLineOnFalse(cond) if (!(cond)) { scope.eatLine(); errorLess = false; continue; }
-bool preprocessImpl(Scope& scope) {
+bool preprocess(Scope& scope) {
 	bool errorLess = true;
 	while (scope.advanceIteration()) {
 		Token& currToken = scope.currToken();
@@ -987,10 +1027,6 @@ bool preprocessImpl(Scope& scope) {
 		scope.next(currToken);
 	}
 	return errorLess;
-}
-void preprocess(Scope& scope, string fileName) {
-	IdToNamespace[NextNamespaceId] = Namespace(TOP_NAMESPACE_NAME, Loc(fileName, 0, 0), -1, false); NextNamespaceId++;
-	preprocessImpl(scope);
 }
 // compilation -----------------------------------
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
@@ -1023,9 +1059,9 @@ void initStrToLabel(list<Token>& tokens, string fileName) {
 		StrToLabel["end"].loc = tokens.back().loc;
 	}
 }
-vector<Instr> compile(Scope& scope, string fileName) {
+vector<Instr> compile(Scope& scope, string mainRelPath) {
 	vector<Instr> instrs;
-	initStrToLabel(scope.currList(), fileName);
+	initStrToLabel(scope.currList(), mainRelPath);
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
 		Token& top = scope.currToken(); loc = top.loc;
@@ -1563,13 +1599,27 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile.close();
 }
 // IO ---------------------------------------
+struct Flags {
+	bool verbose = false;
+	bool run = false;
+	bool keepAsm = false;
+
+	fs::path inputPath = "";
+
+	fs::path filePath(string fileExt) {
+		return inputPath.replace_extension(fileExt);
+	}
+	string filePathStr(string fileExt) {
+		return '"' + filePath(fileExt).string() + '"';
+	}
+};
 void printUsage() {
-	cout << "usage: Masfix [flags] <file-name>\n"
+	cout << "usage: Masfix [flags] <masfix-file-path>\n"
 			"	flags:\n"
-			"		-s / --silent     - supresses all unnecessary stdout messages\n"
-			"		-r / --run        - run the executable after compilation\n"
-			"		--keep-asm        - keep the assembly file\n"
-			"		--strict-errors   - disables many errors\n";
+			"		-v / --verbose   - additional compilation messages\n"
+			"		-r / --run       - run executable after compilation\n"
+			"		-A / --keep-asm  - keep assembly file\n"
+			"		-S / --strict    - disables multiple errors\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -1591,48 +1641,45 @@ vector<string> getLineArgs(int argc, char *argv[]) {
 	}
 	return args;
 }
-void genFileNames(string arg) {
-	InputFileName = fs::absolute(arg);
-	OutputFileName = InputFileName;
-	OutputFileName.replace_extension("asm");
-}
-void processLineArgs(int argc, char *argv[]) {
-	vector<string> args = getLineArgs(argc, argv);
-	checkUsage(args.size() >= 2, "Insufficent number of command line args");
-	vector<string> flags = vector<string>(++args.begin(), --args.end());
-	for (string s : flags) {
-		if (s == "-s" || s == "--silent") {
-			FLAG_silent = true;
-		} else if (s == "-r" || s == "--run") {
-			FLAG_run = true;
-		} else if (s == "--keep-asm") {
-			FLAG_keepAsm = true;
-		} else if (s == "--strict-errors") {
+Flags processLineArgs(int argc, char *argv[]) {
+	checkUsage(argc >= 2, "Insufficent number of command line args");
+	Flags flags = Flags();
+	for (int i = 1; i < argc; ++i) {
+		string arg = argv[i];
+		if (arg == "-v" || arg == "--verbose") {
+			flags.verbose = true;
+		} else if (arg == "-r" || arg == "--run") {
+			flags.run = true;
+		} else if (arg == "-A" || arg == "--keep-asm") {
+			flags.keepAsm = true;
+		} else if (arg == "-S" || arg == "--strict") {
 			FLAG_strictErrors = true;
 		} else {
-			checkUsage(false, "Unknown command line arg" errorQuoted(s));
+			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
+			checkUsage(fs::exists(arg) && fs::is_regular_file(arg), "Invalid argument or file not found" errorQuoted(arg));
+			flags.inputPath = fs::absolute(arg);
 		}
 	}
-	genFileNames(args[args.size()-1]);
+	return flags;
 }
-ifstream getInputFile() {
-	ifstream inFile;
-	checkCond(fs::exists(InputFileName), "The input file" errorQuoted(InputFileName.string()) " couldn't be found");
-	inFile.open(InputFileName);
-	checkCond(inFile.good(), "The input file" errorQuoted(InputFileName.string()) " couldn't be opened");
-	return inFile;
+ifstream openInputFile(fs::path path) {
+	ifstream ifs(path);
+	checkCond(ifs.good(), "The input file" errorQuoted(path.string()) " couldn't be opened");
+	return ifs;
 }
-ofstream getOutputFile() {
-	ofstream outFile;
-	outFile.open(OutputFileName);
-	checkCond(outFile.good(), "The output file" errorQuoted(OutputFileName.string()) " couldn't be opened");
-	return outFile;
+ofstream openOutputFile(fs::path path) {
+	ofstream ofs(path);
+	checkCond(ofs.good(), "The output file" errorQuoted(path.string()) " couldn't be opened");
+	return ofs;
 }
-void runCmdEchoed(string command) {
-	if (!FLAG_silent) {
+void runCmdEchoed(vector<string> args, Flags& flags) {
+	string s = accumulate(args.begin() + 1, args.end(), args.front(), // concat args with spaces
+		[](string s0, const string& s1) { return s0 += " " + s1; });
+	const char* command = s.c_str();
+	if (flags.verbose) {
 		cout << "[CMD] " << command << '\n';
 	}
-	int returnCode = system(command.c_str());
+	int returnCode = system(command);
 	if (returnCode) {
 		exit(returnCode);
 	}
@@ -1643,58 +1690,31 @@ void removeFile(fs::path file) {
 		cerr << "WARNING: error on removing the file '" << file.filename() << "'\n";
 	}
 }
-void compileAndRun(fs::path asmPath) {
-	fs::path objectPath = asmPath;
-	objectPath.replace_extension("obj");
-	fs::path exePath = asmPath;
-	exePath.replace_extension("exe");
-
-	runCmdEchoed("nasm -fwin64 " + asmPath.string());
-	runCmdEchoed("ld C:\\Windows\\System32\\kernel32.dll -e _start -o " + exePath.string() + " " + objectPath.string());
-	if (!FLAG_keepAsm) {
-		removeFile(asmPath);
+void compileAndRun(Flags& flags) {
+	runCmdEchoed({"nasm", "-fwin64", flags.filePathStr("asm")}, flags);
+	runCmdEchoed({"ld", "C:\\Windows\\System32\\kernel32.dll -e _start -o", flags.filePathStr("exe"), flags.filePathStr("obj")}, flags);
+	if (flags.keepAsm) {
+		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":179:1\n";
 	} else {
-		cout << "[NOTE] asm file: " << asmPath.string() << ":179:1\n";
+		removeFile(flags.filePath("asm"));
 	}
-	removeFile(objectPath);
-	if (FLAG_run) {
-		runCmdEchoed(exePath.string());
-	}
-}
-fs::path pathFromMasfix(fs::path p) {
-	fs::path out;
-	bool found = false;
-	for (fs::path part : p) {
-		string s = part.string();
-		if (found) out.append(s);
-		if (s == "Masfix") {
-			found = true;
-		}
-	}
-	return found ? out : p;
+	removeFile(flags.filePath("obj"));
+	if (flags.run) runCmdEchoed({flags.filePathStr("exe")}, flags);
 }
 int main(int argc, char *argv[]) {
-	processLineArgs(argc, argv);
-	string fileName = pathFromMasfix(InputFileName).string();
+	Flags flags = processLineArgs(argc, argv);
+	Scope scope;
+	string mainRelPath = tokenizeNewModule(flags.inputPath, scope, true);
 
-	Token module = Token(TImodule, TOP_NAMESPACE_NAME, Loc(fileName, 1, 1), false, true);
-	Scope scope(module);
-
-	ifstream inFile = getInputFile();
-	tokenize(inFile, fileName, scope);
-	inFile.close();
-
-	scope.init(module);
-	preprocess(scope, fileName);
-	scope.init(module);
-	vector<Instr> instrs = compile(scope, fileName);
+	preprocess(scope);
+	scope.prepareForCompile();
+	vector<Instr> instrs = compile(scope, mainRelPath);
 
 	parseInstrs(instrs);
 	raiseErrors();
 
-	ofstream outFile = getOutputFile();
+	ofstream outFile = openOutputFile(flags.filePath("asm"));
 	generate(outFile, instrs);
-	outFile.close();
 
-	compileAndRun(OutputFileName);
+	compileAndRun(flags);
 }
