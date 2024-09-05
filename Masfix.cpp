@@ -227,10 +227,6 @@ struct Token {
 		}
 		return out;
 	}
-	int64_t asLong() { // TODO report value overflows
-		assert(type == Tnumeric);
-		return stoi(data);
-	}
 	bool isSeparated() {
 		assert(type == Tlist);
 		for (Token t : tlist) {
@@ -343,6 +339,7 @@ private:
 	stack<list<Token>::iterator> itrs;
 	vector<Module> modules;
 	vector<Module>::iterator currModule;
+	bool isPreprocessing = true;
 	
 	/// opens new tlist for iteration
 	void openList(Token& tlist) {
@@ -351,7 +348,8 @@ private:
 	}
 	/// closes single list
 	void closeList() {
-		assert(!hasNext());
+		static_assert(TokenCount == 11, "Exhaustive closeList definition");
+		if (isPreprocessing)
 		if (tlists.top().get().type == TIexpansion) {
 			endMacroExpansion();
 		} else if (tlists.top().get().type == TInamespace) {
@@ -375,12 +373,13 @@ public:
 	}
 
 	void prepareForCompile() {
-		static_assert(sizeof(Scope) == 352, "Exhaustive Scope sanity checks definition");
+		static_assert(sizeof(Scope) == 360, "Exhaustive Scope sanity checks definition");
 		assert(!tlists.size());
 		assert(!itrs.size());
 		assert(!macros.size());
 		assert(namespaces.size() == 1);
-		assert(currModule == modules.end());
+		assert(currModule+1 == modules.end());
+		isPreprocessing = false;
 		currModule = modules.begin();
 		openList(currModule->contents);
 	}
@@ -468,10 +467,6 @@ public:
 // tokenization -----------------------------------------
 	bool tokenizeHasTlist() {
 		return tlists.size() && tlists.top().get().type == Tlist;
-	}
-	void tokenizeInsert(Token&& token) {
-		insertToken((Token&&)token);
-		next(currToken());
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
 		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
@@ -653,7 +648,8 @@ string getCharRun(string s) {
 	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
-#define addToken(type) scope.tokenizeInsert(Token(type, run, loc, continued, firstOnLine));
+#define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
+					scope.next(scope.currToken());
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
 	string line;
@@ -741,7 +737,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 10, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 11, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -1052,16 +1048,9 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitions(ident, loc, true);
 }
-void initStrToLabel(list<Token>& tokens, string fileName) {
-	StrToLabel = {{"begin", Label("begin", 0, Loc(fileName, 1, 1))}, {"end", Label("end", 0, Loc(fileName, 1, 1))}};
-	if (tokens.size()) {
-		StrToLabel["begin"].loc = tokens.front().loc;
-		StrToLabel["end"].loc = tokens.back().loc;
-	}
-}
 vector<Instr> compile(Scope& scope, string mainRelPath) {
+	StrToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 	vector<Instr> instrs;
-	initStrToLabel(scope.currList(), mainRelPath);
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
 		Token& top = scope.currToken(); loc = top.loc;
