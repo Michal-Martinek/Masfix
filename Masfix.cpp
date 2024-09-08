@@ -54,9 +54,10 @@ const set<string> DefiningDirectivesSet = {
 	"macro",
 	"namespace"
 };
-constexpr int BuiltinDirectivesCount = 1;
+constexpr int BuiltinDirectivesCount = 2;
 const set<string> BuiltinDirectivesSet = {
-	"using"
+	"using",
+	"include"
 };
 enum RegNames {
 	Rh,
@@ -332,13 +333,13 @@ bool raiseError(string message, Loc loc, bool strict=false);
 /// keeping track of current module, namespace, expansion scope, arglist situation
 struct Scope {
 private:
-	stack<int> namespaces = stack<int>({ 0 });
+	stack<int> namespaces;
 	stack<pair<int, string>> macros;
 	// TODO better max depth checks - maybe add depth counter
 	stack<reference_wrapper<Token>> tlists;
 	stack<list<Token>::iterator> itrs;
-	vector<Module> modules;
-	vector<Module>::iterator currModule;
+	list<Module> modules;
+	list<Module>::iterator currModule = modules.begin();
 	bool isPreprocessing = true;
 	
 	/// opens new tlist for iteration
@@ -353,9 +354,11 @@ private:
 		if (tlists.top().get().type == TIexpansion) {
 			endMacroExpansion();
 		} else if (tlists.top().get().type == TInamespace) {
+			assert(currNamespace().isUpperAccesible);
 			exitNamespace();
 		} else if (tlists.top().get().type == TImodule) {
 			exitNamespace();
+			currModule++;
 		}
 		tlists.pop(); itrs.pop();
 	}
@@ -377,11 +380,12 @@ public:
 		assert(!tlists.size());
 		assert(!itrs.size());
 		assert(!macros.size());
-		assert(namespaces.size() == 1);
-		assert(currModule+1 == modules.end());
+		assert(!namespaces.size());
+		assert(currModule == modules.end());
 		isPreprocessing = false;
-		currModule = modules.begin();
-		openList(currModule->contents);
+		for (list<Module>::reverse_iterator itr = modules.rbegin(); itr != modules.rend(); ++itr) {
+			openList(itr->contents);
+		}
 	}
 	void addModule(fs::path abspath, string relPath, string moduleName) {
 		Loc loc = Loc(relPath, 1, 1);
@@ -431,6 +435,9 @@ public:
 		assert(insideMacro());
 		return currNamespace().macros[macros.top().second];
 	}
+	fs::path currModuleFolder() {
+		return currModule->abspath.parent_path();
+	}
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
 	}
@@ -452,7 +459,7 @@ public:
 		namespaces.push(newId);
 	}
 	void exitNamespace() {
-		assert(namespaces.size() > 1);
+		assert(namespaces.size() >= 1);
 		namespaces.pop();
 	}
 	void enterArglist(Token& tlist) {
@@ -479,7 +486,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() == 1 && tlists.top().get().type == TImodule);
+		assert(tlists.size() >= 1 && tlists.top().get().type == TImodule);
 		itrs.top() = currList().begin();
 	}
 // helpers -------------------------------------------------
@@ -772,14 +779,11 @@ string relPathFromMasfix(fs::path p) {
 	}
 	return (found ? out : p).string();
 }
-void _openNewModule(fs::path path, string relPath, Scope& scope, bool mainModule=false) {
-	string moduleName = mainModule ? TOP_MODULE_NAME : path.filename().replace_extension("").string();
-	scope.addModule(path, relPath, moduleName);
-}
 ifstream openInputFile(fs::path path);
 string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) {
 	string relPath = relPathFromMasfix(abspath);
-	_openNewModule(abspath, relPath, scope, mainModule);
+	string moduleName = mainModule ? TOP_MODULE_NAME : abspath.filename().replace_extension("").string(); // TODO name sanitazion, module name redefs?
+	scope.addModule(abspath, relPath, moduleName);
 	ifstream ifs = openInputFile(abspath);
 	tokenize(ifs, relPath, scope);
 	ifs.close();
@@ -974,10 +978,25 @@ bool processUsing(Loc loc, Scope& scope) {
 	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already imported" errorQuoted(firstName), locs.back());
 	return true;
 }
-bool processBuiltinUse(string directive, Scope& scope, Loc directiveLoc) {
-	static_assert(BuiltinDirectivesCount == 1, "Exhaustive processBuiltinUse definition");
+fs::path processIncludePath(string str, Scope& scope) {
+	fs::path path;
+	for (fs::path prepath : {scope.currModuleFolder(), fs::current_path()}) { // TODO crystalize scopes
+		path = prepath;
+		path /= fs::path(str).replace_extension(".mx");
+		if (fs::exists(path)) break;
+	}
+	return fs::exists(path) ? fs::absolute(path) : fs::path();
+}
+bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
+	static_assert(BuiltinDirectivesCount == 2, "Exhaustive processBuiltinUse definition");
+	Token token;
 	if (directive == "using") {
-		returnOnFalse(processUsing(directiveLoc, scope));
+		returnOnFalse(processUsing(loc, scope));
+	} else if (directive == "include") {
+		directiveEatToken(Tstring, "Missing included path string", true);
+		fs::path path = processIncludePath(token.data, scope);
+		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" couldn't be found", loc);
+		tokenizeNewModule(path, scope);
 	} else {
 		unreachable();
 	}
