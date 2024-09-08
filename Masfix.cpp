@@ -322,9 +322,11 @@ map<int, Namespace> IdToNamespace;
 struct Module {
 	fs::path abspath;
 	Token contents; // TImodule
+	int namespaceId;
 
-	Module(fs::path path) {
+	Module(fs::path path, int namespaceId) {
 		abspath = path;
+		this->namespaceId = namespaceId;
 	}
 };
 bool raiseError(string message, Token token, bool strict=false);
@@ -387,13 +389,6 @@ public:
 			openList(itr->contents);
 		}
 	}
-	void addModule(fs::path abspath, string relPath, string moduleName) {
-		Loc loc = Loc(relPath, 1, 1);
-		currModule = modules.insert(currModule, Module(abspath));
-		currModule->contents = Token(TImodule, moduleName, loc, false, true);
-		openList(currModule->contents);
-		addNamespace(moduleName, loc, false);
-	}
 	// iteration ----------------------------------------------------------
 
 	/// whether currList has any next token
@@ -451,12 +446,13 @@ public:
 		currMacro().closeExpansionScope();
 		macros.pop();
 	}
-	void addNamespace(string& name, Loc loc, bool isUpperAccesible) {
+	int addNewNamespace(string& name, Loc loc, bool isDefinedInside) {
 		assert(!insideMacro());
 		int newId = IdToNamespace.size();
-		if (newId != 0) currNamespace().innerNamespaces[name] = newId;
-		IdToNamespace[newId] = Namespace(name, loc, isUpperAccesible ? currNamespaceId() : -1, isUpperAccesible);
+		if (isDefinedInside && newId != 0) currNamespace().innerNamespaces[name] = newId;
+		IdToNamespace[newId] = Namespace(name, loc, isDefinedInside ? currNamespaceId() : -1, isDefinedInside);
 		namespaces.push(newId);
+		return newId;
 	}
 	void exitNamespace() {
 		assert(namespaces.size() >= 1);
@@ -489,6 +485,22 @@ public:
 		assert(tlists.size() >= 1 && tlists.top().get().type == TImodule);
 		itrs.top() = currList().begin();
 	}
+// modules -------------------------------------------------
+
+	bool newModuleIncluded(fs::path abspath) {
+		for (list<Module>::iterator itr = modules.begin(); itr != modules.end(); ++itr) {
+			if (itr->abspath == abspath) return false;
+		}
+		return true;
+	}
+	void addNewModule(fs::path abspath, string relPath, string moduleName) {
+		Loc loc = Loc(relPath, 1, 1);
+		int namespaceId = addNewNamespace(moduleName, loc, false);
+		currModule = modules.insert(currModule, Module(abspath, namespaceId));
+		currModule->contents = Token(TImodule, moduleName, loc, false, true);
+		openList(currModule->contents);
+	}
+
 // helpers -------------------------------------------------
 	void insertToken(Token& token) {
 		itrs.top() = currList().insert(itrs.top(), token);
@@ -783,7 +795,7 @@ ifstream openInputFile(fs::path path);
 string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) {
 	string relPath = relPathFromMasfix(abspath);
 	string moduleName = mainModule ? TOP_MODULE_NAME : abspath.filename().replace_extension("").string(); // TODO name sanitazion, module name redefs?
-	scope.addModule(abspath, relPath, moduleName);
+	scope.addNewModule(abspath, relPath, moduleName);
 	ifstream ifs = openInputFile(abspath);
 	tokenize(ifs, relPath, scope);
 	ifs.close();
@@ -823,7 +835,7 @@ bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
 	scope->tlist = token.tlist;
-	scope.addNamespace(name, percentLoc, true);
+	scope.addNewNamespace(name, percentLoc, true);
 	return true;
 }
 bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
@@ -996,7 +1008,9 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		directiveEatToken(Tstring, "Missing included path string", true);
 		fs::path path = processIncludePath(token.data, scope);
 		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" couldn't be found", loc);
-		tokenizeNewModule(path, scope);
+		int includingNamespaceId = scope.currNamespaceId();
+		if (scope.newModuleIncluded(path)) tokenizeNewModule(path, scope);
+		IdToNamespace[includingNamespaceId].usedNamespaces.insert(scope.currNamespaceId());
 	} else {
 		unreachable();
 	}
