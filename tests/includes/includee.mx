@@ -1,0 +1,18 @@
+
+%namespace includee {
+	%define hidden 65
+}
+%using includee
+%macro printHidden() {
+	print %hidden
+}
+%define defd 9
+
+:unreachable %befIncl
+%afterIncl
+%include "includes.mx"
+
+reachable? %befIncl
+%afterIncl
+
+%include "a ted uz: sere me tuze inkluze..."

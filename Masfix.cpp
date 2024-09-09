@@ -421,6 +421,7 @@ public:
 		return tlists.top().get().type == TIarglist;
 	}
 	int currNamespaceId() {
+		assert(namespaces.size());
 		return insideMacro() ? macros.top().first : namespaces.top();
 	}
 	Namespace& currNamespace() {
@@ -446,11 +447,14 @@ public:
 		currMacro().closeExpansionScope();
 		macros.pop();
 	}
-	int addNewNamespace(string& name, Loc loc, bool isDefinedInside) {
+	int addNewNamespace(string& name, Loc loc, bool isModuleDefinition) {
 		assert(!insideMacro());
 		int newId = IdToNamespace.size();
-		if (isDefinedInside && newId != 0) currNamespace().innerNamespaces[name] = newId;
-		IdToNamespace[newId] = Namespace(name, loc, isDefinedInside ? currNamespaceId() : -1, isDefinedInside);
+		if (newId != 0) {
+			if (isModuleDefinition) currNamespace().usedNamespaces.insert(newId);
+			else currNamespace().innerNamespaces[name] = newId;
+		}
+		IdToNamespace[newId] = Namespace(name, loc, isModuleDefinition ? -1 : currNamespaceId(), !isModuleDefinition);
 		namespaces.push(newId);
 		return newId;
 	}
@@ -488,14 +492,17 @@ public:
 // modules -------------------------------------------------
 
 	bool newModuleIncluded(fs::path abspath) {
-		for (list<Module>::iterator itr = modules.begin(); itr != modules.end(); ++itr) {
-			if (itr->abspath == abspath) return false;
+		for (list<Module>::iterator module = modules.begin(); module != modules.end(); ++module) {
+			if (fs::equivalent(module->abspath, abspath)) {
+				currNamespace().usedNamespaces.insert(module->namespaceId);
+				return false;
+			}
 		}
 		return true;
 	}
 	void addNewModule(fs::path abspath, string relPath, string moduleName) {
 		Loc loc = Loc(relPath, 1, 1);
-		int namespaceId = addNewNamespace(moduleName, loc, false);
+		int namespaceId = addNewNamespace(moduleName, loc, true);
 		currModule = modules.insert(currModule, Module(abspath, namespaceId));
 		currModule->contents = Token(TImodule, moduleName, loc, false, true);
 		openList(currModule->contents);
@@ -835,7 +842,7 @@ bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
 	scope->tlist = token.tlist;
-	scope.addNewNamespace(name, percentLoc, true);
+	scope.addNewNamespace(name, percentLoc, false);
 	return true;
 }
 bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
@@ -991,13 +998,14 @@ bool processUsing(Loc loc, Scope& scope) {
 	return true;
 }
 fs::path processIncludePath(string str, Scope& scope) {
-	fs::path path;
+	fs::path path = fs::path(str);
+	if (path.has_extension() && path.extension() != ".mx") return fs::path();
 	for (fs::path prepath : {scope.currModuleFolder(), fs::current_path()}) { // TODO crystalize scopes
 		path = prepath;
 		path /= fs::path(str).replace_extension(".mx");
 		if (fs::exists(path)) break;
 	}
-	return fs::exists(path) ? fs::absolute(path) : fs::path();
+	return fs::exists(path) ? fs::canonical(path) : fs::path();
 }
 bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	static_assert(BuiltinDirectivesCount == 2, "Exhaustive processBuiltinUse definition");
@@ -1008,9 +1016,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		directiveEatToken(Tstring, "Missing included path string", true);
 		fs::path path = processIncludePath(token.data, scope);
 		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" couldn't be found", loc);
-		int includingNamespaceId = scope.currNamespaceId();
 		if (scope.newModuleIncluded(path)) tokenizeNewModule(path, scope);
-		IdToNamespace[includingNamespaceId].usedNamespaces.insert(scope.currNamespaceId());
 	} else {
 		unreachable();
 	}
@@ -1679,7 +1685,7 @@ Flags processLineArgs(int argc, char *argv[]) {
 		} else {
 			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
 			checkUsage(fs::exists(arg) && fs::is_regular_file(arg), "Invalid argument or file not found" errorQuoted(arg));
-			flags.inputPath = fs::absolute(arg);
+			flags.inputPath = fs::canonical(arg);
 		}
 	}
 	return flags;

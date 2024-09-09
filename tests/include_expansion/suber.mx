@@ -1,0 +1,26 @@
+outu 10
+
+%macro cout(num) {
+	outu %num
+	outc 44
+	outc 32
+}
+%define suber 8
+%namespace suber_nam {
+	%define second_things_second 324
+	%cout(%suber)
+	
+	%macro newline_end() {
+		ld %suber
+		lda 2
+		outcr
+	}
+}
+%using suber_nam
+%cout(%second_things_second)
+
+
+:label__definitelly_not_redefined
+%include "tests/include_expansion/suber.mx"
+outu 12
+outc 10

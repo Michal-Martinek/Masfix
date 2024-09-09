@@ -1,0 +1,27 @@
+
+; include syntax
+%inclde
+%include
+%include 78
+%include main
+%include ''
+%include ""
+%include "\r\n\\"
+%include "\$/\-"
+%include "includ"
+
+%define befIncl 5
+
+; correct file searching
+%include "include"
+%%
+%include "includee"
+%include "includee.mx"
+%include "includes.txt"
+%include "includes.mx"
+
+%define afterIncl 6
+
+%hidden
+now-gonna-includeeznuts
+%printHidden()
