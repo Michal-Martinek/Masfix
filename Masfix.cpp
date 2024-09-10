@@ -9,6 +9,7 @@ namespace fs = std::filesystem;
 #include <vector>
 #include <list>
 #include <stack>
+#include <optional>
 
 #include <algorithm>
 #include <numeric>
@@ -578,7 +579,7 @@ struct Instr {
 
 	string opcodeStr;
 	Loc opcodeLoc;
-	vector<Token> immFields;
+	vector<string> immFields;
 
 	Instr() {}
 	Instr(string opcodeStr,	Loc opcodeLoc) {
@@ -591,20 +592,9 @@ struct Instr {
 	bool hasReg()  { return suffixes.reg != Rno; }
 	string toStr() {
 		string out = opcodeStr;
-		for (string s : immAsWords()) {
+		for (string s : immFields) {
 			out.push_back(' ');
 			out.append(s);
-		}
-		return out;
-	}
-	vector<string> immAsWords() {
-		vector<string> out;
-		for (Token t : immFields) {
-			if (t.continued) {
-				out[out.size()-1].append(t.toStr());
-			} else {
-				out.push_back(t.toStr());
-			}
 		}
 		return out;
 	}
@@ -1064,6 +1054,10 @@ bool preprocess(Scope& scope) {
 	return errorLess;
 }
 // compilation -----------------------------------
+#define dumpLabel() if (!!dump) { dump.value() << "\n:" << name; }
+#define dumpInstrOpcode(str) if (!!dump) { dump.value() << '\n' << str; }
+#define dumpInstrField(str)  if (!!dump) { dump.value() << ' ' << str; }
+#define dumpExpansion(str)   if (!!dump) { dump.value() << "\n; " << str; }
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
 	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
@@ -1083,32 +1077,36 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);
-	if (purpose == "instr") return true;
+	if (purpose == "instr" || purpose == "immediate") return true;
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitions(ident, loc, true);
 }
-vector<Instr> compile(Scope& scope, string mainRelPath) {
+vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dump) {
 	StrToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 	vector<Instr> instrs;
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
-		Token& top = scope.currToken(); loc = top.loc;
+		Token& top = scope.currToken(); loc = top.loc; string name;
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
-			string name;
 			scope.next();
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label"));
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			StrToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
+			dumpLabel();
 		} else if (top.type == Talpha) {
-			string instrStr = "";
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, instrStr, "instr"));
-			instrs.push_back(Instr(instrStr, loc));
-			for (; scope.hasNext() && !scope->firstOnLine; scope.next()) {
-				instrs.back().immFields.push_back(scope.currToken());
+			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
+			instrs.push_back(Instr(name, loc));
+			dumpInstrOpcode(name);
+			while (scope.hasNext() && !scope->firstOnLine) {
+				string immFrag;
+				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"));
+				instrs.back().immFields.push_back(immFrag);
+				dumpInstrField(immFrag);
 			}
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
+			dumpExpansion(top.data);
 			scope.next(top);
 		} else {
 			raiseError("Unexpected token", top);
@@ -1116,6 +1114,7 @@ vector<Instr> compile(Scope& scope, string mainRelPath) {
 		}
 	}
 	StrToLabel["end"].addr = instrs.size();
+	if (!!dump) dump->close();
 	return instrs;
 }
 // parsing -------------------------------------------------------------------
@@ -1179,15 +1178,15 @@ bool verifyNotInstrOpcode(string name) {
 	return ans;
 }
 bool parseInstrImmediate(Instr& instr) {
-	vector<string> immWords = instr.immAsWords();
-	checkReturnOnFail(immWords.size() == 1, "Only simple immediates for now", instr);
-	if (StrToLabel.count(immWords[0]) > 0) {
-		instr.immediate = StrToLabel[immWords[0]].addr;
+	checkReturnOnFail(instr.immFields.size() == 1, "Only simple immediates for now", instr);
+	string immVal = instr.immFields[0];
+	if (StrToLabel.count(immVal) > 0) {
+		instr.immediate = StrToLabel[immVal].addr;
 		return true;
 	}
-	checkReturnOnFail(isdigit(immWords[0].at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(immWords[0]);
-	checkReturnOnFail(to_string(instr.immediate) == immWords[0], "Invalid instruction immediate", instr);
+	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
+	instr.immediate = stoi(immVal);
+	checkReturnOnFail(to_string(instr.immediate) == immVal, "Invalid instruction immediate", instr);
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 bool parseInstrFields(Instr& instr) {
@@ -1631,6 +1630,7 @@ struct Flags {
 	bool verbose = false;
 	bool run = false;
 	bool keepAsm = false;
+	bool dump = false;
 
 	fs::path inputPath = "";
 
@@ -1647,7 +1647,8 @@ void printUsage() {
 			"		-v / --verbose   - additional compilation messages\n"
 			"		-r / --run       - run executable after compilation\n"
 			"		-A / --keep-asm  - keep assembly file\n"
-			"		-S / --strict    - disables multiple errors\n";
+			"		-S / --strict    - disables multiple errors\n"
+			"		-D / --dump      - dumps prepocessed code into file\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -1682,6 +1683,8 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.keepAsm = true;
 		} else if (arg == "-S" || arg == "--strict") {
 			FLAG_strictErrors = true;
+		} else if (arg == "-D" || arg == "-d" || arg == "--dump") {
+			flags.dump = true;
 		} else {
 			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
 			checkUsage(fs::exists(arg) && fs::is_regular_file(arg), "Invalid argument or file not found" errorQuoted(arg));
@@ -1736,7 +1739,10 @@ int main(int argc, char *argv[]) {
 
 	preprocess(scope);
 	scope.prepareForCompile();
-	vector<Instr> instrs = compile(scope, mainRelPath);
+
+	optional<ofstream> dumpFile;
+	if (flags.dump) dumpFile = openOutputFile(flags.filePath("dump"));
+	vector<Instr> instrs = compile(scope, mainRelPath, dumpFile);
 
 	parseInstrs(instrs);
 	raiseErrors();
@@ -1745,4 +1751,5 @@ int main(int argc, char *argv[]) {
 	generate(outFile, instrs);
 
 	compileAndRun(flags);
+	if (flags.dump) cout << "\n[NOTE] dump file: " << flags.filePath("dump") << '\n';
 }
