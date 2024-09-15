@@ -12,6 +12,28 @@
 
 %define befIncl 5
 
+%namespace overload_test {
+	%namespace foo {
+		%include "tests/includes/includee.mx"
+		debug %defd
+		%includee:defd
+		%macro m () {
+			outu %defd
+		}
+	}
+	%includee:notfound
+	%using foo
+	%includee:notfound
+	%defd
+	%foo:defd
+	%m()
+	%include "tests/includes/includee"
+	%defd
+	print %includee:hidden
+}
+
+%define afterIncl 6
+
 ; correct file searching
 %include "include"
 %%
@@ -20,7 +42,6 @@
 %include "includes.txt"
 %include "includes.mx"
 
-%define afterIncl 6
 
 %hidden
 now-gonna-includeeznuts

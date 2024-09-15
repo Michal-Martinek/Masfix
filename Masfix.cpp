@@ -224,9 +224,10 @@ struct Token {
 		if (type == Tlist) {
 			if (isSeparated()) out.push_back(',');
 			out.push_back(tlistCloseChar());
-		} else if (type == Tstring) {
-			return "\"\"";
 		}
+		// } else if (type == Tstring && quotedStr) {
+		// 	return '"' + data + '"';
+		// }
 		return out;
 	}
 	bool isSeparated() {
@@ -704,11 +705,14 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					keepContinued = false;
 				} else if (first == '"') {
 					size_t quotePos = line.find('"');
-					checkContinueOnFail(quotePos != string::npos, "Expected string termination", loc); // TODO ignore line
+					if (!check(quotePos != string::npos, "Expected string termination", loc)) {
+						line = ""; continue;
+					}
 					run = line.substr(0, quotePos);
+					col +=++ quotePos;
+					continued = false; keepContinued = false;
 					addToken(Tstring);
-					line = line.substr(quotePos + 1);
-					keepContinued = false; // TODO before & after
+					line = line.substr(quotePos);
 				} else {
 					addToken(Tspecial);
 				}
@@ -759,7 +763,8 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 
 	set<TokenTypes> allowedTypes = {Tnumeric, Talpha, Tspecial};
 	if (eatAnything >= 1) allowedTypes.insert(Tcolon);
-	if (eatAnything == 2) allowedTypes.insert(Tlist);
+	if (eatAnything >= 2) allowedTypes.insert(Tstring);
+	if (eatAnything >= 3) allowedTypes.insert(Tlist);
 	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
 		name += scope.eatenToken().toStr();
 		first = false;
@@ -1067,13 +1072,13 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
 			processArglistWrapper(
-				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2);
+				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 3);
 				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
 			ident.append(fragment);
 			scope.next();
 		} else {
-			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 1));
+			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);

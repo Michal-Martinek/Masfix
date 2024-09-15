@@ -130,3 +130,19 @@ ld %defined1 %test_mac()
 %threeArg(6,  ,7)
 %threeArg(,,7)
 %threeArg(1, ,4,5,6)
+
+; MACRO ARG VOLATILITY TEST
+%macro debug(val) { debug %val }
+%macro debug2(a, b) { debug %a %b }
+%macro tooManyArgsUsed(a) {
+	%debug(%a)
+	%tooManyArgsUsed(2, 3)
+	%debug(%a)
+}
+%tooManyArgsUsed(1)
+%macro notEnoughArgsUsed(a, b) {
+	%debug2(%a, %b)
+	%notEnoughArgsUsed(3)
+	%debug2(%a, %b)
+}
+%notEnoughArgsUsed(1, 2)

@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2242
+:stderr 3081
 tests\complex-names.mx:41:4 ERROR: Directive must not continue
 tests\complex-names.mx:42:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Expected label field
@@ -17,23 +17,36 @@ tests\complex-names.mx:25:1 ERROR: Invalid label name 'n8!5'
 tests\complex-names.mx:29:1 ERROR: Invalid label name '7zaza'
 tests\complex-names.mx:30:2 ERROR: Simple label field expected
 tests\complex-names.mx:31:1 ERROR: Invalid label name 'a:b$(,)!'
+tests\complex-names.mx:34:5 ERROR: Expected immediate field
 tests\complex-names.mx:35:4 ERROR: Expected instr field
+tests\complex-names.mx:36:1 ERROR: Missing immediate field name
+tests\complex-names.mx:38:4 ERROR: Expected immediate field
 tests\complex-names.mx:39:4 ERROR: Missing instr field name
 tests\complex-names.mx:43:3 ERROR: Simple instr field expected
 tests\complex-names.mx:47:3 ERROR: Expected instr field
 tests\complex-names.mx:48:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:50:2 ERROR: Simple instr field expected
-tests\complex-names.mx:34:1 ERROR: Invalid instruction immediate 'mov ()'
-tests\complex-names.mx:36:1 ERROR: Invalid instruction immediate 'swap ,'
+tests\complex-names.mx:59:1 ERROR: Unexpected token 'ld'
+tests\complex-names.mx:60:1 ERROR: Unexpected token '()'
+tests\complex-names.mx:67:20 ERROR: Expected immediate field
+tests\complex-names.mx:68:20 ERROR: Simple immediate field expected
+tests\complex-names.mx:34:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
 tests\complex-names.mx:37:1 ERROR: Unknown suffix 'inc:'
-tests\complex-names.mx:38:1 ERROR: Only simple immediates for now 'ld () ,'
+tests\complex-names.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\complex-names.mx:40:1 ERROR: Unknown instruction 'huhutata'
 tests\complex-names.mx:41:1 ERROR: Instrs must have only imm, or 1 reg for now 'jmp'
 tests\complex-names.mx:46:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
 tests\complex-names.mx:49:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
-tests\complex-names.mx:51:1 ERROR: Unknown instruction 'jm () 4'
+tests\complex-names.mx:51:1 ERROR: Unknown instruction 'jm p 4'
 tests\complex-names.mx:54:1 ERROR: The second suffix must be a register 'strts'
 tests\complex-names.mx:55:1 ERROR: Instrs must have only imm, or 1 reg for now 'smge'
 tests\complex-names.mx:56:1 ERROR: Instrs must have only imm, or 1 reg for now 'bmeqm 15'
+tests\complex-names.mx:61:1 ERROR: Unknown instruction 'dll'
+tests\complex-names.mx:62:1 ERROR: Unknown condition 'l lvm'
+tests\complex-names.mx:65:1 ERROR: Unknown instruction 'debug 1 234'
+tests\complex-names.mx:66:1 ERROR: Unknown instruction 'debug 01  23 4 5'
+tests\complex-names.mx:67:1 ERROR: Unknown instruction 'triplet hh e'
+tests\complex-names.mx:68:1 ERROR: Unknown instruction 'tlists ea()'
+tests\complex-names.mx:69:1 ERROR: Unknown condition 'stst a b'
 
 

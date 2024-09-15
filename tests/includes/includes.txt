@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1488
+:stderr 2032
 tests\includes\includes.mx:3:2 ERROR: Undeclared identifier 'inclde'
 tests\includes\includes.mx:4:2 ERROR: Missing included path string
 tests\includes\includes.mx:5:10 ERROR: Unexpected token type '78'
@@ -10,16 +10,24 @@ tests\includes\includes.mx:8:10 ERROR: Input file "" couldn't be found
 tests\includes\includes.mx:9:10 ERROR: Input file "\r\n\\" couldn't be found
 tests\includes\includes.mx:10:10 ERROR: Input file "\$/\-" couldn't be found
 tests\includes\includes.mx:11:10 ERROR: Input file "includ" couldn't be found
-tests\includes\includes.mx:16:10 ERROR: Input file "include" couldn't be found
-tests\includes\includes.mx:17:2 ERROR: Invalid directive name '%'
 tests\includes\includee.mx:11:15 ERROR: Undeclared identifier 'befIncl'
 tests\includes\includee.mx:12:2 ERROR: Undeclared identifier 'afterIncl'
 tests\includes\includee.mx:16:2 ERROR: Undeclared identifier 'afterIncl'
 tests\includes\includee.mx:18:10 ERROR: Input file "a ted uz: sere me tuze inkluze..." couldn't be found
-tests\includes\includes.mx:20:10 ERROR: Input file "includes.txt" couldn't be found
-tests\includes\includes.mx:25:2 ERROR: Undeclared identifier 'hidden'
+tests\includes\includes.mx:19:13 ERROR: Undeclared identifier 'defd'
+tests\includes\includes.mx:24:3 ERROR: Namespace not found 'includee'
+tests\includes\includes.mx:26:3 ERROR: Namespace not found 'includee'
+tests\includes\includes.mx:27:3 ERROR: Undeclared identifier 'defd'
+tests\includes\includes.mx:28:7 ERROR: Undeclared identifier 'defd'
+tests\includes\includes.mx:38:10 ERROR: Input file "include" couldn't be found
+tests\includes\includes.mx:39:2 ERROR: Invalid directive name '%'
+tests\includes\includes.mx:42:10 ERROR: Input file "includes.txt" couldn't be found
+tests\includes\includes.mx:46:2 ERROR: Undeclared identifier 'hidden'
+tests\includes\includes.mx:31:2 ERROR: Unexpected token '9'
 tests\includes\includee.mx:15:1 ERROR: Unknown instruction 'reachable? 5'
-tests\includes\includes.mx:26:1 ERROR: Unknown instruction 'now-gonna-includeeznuts'
+tests\includes\includes.mx:18:3 ERROR: Unknown instruction 'debug 9'
+tests\includes\includes.mx:32:2 ERROR: Unknown instruction 'print 65'
+tests\includes\includes.mx:47:1 ERROR: Unknown instruction 'now-gonna-includeeznuts'
 tests\includes\includee.mx:7:2 ERROR: Unknown instruction 'print 65'
 
 
