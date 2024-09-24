@@ -1,0 +1,23 @@
+%define top_def 46
+%macro bigMac(n) {
+	%cout(%n)
+	%cout(%second_things_second)
+	%print(%top_def)
+}
+
+outu 1
+%include "empty.mx"
+outu 2
+%include "subfolder/sub.mx"
+outu 3
+%include "suber"
+outu 4
+outc 10
+
+%using suber_nam
+
+%bigMac(%inner_single:sub_1)
+
+%inner_single:sub_1_mac()
+outc %top_def
+%newline_end()

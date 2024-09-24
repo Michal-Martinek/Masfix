@@ -1,0 +1,32 @@
+:returncode 1
+
+:stderr 1598
+tests\strings.mx:1:1 ERROR: Expected string termination
+tests\strings.mx:5:1 ERROR: Expected string termination
+tests\strings.mx:6:13 ERROR: Expected string termination
+tests\strings.mx:8:9 ERROR: Expected string termination
+tests\strings.mx:9:13 ERROR: Expected string termination
+tests\strings.mx:10:21 ERROR: Invalid directive name 'no-where-is-it'
+tests\strings.mx:14:3 ERROR: Missing define name
+tests\strings.mx:2:1 ERROR: Unexpected token ''
+tests\strings.mx:3:1 ERROR: Unexpected token ' '
+tests\strings.mx:4:1 ERROR: Unexpected token 'Hello, world!'
+tests\strings.mx:10:1 ERROR: Unexpected token 'got the loc bro?'
+tests\strings.mx:11:1 ERROR: Unexpected token '( } ) '!'
+tests\strings.mx:13:1 ERROR: Unexpected token '()'
+tests\strings.mx:17:9 ERROR: Unexpected token 'Emmet'
+tests\strings.mx:19:1 ERROR: Unexpected token '()'
+tests\strings.mx:22:1 ERROR: Invalid label name 'whos there'
+tests\strings.mx:26:1 ERROR: Missing immediate field name
+tests\strings.mx:29:24 ERROR: Simple immediate field expected
+tests\strings.mx:6:1 ERROR: Unknown instruction 'nuefounland'
+tests\strings.mx:8:1 ERROR: Unknown instruction 'Where's'
+tests\strings.mx:9:1 ERROR: Unknown instruction 'He:replied:'
+tests\strings.mx:24:1 ERROR: Unknown instruction 'a \n'
+tests\strings.mx:25:1 ERROR: Missing condition 'b s trin g'
+tests\strings.mx:26:1 ERROR: Unknown instruction 'debug'
+tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa sd !a   ld  	  \t'
+tests\strings.mx:28:1 ERROR: Unknown instruction 'NASA's  deepspace banger Juice'
+tests\strings.mx:29:1 ERROR: Unknown instruction 'help mouse	is'
+
+

@@ -49,3 +49,45 @@
 
 %define %Foo
 %mac(5) %Foo
+
+; using syntax
+%namespace space {
+	%namespace time{}
+}
+%namespace using_syntax {
+	%using
+	%using _-
+	%using ,
+	%using hle,
+	%using :
+	%using _
+	%using ::oh
+	%using *:/
+	%using %
+	%using 4
+	%using()
+	%using ()
+	
+	%using space,::
+	%using space::
+	%using space:,
+	%using space:/
+	%using space:8
+
+	%using space:time
+	%using space : time:
+	%using space :time%
+	%using space:time %
+	%using space:time?
+
+	%using macro
+	%using define:p
+	%using using
+	%using space:define
+
+	%using space :
+	%using space !
+	%using space %define
+	%using space :time %macro
+	%using space:time 15
+}

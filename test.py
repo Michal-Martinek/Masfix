@@ -98,7 +98,7 @@ def updateInput(file: Path):
 	
 # test ------------------------------------------
 def runFile(path, stdin) -> dict:
-	return runCommand(['Masfix',  '-s',  '-r', str(path)], stdin)
+	return runCommand(['Masfix', '-r', str(path)], stdin)
 def runTest(path: Path) -> bool:
 	print('[TESTING]', path)
 	expected = getTestcaseDesc(path)
@@ -121,9 +121,11 @@ def runTests(dir: Path):
 	failedTests = []
 	for file in os.listdir(dir):
 		path = Path(os.path.join(dir, file))
+		if path.is_dir(): path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
 		if path.suffix != '.mx':
 			continue
 		try:
+			check(os.path.exists(path), 'Testcase not found', quoted(path))
 			passed = runTest(path)
 		except TestcaseException:
 			passed = False
@@ -151,6 +153,7 @@ def processFileArg(arg) -> Path:
 			if os.path.exists(path):
 				file = Path(path)
 	check(isinstance(file, Path), 'File was not found', quoted(arg), insideTestcase=False)
+	if file.is_dir(): file = Path(os.path.join(file, os.path.basename(file.with_suffix('.mx'))))
 	check(file.suffix == '.mx', "The file is expected to end with '.mx'", quoted(file), insideTestcase=False)
 	return file
 def modeRun(args):

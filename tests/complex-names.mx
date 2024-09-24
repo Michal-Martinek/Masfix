@@ -28,7 +28,7 @@
 :(rrr)(6)
 :(7)(zaza)
 :(rrr 6)
-:(a,):(b),((o,o))!
+:(a):(b)$((o,o))!
 
 ; wrong use in instructions
 mov ()
@@ -54,3 +54,16 @@ mov(a)(p)
 str(t)(s)
 s(m)(ge)
 b(me)qm 15
+
+; string in instr names
+"ld" 5
+("ld") 6
+d( "ll")
+l(" l" )vm
+
+; token continuation:
+debug (1) (2)(3)4
+debug 0(1) (" 2" )(3)"4"5
+triplet (hh) "e"(_)()
+tlists e("a")(())	 (" "())
+stst "a""b"

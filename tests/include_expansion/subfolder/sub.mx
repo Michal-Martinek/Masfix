@@ -1,0 +1,31 @@
+%macro print(n) {
+	outu %n
+	outc 32
+}
+
+outu 1
+
+%define sub_top 1
+%namespace inner_single {
+	%define sub_1 2
+	%macro sub_1_mac() {
+		%print(%sub_top)
+		%print(%sub_1)
+	}
+	outu 2
+}
+
+%include "../suber"
+
+%inner_single:sub_1_mac()
+%using inner_single
+%print(%sub_1)
+
+outu 3
+
+%cout(%suber)
+%using suber_nam
+%print(%second_things_second)
+
+outu 4
+outc 10
