@@ -354,14 +354,15 @@ private:
 	/// closes single list
 	void closeList() {
 		static_assert(TokenCount == 11, "Exhaustive closeList definition");
-		if (isPreprocessing)
 		if (tlists.top().get().type == TIexpansion) {
-			endMacroExpansion();
+			if (isPreprocessing) endMacroExpansion();
 		} else if (tlists.top().get().type == TInamespace) {
-			assert(currNamespace().isUpperAccesible);
-			exitNamespace();
+			if (isPreprocessing) {
+				assert(currNamespace().isUpperAccesible);
+				exitNamespace();
+			}
 		} else if (tlists.top().get().type == TImodule) {
-			exitNamespace();
+			if (isPreprocessing) exitNamespace();
 			currModule++;
 		}
 		tlists.pop(); itrs.pop();
@@ -386,6 +387,7 @@ public:
 		assert(!macros.size());
 		assert(!namespaces.size());
 		assert(currModule == modules.end());
+		currModule = modules.begin();
 		isPreprocessing = false;
 		for (list<Module>::reverse_iterator itr = modules.rbegin(); itr != modules.rend(); ++itr) {
 			openList(itr->contents);
@@ -440,7 +442,7 @@ public:
 		return insideMacro() && currMacro().hasArg(name);
 	}
 	void addMacroExpansion(int namespaceId, Token& expansionToken) {
-		if (macros.size() > MAX_EXPANSION_DEPTH) {
+		if (macros.size() > MAX_EXPANSION_DEPTH) { // TODO?
 			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
 		}
 		macros.push(pair(namespaceId, expansionToken.data));
@@ -492,7 +494,9 @@ public:
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
-
+	Module* getCurrModule() {
+		return &*currModule;
+	}
 	bool newModuleIncluded(fs::path abspath) {
 		for (list<Module>::iterator module = modules.begin(); module != modules.end(); ++module) {
 			if (fs::equivalent(module->abspath, abspath)) {
@@ -557,6 +561,9 @@ public:
 		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc));
 		mac.addExpansionArgs(argSpans);
 		return true;
+	}
+	int expansionDepth() {
+		return tlists.size();
 	}
 };
 struct Suffix {
@@ -1059,10 +1066,6 @@ bool preprocess(Scope& scope) {
 	return errorLess;
 }
 // compilation -----------------------------------
-#define dumpLabel() if (!!dump) { dump.value() << "\n:" << name; }
-#define dumpInstrOpcode(str) if (!!dump) { dump.value() << '\n' << str; }
-#define dumpInstrField(str)  if (!!dump) { dump.value() << ' ' << str; }
-#define dumpExpansion(str)   if (!!dump) { dump.value() << "\n; " << str; }
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
 	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
@@ -1086,11 +1089,22 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitions(ident, loc, true);
 }
-vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dump) {
+
+bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
+	dumpFile.value() << string(indent, '\t') << s << '\n';
+	return true;
+}
+#define dump(str) (!!dumpFile) && dumpImpl(dumpFile, scope.expansionDepth(), str)
+#define dumpExpansion(str) dump("; " + str)
+vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dumpFile) {
 	StrToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 	vector<Instr> instrs;
-	Loc loc; bool errorLess, labelOnLine;
+	Loc loc; bool errorLess, labelOnLine; Module* lastModule = nullptr;
 	while (scope.advanceIteration()) {
+		if (scope.getCurrModule() != lastModule) {
+			lastModule = scope.getCurrModule();
+			dumpExpansion(lastModule->abspath.string() + " ----");
+		}
 		Token& top = scope.currToken(); loc = top.loc; string name;
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
@@ -1099,19 +1113,18 @@ vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dump
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			StrToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
-			dumpLabel();
+			dump(':' + name);
 		} else if (top.type == Talpha) {
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
 			instrs.push_back(Instr(name, loc));
-			dumpInstrOpcode(name);
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
 				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"));
 				instrs.back().immFields.push_back(immFrag);
-				dumpInstrField(immFrag);
 			}
+			dump(instrs.back().toStr());
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
-			dumpExpansion(top.data);
+			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
 		} else {
 			raiseError("Unexpected token", top);
@@ -1119,7 +1132,7 @@ vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dump
 		}
 	}
 	StrToLabel["end"].addr = instrs.size();
-	if (!!dump) dump->close();
+	if (!!dumpFile) dumpFile->close();
 	return instrs;
 }
 // parsing -------------------------------------------------------------------
