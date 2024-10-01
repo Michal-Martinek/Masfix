@@ -1,0 +1,43 @@
+
+%namespace memory_impl {
+
+	%define STACK_PTR 0
+	%define STACK_BOTTOM 16
+
+	; NOTE the SP points to the last occupied space
+	mov %STACK_PTR
+	str %STACK_BOTTOM
+	strs 1
+
+	%macro derefSP() {
+		mov %STACK_PTR
+		movm
+	}
+	%macro derefSPpush() {
+		mov %STACK_PTR
+		stra 1
+		movm
+	}
+	%macro derefSPpop() {
+		mov %STACK_PTR
+		strs 1
+		movm
+		mova 1
+	}
+}
+%using memory_impl
+
+%macro top() {
+	%derefSP()
+}
+%macro push(imm) {
+	%derefSPpush()
+	str %imm
+}
+%macro pushr() {
+	%derefSPpush()
+	strr
+}
+%macro pop() {
+	%derefSPpop()
+}

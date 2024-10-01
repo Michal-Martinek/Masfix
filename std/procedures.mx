@@ -1,0 +1,29 @@
+%include "memory"
+
+%macro proc(name, body) {
+	jmp proc_(%name)_end
+:proc_(%name)
+	%body
+	%pop()
+	jmpm
+:proc_(%name)_end
+}
+%macro call(name) {
+	%memory_impl:derefSPpush()
+	str 2 ; ret addr offset
+	strap
+	jmp proc_(%name)
+}
+
+%macro callWith1Arg(func, arg) {
+	%push(%arg)
+	%call(%func)
+	%pop()
+}
+%macro callWith2Arg(func, a, b) {
+	%push(%a)
+	%push(%b)
+	%call(%func)
+	%pop()
+	%pop()
+}
