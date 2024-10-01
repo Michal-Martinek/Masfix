@@ -380,7 +380,7 @@ public:
 		return &currToken();
 	}
 
-	void prepareForCompile() {
+	void prepareForParsing() {
 		static_assert(sizeof(Scope) == 360, "Exhaustive Scope sanity checks definition");
 		assert(!tlists.size());
 		assert(!itrs.size());
@@ -621,9 +621,20 @@ struct Label {
 		return ":" + name;
 	}
 };
-// checks implementation ----------------------------------------------
-map<string, Label> StrToLabel;
+struct ParseCtx {
+	vector<Instr> instrs;
+	map<string, Label> strToLabel;
+	Module* lastModule = nullptr;
+	optional<ofstream> dumpFile;
 
+	void end() {
+		strToLabel["end"].addr = instrs.size();
+		if (!!dumpFile) dumpFile->close();
+	}
+};
+ParseCtx parseCtx;
+
+// checks implementation ----------------------------------------------
 bool FLAG_strictErrors = false;
 bool SupressErrors = false;
 #define returnOnErrSupress() if (SupressErrors) return false;
@@ -745,7 +756,7 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
 	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
 	if (label) {
-		checkReturnOnFail(StrToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
 	} else {
 		assert(currNamespace);
 		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
@@ -1067,7 +1078,7 @@ bool preprocess(Scope& scope) {
 	}
 	return errorLess;
 }
-// compilation -----------------------------------
+// token stream parsing -----------------------------------
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
 	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
@@ -1096,35 +1107,33 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 	dumpFile.value() << string(indent, '\t') << s << '\n';
 	return true;
 }
-#define dump(str) (!!dumpFile) && dumpImpl(dumpFile, scope.expansionDepth(), str)
+#define dump(str) (!!parseCtx.dumpFile) && dumpImpl(parseCtx.dumpFile, scope.expansionDepth(), str)
 #define dumpExpansion(str) dump("; " + str)
-vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dumpFile) {
-	StrToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
-	vector<Instr> instrs;
-	Loc loc; bool errorLess, labelOnLine; Module* lastModule = nullptr;
+void parseTokenStream(Scope& scope) {
+	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
-		if (scope.getCurrModule() != lastModule) {
-			lastModule = scope.getCurrModule();
-			dumpExpansion(lastModule->abspath.string() + " ----");
+		if (scope.getCurrModule() != parseCtx.lastModule) {
+			parseCtx.lastModule = scope.getCurrModule();
+			dumpExpansion(parseCtx.lastModule->abspath.string() + " ----");
 		}
 		Token& top = scope.currToken(); loc = top.loc; string name;
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
-			scope.next();
+			scope.eatenToken();
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label"));
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
-			StrToLabel.insert(pair(name, Label(name, instrs.size(), loc)));
+			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
 			dump(':' + name);
 		} else if (top.type == Talpha) {
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
-			instrs.push_back(Instr(name, loc));
+			parseCtx.instrs.push_back(Instr(name, loc));
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
 				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"));
-				instrs.back().immFields.push_back(immFrag);
+				parseCtx.instrs.back().immFields.push_back(immFrag);
 			}
-			dump(instrs.back().toStr());
+			dump(parseCtx.instrs.back().toStr());
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
@@ -1133,11 +1142,8 @@ vector<Instr> compile(Scope& scope, string mainRelPath, optional<ofstream>& dump
 			scope.eatLine(true);
 		}
 	}
-	StrToLabel["end"].addr = instrs.size();
-	if (!!dumpFile) dumpFile->close();
-	return instrs;
 }
-// parsing -------------------------------------------------------------------
+// parsing instructions -------------------------------------------------------------------
 bool parseCond(Instr& instr, string& s) {
 	checkReturnOnFail(s.size() >= 1, "Missing condition", instr);
 	char reg = s.at(0);
@@ -1200,8 +1206,8 @@ bool verifyNotInstrOpcode(string name) {
 bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immFields.size() == 1, "Only simple immediates for now", instr);
 	string immVal = instr.immFields[0];
-	if (StrToLabel.count(immVal) > 0) {
-		instr.immediate = StrToLabel[immVal].addr;
+	if (parseCtx.strToLabel.count(immVal) > 0) {
+		instr.immediate = parseCtx.strToLabel[immVal].addr;
 		return true;
 	}
 	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
@@ -1249,6 +1255,11 @@ void parseInstrs(vector<Instr>& instrs) {
 		instrs[i] = instr;
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
+}
+void forceParse(Scope& scope) {
+	parseTokenStream(scope); // NOTE leaves expansion, namespace, module?
+	parseCtx.end();
+	parseInstrs(parseCtx.instrs);
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -1754,23 +1765,25 @@ void compileAndRun(Flags& flags) {
 	removeFile(flags.filePath("obj"));
 	if (flags.run) runCmdEchoed({flags.filePathStr("exe")}, flags);
 }
+void initParseCtx(Flags& flags, string mainRelPath) {
+	if (flags.dump) parseCtx.dumpFile = openOutputFile(flags.filePath("dump"));
+	parseCtx.strToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
+}
+
 int main(int argc, char *argv[]) {
 	Flags flags = processLineArgs(argc, argv);
 	Scope scope;
 	string mainRelPath = tokenizeNewModule(flags.inputPath, scope, true);
+	initParseCtx(flags, mainRelPath);
 
 	preprocess(scope);
-	scope.prepareForCompile();
+	scope.prepareForParsing();
 
-	optional<ofstream> dumpFile;
-	if (flags.dump) dumpFile = openOutputFile(flags.filePath("dump"));
-	vector<Instr> instrs = compile(scope, mainRelPath, dumpFile);
-
-	parseInstrs(instrs);
+	forceParse(scope);
 	raiseErrors();
 
 	ofstream outFile = openOutputFile(flags.filePath("asm"));
-	generate(outFile, instrs);
+	generate(outFile, parseCtx.instrs);
 
 	compileAndRun(flags);
 	if (flags.dump) cout << "\n[NOTE] dump file: " << flags.filePath("dump") << '\n';
