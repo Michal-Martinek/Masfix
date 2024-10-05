@@ -384,7 +384,7 @@ public:
 		return tlists.top().get().type == type;
 	}
 	int expansionDepth() {
-		return tlists.size();
+		return max(0, (int)tlists.size() - 2);
 	}
 
 // iteration ----------------------------------------------------------
@@ -533,22 +533,14 @@ public:
 		openList(currModule->contents);
 	}
 
-	void assertScopeClosed() {
-		static_assert(sizeof(Scope) == 360, "Exhaustive Scope sanity checks definition");
-		assert(!tlists.size());
-		assert(!itrs.size());
-		assert(!macros.size());
-		assert(!namespaces.size());
-		assert(currModule == modules.end());
-	}
 	void forceParseImpl();
 	/// prepares for parsing, cleans Scope after parsing
 	void forceParse() {
 		isPreprocessing = false;
-		// TODO checks before, data preservation
 		openList(currModule->contents);
+		int numTlistsBefore = tlists.size();
 		forceParseImpl();
-		assert(tlists.size() && isCurrTtype(TImodule));
+		assert(tlists.size() == numTlistsBefore && isCurrTtype(TImodule));
 		assert(tlists.top().get().data == currModule->contents.data);
 		closeList();
 		isPreprocessing = true;
@@ -636,12 +628,12 @@ struct Label {
 };
 struct ParseCtx {
 	vector<Instr> instrs;
+	size_t parseStartIdx;
 	map<string, Label> strToLabel;
 	Module* lastModule = nullptr;
 	optional<ofstream> dumpFile;
 
-	void end() {
-		strToLabel["end"].addr = instrs.size();
+	void close() {
 		if (!!dumpFile) dumpFile->close();
 	}
 };
@@ -1266,16 +1258,18 @@ bool checkValidity(Instr& instr) {
 	return true;
 }
 void parseInstrs(vector<Instr>& instrs) {
-	for (int i = 0; i < instrs.size(); ++i) {
-		Instr instr = instrs[i];
+	for (size_t i = parseCtx.parseStartIdx; i < instrs.size(); ++i) {
+		Instr& instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
-		instrs[i] = instr;
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 }
 void Scope::forceParseImpl() {
+	parseCtx.parseStartIdx = parseCtx.instrs.size();
 	parseTokenStream(*this);
+	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
+	parseInstrs(parseCtx.instrs);
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -1791,15 +1785,13 @@ int main(int argc, char *argv[]) {
 	initParseCtx(flags, mainRelPath);
 
 	preprocess(scope);
-	scope.prepareForParsing();
 
-	parseCtx.end();
-	parseInstrs(parseCtx.instrs);
+	parseCtx.close();
 	raiseErrors();
 
 	ofstream outFile = openOutputFile(flags.filePath("asm"));
 	generate(outFile, parseCtx.instrs);
 
 	compileAndRun(flags);
-	if (flags.dump) cout << "\n[NOTE] dump file: " << flags.filePath("dump") << '\n';
+	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 }
