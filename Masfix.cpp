@@ -354,15 +354,15 @@ private:
 	/// closes single list
 	void closeList() {
 		static_assert(TokenCount == 11, "Exhaustive closeList definition");
-		if (tlists.top().get().type == TIexpansion) {
-			if (isPreprocessing) endMacroExpansion();
-		} else if (tlists.top().get().type == TInamespace) {
-			if (isPreprocessing) {
-				assert(currNamespace().isUpperAccesible);
-				exitNamespace();
-			}
-		} else if (tlists.top().get().type == TImodule) {
-			if (isPreprocessing) exitNamespace();
+		if (isPreprocessing) // NOTE extra work only when isPreprocessing
+		if (isCurrTtype(TIexpansion)) {
+			endMacroExpansion();
+		} else if (isCurrTtype(TInamespace)) {
+			assert(currNamespace().isUpperAccesible);
+			exitNamespace();
+		} else if (isCurrTtype(TImodule)) {
+			forceParse();
+			exitNamespace();
 			currModule++;
 		}
 		tlists.pop(); itrs.pop();
@@ -379,21 +379,15 @@ public:
 	Token* operator->() {
 		return &currToken();
 	}
-
-	void prepareForParsing() {
-		static_assert(sizeof(Scope) == 360, "Exhaustive Scope sanity checks definition");
-		assert(!tlists.size());
-		assert(!itrs.size());
-		assert(!macros.size());
-		assert(!namespaces.size());
-		assert(currModule == modules.end());
-		currModule = modules.begin();
-		isPreprocessing = false;
-		for (list<Module>::reverse_iterator itr = modules.rbegin(); itr != modules.rend(); ++itr) {
-			openList(itr->contents);
-		}
+	/// is topmost (current) token of the specified type?
+	bool isCurrTtype(TokenTypes type) {
+		return tlists.top().get().type == type;
 	}
-	// iteration ----------------------------------------------------------
+	int expansionDepth() {
+		return tlists.size();
+	}
+
+// iteration ----------------------------------------------------------
 
 	/// whether currList has any next token
 	bool hasNext() {
@@ -401,7 +395,7 @@ public:
 	}
 	/// closes ended lists if necessary, returns if iteration can continue in this situation
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !insideArglist()) closeList();
+		while (tlists.size() && !hasNext() && !insideArglist() && (isPreprocessing || !isCurrTtype(TImodule))) closeList();
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -416,13 +410,38 @@ public:
 		}
 		return itrs.top();
 	}
+// token stream manipulation ------------------------------------------
+	void insertToken(Token& token) {
+		itrs.top() = currList().insert(itrs.top(), token);
+	}
+	void insertToken(Token&& token) {
+		itrs.top() = currList().insert(itrs.top(), token);
+	}
+	void insertList(list<Token>& tlist, Token& percentToken) {
+		assert(tlist.size());
+		itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
+		itrs.top()->continued = percentToken.continued;
+		itrs.top()->firstOnLine = percentToken.firstOnLine;
+	}
+	Token eatenToken() {
+		Token t = currToken();
+		itrs.top() = currList().erase(itrs.top());
+		return t;
+	}
+	/// eats tokens upto EOL or separator
+	void eatLine(bool surelyEat=false) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(insideArglist() && currToken().type == Tseparator)) {
+			eatenToken();
+			surelyEat = false;
+		}
+	}
 // situation checks -----------------------------------------
 	bool insideMacro() {
 		return macros.size();
 	}
-	/// is closest tlist an arglist
+	/// is CLOSEST tlist an arglist
 	bool insideArglist() {
-		return tlists.top().get().type == TIarglist;
+		return isCurrTtype(TIarglist);
 	}
 	int currNamespaceId() {
 		assert(namespaces.size());
@@ -477,7 +496,7 @@ public:
 	}
 // tokenization -----------------------------------------
 	bool tokenizeHasTlist() {
-		return tlists.size() && tlists.top().get().type == Tlist;
+		return tlists.size() && isCurrTtype(Tlist);
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
 		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
@@ -490,7 +509,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() >= 1 && tlists.top().get().type == TImodule);
+		assert(tlists.size() && isCurrTtype(TImodule));
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
@@ -514,32 +533,28 @@ public:
 		openList(currModule->contents);
 	}
 
-// helpers -------------------------------------------------
-	void insertToken(Token& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
+	void assertScopeClosed() {
+		static_assert(sizeof(Scope) == 360, "Exhaustive Scope sanity checks definition");
+		assert(!tlists.size());
+		assert(!itrs.size());
+		assert(!macros.size());
+		assert(!namespaces.size());
+		assert(currModule == modules.end());
 	}
-	void insertToken(Token&& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
-	}
-	void insertList(list<Token>& tlist, Token& percentToken) {
-		assert(tlist.size());
-		itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
-		itrs.top()->continued = percentToken.continued;
-		itrs.top()->firstOnLine = percentToken.firstOnLine;
-	}
-	Token eatenToken() {
-		Token t = currToken();
-		itrs.top() = currList().erase(itrs.top());
-		return t;
-	}
-	/// eats tokens upto EOL or separator 
-	void eatLine(bool surelyEat=false) {
-		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(insideArglist() && currToken().type == Tseparator)) {
-			eatenToken();
-			surelyEat = false;
-		}
+	void forceParseImpl();
+	/// prepares for parsing, cleans Scope after parsing
+	void forceParse() {
+		isPreprocessing = false;
+		// TODO checks before, data preservation
+		openList(currModule->contents);
+		forceParseImpl();
+		assert(tlists.size() && isCurrTtype(TImodule));
+		assert(tlists.top().get().data == currModule->contents.data);
+		closeList();
+		isPreprocessing = true;
 	}
 
+// helpers -------------------------------------------------
 	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& argStart, Loc loc) {
 		checkReturnOnFail(argStart != itrs.top(), "Argument expected", loc);
 		argSpans.push_back(pair(argStart, itrs.top()));
@@ -562,10 +577,8 @@ public:
 		mac.addExpansionArgs(argSpans);
 		return true;
 	}
-	int expansionDepth() {
-		return tlists.size();
-	}
 };
+
 struct Suffix {
 	// dest ?<operation>= <reg>/<imm>
 	RegNames condReg;
@@ -685,6 +698,8 @@ string getCharRun(string s) {
 }
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
 					scope.next(scope.currToken());
+/// reads file, performs lexical analysis, builds token stream
+/// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
 	string line;
@@ -1063,6 +1078,8 @@ bool processDirective(Token percentToken, Scope& scope) {
 	return true;
 }
 #define eatLineOnFalse(cond) if (!(cond)) { scope.eatLine(); errorLess = false; continue; }
+/// preprocesses given scope, parses completed modules
+/// closes all scopes
 bool preprocess(Scope& scope) {
 	bool errorLess = true;
 	while (scope.advanceIteration()) {
@@ -1089,8 +1106,8 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 3);
 				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
+			scope.eatenToken();
 			ident.append(fragment);
-			scope.next();
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
 			ident.append(fragment);
@@ -1107,6 +1124,9 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 }
 #define dump(str) (!!parseCtx.dumpFile) && dumpImpl(parseCtx.dumpFile, scope.expansionDepth(), str)
 #define dumpExpansion(str) dump("; " + str)
+/// parses suplied module's token stream upto EOF or possible CTF
+/// registers labels, creates list of unprocessed assembly instructions
+/// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule)
 void parseTokenStream(Scope& scope) {
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
@@ -1141,7 +1161,7 @@ void parseTokenStream(Scope& scope) {
 		}
 	}
 }
-// parsing instructions -------------------------------------------------------------------
+// parsing instruction fields -------------------------------------------------------------------
 bool parseCond(Instr& instr, string& s) {
 	checkReturnOnFail(s.size() >= 1, "Missing condition", instr);
 	char reg = s.at(0);
@@ -1254,10 +1274,8 @@ void parseInstrs(vector<Instr>& instrs) {
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 }
-void forceParse(Scope& scope) {
-	parseTokenStream(scope); // NOTE leaves expansion, namespace, module?
-	parseCtx.end();
-	parseInstrs(parseCtx.instrs);
+void Scope::forceParseImpl() {
+	parseTokenStream(*this);
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
@@ -1775,7 +1793,8 @@ int main(int argc, char *argv[]) {
 	preprocess(scope);
 	scope.prepareForParsing();
 
-	forceParse(scope);
+	parseCtx.end();
+	parseInstrs(parseCtx.instrs);
 	raiseErrors();
 
 	ofstream outFile = openOutputFile(flags.filePath("asm"));
