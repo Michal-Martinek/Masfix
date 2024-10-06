@@ -638,7 +638,18 @@ struct ParseCtx {
 	}
 };
 ParseCtx parseCtx;
+/// structure simulating the virtual machine during interpretation
+struct VM {
+	unsigned short head;
+	unsigned short reg;
+	unsigned short ip;
+	unsigned short mem[CELLS];
 
+	VM(unsigned short startInstr) { ip = startInstr; }
+	unsigned short& cell() {
+		return mem[head];
+	}
+};
 // checks implementation ----------------------------------------------
 bool FLAG_strictErrors = false;
 bool SupressErrors = false;
@@ -1270,6 +1281,96 @@ void Scope::forceParseImpl() {
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
 	parseInstrs(parseCtx.instrs);
+}
+// interpreting -------------------------------------------------
+unsigned short interpGetReg(VM& vm, RegNames reg) {
+	static_assert(RegisterCount == 5, "Exhaustive interpGetReg definition");
+	if (reg == Rh) return vm.head;
+	else if (reg == Rm) return vm.cell();
+	else if (reg == Rr) return vm.reg;
+	else if (reg == Rp) return vm.ip;
+	else unreachable();
+}
+unsigned short interpOperation(VM& vm, OpNames op, unsigned short left, unsigned short right) {
+	static_assert(OperationCount == 10, "Exhaustive interpOperation definition");
+	if (op == OPa) return left + right;
+	else if (op == OPs) return left - right;
+	else if (op == OPt) return left * right;
+	else if (op == OPand) return left & right;
+	else if (op == OPor) return left | right;
+	else if (op == OPxor) return left ^ right;
+	else if (op == OPshl) return left << right;
+	else if (op == OPshr) return left >> right;
+	else if (op == OPbit) return !!(left & (1 << right));
+	else unreachable();
+}
+bool interpCond(VM& vm, Instr& instr, signed short target) {
+	static_assert(ConditionCount == 7, "Exhaustive interpCond definition");
+	short reg = (signed short) interpGetReg(vm, instr.suffixes.condReg);
+	if (instr.instr == Ib) target = 0;
+
+	if (instr.suffixes.cond == Ceq) return reg == target;
+	if (instr.suffixes.cond == Cne) return reg != target;
+	if (instr.suffixes.cond == Clt) return reg <  target;
+	if (instr.suffixes.cond == Cle) return reg <= target;
+	if (instr.suffixes.cond == Cgt) return reg >  target;
+	if (instr.suffixes.cond == Cge) return reg >= target;
+	unreachable();
+}
+void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
+	static_assert(InstructionCount == 14, "Exhaustive interpInstrBody definition");
+	if (instr.instr == Imov) vm.head = target;
+	else if (instr.instr == Istr) {
+		vm.cell() = target;
+	} else if (instr.instr == Ild) {
+		vm.reg = target;
+	} else if (instr.instr == Ijmp) {
+		vm.ip = target;
+		ipChanged = true;
+	} else if (instr.instr == Ib) {
+		if (cond) {
+			vm.ip = target;
+			ipChanged = true;
+		}
+	} else if (instr.instr == Il) {
+		vm.reg = cond ? 1 : 0;
+	} else if (instr.instr == Is) {
+		vm.cell() = cond ? 1 : 0;
+	} else if (instr.instr == Iswap) {
+		unsigned short temp = vm.cell();
+		vm.cell() = vm.reg;
+		vm.reg = temp;
+	}
+	else if (instr.instr == Ioutu) cout << target;
+	else if (instr.instr == Ioutc) cout << (char)target;
+	// else if (instr.instr == Iinc) ;
+	// else if (instr.instr == Iipc) ;
+	// else if (instr.instr == Iinu) ;
+	// else if (instr.instr == Iinl) ;
+	else unreachable();
+}
+void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
+	unsigned short left, right;
+	if (instr.hasImm()) right = instr.immediate;
+	else if (instr.hasReg()) right = interpGetReg(vm, instr.suffixes.reg);
+
+	if (instr.hasMod()) {
+		left = interpGetReg(vm, InstrToModReg[instr.instr]);
+		right = interpOperation(vm, instr.suffixes.modifier, left, right);
+	}
+	bool cond;
+	if (instr.hasCond()) {
+		cond = interpCond(vm, instr, (signed short) right);
+	}
+	interpInstrBody(vm, instr, right, cond, ipChanged);
+}
+void interpret() {
+	VM vm(parseCtx.parseStartIdx);
+	while (vm.ip < parseCtx.instrs.size()) {
+		bool ipChanged = false;
+		interpInstr(vm, parseCtx.instrs[vm.ip], ipChanged);
+		if (!ipChanged) vm.ip++;
+	}
 }
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
