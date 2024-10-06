@@ -1319,6 +1319,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
 	static_assert(InstructionCount == 14, "Exhaustive interpInstrBody definition");
+	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
 		vm.cell() = target;
@@ -1340,13 +1341,25 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 		unsigned short temp = vm.cell();
 		vm.cell() = vm.reg;
 		vm.reg = temp;
+	} else if (instr.instr == Ioutu) {
+		cout << target;
+	} else if (instr.instr == Ioutc) {
+		cout << (char)target;
+	} else if (instr.instr == Iinc) {
+		char c;
+		cin >> c;
+		inputReg = c;
+	} else if (instr.instr == Iipc) {
+		inputReg = cin.peek();
+	} else if (instr.instr == Iinu) {
+		int input = 0;
+		cin >> input;
+		cin.clear();
+		inputReg = (unsigned short)input;
+	} else if (instr.instr == Iinl) {
+		char c = 0;
+		while (c != '\n') cin >> c;
 	}
-	else if (instr.instr == Ioutu) cout << target;
-	else if (instr.instr == Ioutc) cout << (char)target;
-	// else if (instr.instr == Iinc) ;
-	// else if (instr.instr == Iipc) ;
-	// else if (instr.instr == Iinu) ;
-	// else if (instr.instr == Iinl) ;
 	else unreachable();
 }
 void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
@@ -1366,6 +1379,7 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 }
 void interpret() {
 	VM vm(parseCtx.parseStartIdx);
+	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
 	while (vm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
 		interpInstr(vm, parseCtx.instrs[vm.ip], ipChanged);
@@ -1773,6 +1787,7 @@ struct Flags {
 	bool run = false;
 	bool keepAsm = false;
 	bool dump = false;
+	bool interpret = false;
 
 	fs::path inputPath = "";
 
@@ -1788,6 +1803,7 @@ void printUsage() {
 			"	flags:\n"
 			"		-v / --verbose   - additional compilation messages\n"
 			"		-r / --run       - run executable after compilation\n"
+			"		-I / --interpret - interpret instead of compile\n"
 			"		-A / --keep-asm  - keep assembly file\n"
 			"		-S / --strict    - disables multiple errors\n"
 			"		-D / --dump      - dumps prepocessed code into file\n";
@@ -1821,6 +1837,8 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.verbose = true;
 		} else if (arg == "-r" || arg == "--run") {
 			flags.run = true;
+		} else if (arg == "-I" || arg == "--interpret") {
+			flags.interpret = true;
 		} else if (arg == "-A" || arg == "--keep-asm") {
 			flags.keepAsm = true;
 		} else if (arg == "-S" || arg == "--strict") {
@@ -1845,7 +1863,7 @@ ofstream openOutputFile(fs::path path) {
 	checkCond(ofs.good(), "The output file" errorQuoted(path.string()) " couldn't be opened");
 	return ofs;
 }
-void runCmdEchoed(vector<string> args, Flags& flags) {
+int runCmdEchoed(vector<string> args, Flags& flags, bool exitOnErr=true) {
 	string s = accumulate(args.begin() + 1, args.end(), args.front(), // concat args with spaces
 		[](string s0, const string& s1) { return s0 += " " + s1; });
 	const char* command = s.c_str();
@@ -1853,9 +1871,10 @@ void runCmdEchoed(vector<string> args, Flags& flags) {
 		cout << "[CMD] " << command << '\n';
 	}
 	int returnCode = system(command);
-	if (returnCode) {
+	if (exitOnErr && returnCode) {
 		exit(returnCode);
 	}
+	return returnCode;
 }
 void removeFile(fs::path file) {
 	bool ret = remove(file.string().c_str());
@@ -1863,7 +1882,7 @@ void removeFile(fs::path file) {
 		cerr << "WARNING: error on removing the file '" << file.filename() << "'\n";
 	}
 }
-void compileAndRun(Flags& flags) {
+int compileAndRun(Flags& flags) {
 	runCmdEchoed({"nasm", "-fwin64", flags.filePathStr("asm")}, flags);
 	runCmdEchoed({"ld", "C:\\Windows\\System32\\kernel32.dll -e _start -o", flags.filePathStr("exe"), flags.filePathStr("obj")}, flags);
 	if (flags.keepAsm) {
@@ -1872,13 +1891,22 @@ void compileAndRun(Flags& flags) {
 		removeFile(flags.filePath("asm"));
 	}
 	removeFile(flags.filePath("obj"));
-	if (flags.run) runCmdEchoed({flags.filePathStr("exe")}, flags);
+	if (flags.run) return runCmdEchoed({flags.filePathStr("exe")}, flags, false);
+	return 0;
 }
 void initParseCtx(Flags& flags, string mainRelPath) {
 	if (flags.dump) parseCtx.dumpFile = openOutputFile(flags.filePath("dump"));
 	parseCtx.strToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 }
+void run(Flags& flags) {
+	if (flags.interpret) return interpret();
+	ofstream outFile = openOutputFile(flags.filePath("asm"));
+	generate(outFile, parseCtx.instrs);
 
+	int exitCode = compileAndRun(flags);
+	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
+	exit(exitCode);
+}
 int main(int argc, char *argv[]) {
 	Flags flags = processLineArgs(argc, argv);
 	Scope scope;
@@ -1890,9 +1918,5 @@ int main(int argc, char *argv[]) {
 	parseCtx.close();
 	raiseErrors();
 
-	ofstream outFile = openOutputFile(flags.filePath("asm"));
-	generate(outFile, parseCtx.instrs);
-
-	compileAndRun(flags);
-	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
+	run(flags);
 }
