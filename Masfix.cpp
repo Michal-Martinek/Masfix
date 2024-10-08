@@ -1352,10 +1352,8 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iipc) {
 		inputReg = cin.peek();
 	} else if (instr.instr == Iinu) {
-		int input = 0;
-		cin >> input;
+		cin >> inputReg; // NOTE inu maxes out on overflow
 		cin.clear();
-		inputReg = (unsigned short)input;
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
@@ -1378,7 +1376,7 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	interpInstrBody(vm, instr, right, cond, ipChanged);
 }
 void interpret() {
-	VM vm(parseCtx.parseStartIdx);
+	VM vm(0);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
 	while (vm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
@@ -1512,7 +1510,6 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		outFile << "	call stdin_peek\n"
 			"	mov " << inputDest << ", dx\n";
 	} else if (instr == Iinu) {
-		string dest = inputToR ? "r15w" : "[2*r14+r13]";
 		outFile << "	call input_unsigned\n"
 			"	mov " << inputDest << ", ax\n";
 	} else if (instr == Iinl) {
@@ -1707,7 +1704,11 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	pop rax\n"
 		"	mov r10, 10\n"
 		"	mul r10\n"
-		"	add rax, rcx\n"
+		"	add rax, rcx ; rax = 10 * rax + rcx\n"
+		"\n"
+		"	mov r10, 65535\n"
+		"	cmp rax, r10\n"
+		"	cmova rax, r10\n"
 		"	jmp input_unsigned_loop\n"
 		"input_unsigned_end:\n"
 		"	pop rax\n"
@@ -1886,7 +1887,7 @@ int compileAndRun(Flags& flags) {
 	runCmdEchoed({"nasm", "-fwin64", flags.filePathStr("asm")}, flags);
 	runCmdEchoed({"ld", "C:\\Windows\\System32\\kernel32.dll -e _start -o", flags.filePathStr("exe"), flags.filePathStr("obj")}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":179:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":183:1\n";
 	} else {
 		removeFile(flags.filePath("asm"));
 	}
