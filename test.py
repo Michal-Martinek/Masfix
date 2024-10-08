@@ -68,7 +68,7 @@ def askWhetherToDo(doWhat: str) -> bool:
 def updateFileOutput(file: Path, verbose=True):
 	print('[UPDATING]', file)
 	original = getTestcaseDesc(file, update=True)
-	ran = runFile(file, original['stdin'])
+	ran = runFile(file, original['stdin'], False)
 	if verbose:
 		print()
 		print('[NOTE] returncode:', ran['returncode'])
@@ -97,15 +97,16 @@ def updateInput(file: Path):
 		updateFileOutput(file)
 	
 # test ------------------------------------------
-def runFile(path, stdin) -> dict:
-	return runCommand(['Masfix', '-r', str(path)], stdin)
-def runTest(path: Path) -> bool:
-	print('[TESTING]', path)
+def runFile(path, stdin, interpret) -> dict:
+	return runCommand(['Masfix', '-r', str(path)] + ['-I'] * interpret, stdin)
+def runTest(path: Path, interpret: bool) -> bool:
 	expected = getTestcaseDesc(path)
-	ran = runFile(path, expected['stdin'])
-	check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
+	ran = runFile(path, expected['stdin'], interpret)
+	if not interpret:
+		check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
 	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
-	check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
+	if not interpret:
+		check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
 	return True
 def _handleTestResult(failedTests: list[Path]):
 	print()
@@ -117,7 +118,7 @@ def _handleTestResult(failedTests: list[Path]):
 			for file in failedTests:
 				updateFileOutput(file, False)
 		exit(1)
-def runTests(dir: Path):
+def runTests(dir: Path, quick: bool):
 	failedTests = []
 	for file in os.listdir(dir):
 		path = Path(os.path.join(dir, file))
@@ -126,7 +127,9 @@ def runTests(dir: Path):
 			continue
 		try:
 			check(os.path.exists(path), 'Testcase not found', quoted(path))
-			passed = runTest(path)
+			print('[TESTING]', path)
+			passed = runTest(path, True)
+			if (not quick): passed = passed and runTest(path, False)
 		except TestcaseException:
 			passed = False
 			print()
@@ -156,15 +159,15 @@ def processFileArg(arg) -> Path:
 	if file.is_dir(): file = Path(os.path.join(file, os.path.basename(file.with_suffix('.mx'))))
 	check(file.suffix == '.mx', "The file is expected to end with '.mx'", quoted(file), insideTestcase=False)
 	return file
-def modeRun(args):
+def modeRun(args, quick: bool):
 	if len(args):
 		file = processFileArg(args[0])
 		print('file:', file)
 		assert False, 'Running a single file not implemented yet'
 	else:
-		runTests('tests')
+		runTests('tests', quick)
 		print()
-		runTests('examples')
+		runTests('examples', quick)
 def modeUpdate(args):
 	checkUsage(len(args) >= 1, 'Update specifier expected')
 	update = args[0]
@@ -177,8 +180,8 @@ def modeUpdate(args):
 	elif update in ['output', 'o']:
 		updateFileOutput(file)
 def test(args):
-	if args[0] in ['run', 'r']:
-		modeRun(args[1:])
+	if (arg := args[0]) in ['run', 'r', 'quick', 'q']:
+		modeRun(args[1:], arg[0] == 'q')
 	elif args[0] in ['update', 'u']:
 		modeUpdate(args[1:])
 	else:
@@ -193,6 +196,7 @@ def usage():
 	print(
 """Usage: test.py <mode>
 modes:
+	quick                  - test all by only interpretting (also the default behavior)
 	run                    - test all in the 'tests', 'examples' folders
 	update output <test>   - update the expected output of <test> to the actual output
 	update input <test>    - update the stdin passed to <test>"""
@@ -204,8 +208,10 @@ def checkUsage(cond, *messages):
 		usage()
 		exit(1)
 def getLineArgs() -> list[str]:
-	checkUsage(len(sys.argv) >= 2, "Mode expected")
-	return sys.argv[1:]
+	args = sys.argv.copy()
+	assert len(args) >= 1, 'Invalid program args'
+	if len(args) == 1: args.append('quick')
+	return args[1:]
 def main():
 	args = getLineArgs()
 	# compileCompiler() TODO
