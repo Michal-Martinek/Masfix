@@ -35,8 +35,7 @@ outc 10
 
 
 %proc(cout, ; arg on stack
-	mov %memory_impl:STACK_PTR
-	movm
+	%top()
 	movs 1
 	; ^ arg[0] ^
 	outum
@@ -46,18 +45,17 @@ outc 10
 %proc(printPair,
 	outc 40 ; '('
 
-	mov %memory_impl:STACK_PTR
-	movm
+	%top()
 	movs 2
 	; ^ args[0] ^
 	outum
-	outc 44
+	outc 44 ; ", "
 	outc 32
 
 	; args[1]
 	mova 1
 	outum
-	outc 41
+	outc 41 ; ')'
 	outc 32
 )
 
@@ -68,6 +66,7 @@ outc 10
 	; outc 225
 	outc 32
 )
+
 ; calling with args
 %callWith1Arg(cout, 69)
 %call(sharfesS)
@@ -79,6 +78,5 @@ outc 10
 %callWith2Arg(printPair, 8, 9)
 
 outc 10
-mov %memory_impl:STACK_PTR
-outum
-
+%top()
+outuh

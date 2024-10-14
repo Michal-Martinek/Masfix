@@ -146,3 +146,39 @@ ld %defined1 %test_mac()
 	%debug2(%a, %b)
 }
 %notEnoughArgsUsed(1, 2)
+
+; macro inside arglist
+%macro placist(val) { here %val }
+%macro milkers() { cream }
+%macro diamondMine() { ice }
+%macro autism() {
+	vaccine
+}
+
+%macro m(first, sec) {
+	%first
+	%placist(I s(%first))
+	%sec %first
+	ew %sec
+}
+%placist( %placist(5) )
+%placist(
+	%placist(%defined2) )
+%m(
+	%milkers(),
+	%diamondMine()
+)
+autist ~
+%m( a
+, %autism() )
+%m(pawn,
+%autism()
+)
+sheep
+%m(
+	%placist(%defined3),
+	sekuret )
+rec
+%m(
+	%m(k8,420) , ULL69 ; ultra long long (expansion)
+)
