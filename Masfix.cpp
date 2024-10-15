@@ -1916,11 +1916,15 @@ void initParseCtx(Flags& flags, string mainRelPath) {
 	parseCtx.strToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 }
 void run(Flags& flags) {
-	if (flags.interpret) return interpret();
-	ofstream outFile = openOutputFile(flags.filePath("asm"));
-	generate(outFile, parseCtx.instrs);
+	int exitCode = 0;
+	if (flags.interpret) {
+		interpret();
+	} else {
+		ofstream outFile = openOutputFile(flags.filePath("asm"));
+		generate(outFile, parseCtx.instrs);
 
-	int exitCode = compileAndRun(flags);
+		exitCode = compileAndRun(flags);
+	}
 	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 	exit(exitCode);
 }
