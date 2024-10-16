@@ -171,16 +171,6 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ijmp, Rp},
 	// others don't have modifiable destination
 };
-// checks --------------------------------------------------------------------
-#define errorQuoted(s) " '" + (s) + "'"
-#define unreachable() assert(("Unreachable", false));
-
-#define continueOnFalse(cond) if (!(cond)) continue;
-#define returnOnFalse(cond) if (!(cond)) return false;
-
-#define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
 
 // structs -------------------------------
 struct Loc {
@@ -253,7 +243,7 @@ struct Define {
 struct MacroArg {
 	string name;
 	Loc loc;
-	stack<list<Token>> value; // TODO test multiple expansions inside each other
+	stack<list<Token>> value;
 
 	MacroArg() {}
 	MacroArg(string name, Loc loc) {
@@ -331,8 +321,136 @@ struct Module {
 		this->namespaceId = namespaceId;
 	}
 };
-bool raiseError(string message, Token token, bool strict=false);
-bool raiseError(string message, Loc loc, bool strict=false);
+
+struct Suffix {
+	// dest ?<operation>= <reg>/<imm>
+	RegNames condReg;
+	CondNames cond;
+	OpNames modifier;
+	RegNames reg;
+
+	Suffix() {
+		condReg = Rno;
+		cond = Cno;
+		modifier = OPno;
+		reg = Rno;
+	}
+};
+struct Instr {
+	InstrNames instr = InstructionCount;
+	Suffix suffixes;
+	int immediate;
+
+	string opcodeStr;
+	Loc opcodeLoc;
+	vector<string> immFields;
+
+	Instr() {}
+	Instr(string opcodeStr,	Loc opcodeLoc) {
+		this->opcodeStr = opcodeStr;
+		this->opcodeLoc = opcodeLoc;
+	}
+	bool hasImm() { return immFields.size() != 0; }
+	bool hasCond() { return suffixes.cond != Cno; }
+	bool hasMod()  { return suffixes.modifier != OPno; }
+	bool hasReg()  { return suffixes.reg != Rno; }
+	string toStr() {
+		string out = opcodeStr;
+		for (string s : immFields) {
+			out.push_back(' ');
+			out.append(s);
+		}
+		return out;
+	}
+};
+struct Label {
+	string name;
+	int addr;
+	Loc loc;
+	Label() { name=""; }
+	Label(string name, int addr, Loc loc) {
+		this->name = name;
+		this->addr = addr;
+		this->loc = loc;
+	}
+	string toStr() {
+		return ":" + name;
+	}
+};
+struct ParseCtx {
+	vector<Instr> instrs;
+	size_t parseStartIdx;
+	map<string, Label> strToLabel;
+	Module* lastModule = nullptr;
+	optional<ofstream> dumpFile;
+
+	void close() {
+		if (!!dumpFile) dumpFile->close();
+	}
+};
+ParseCtx parseCtx;
+/// structure simulating the virtual machine during interpretation
+struct VM {
+	unsigned short head;
+	unsigned short reg;
+	unsigned short ip;
+	unsigned short mem[CELLS];
+
+	VM(unsigned short startInstr) { ip = startInstr; }
+	unsigned short& cell() {
+		return mem[head];
+	}
+};
+
+// checks --------------------------------------------------------------------
+#define errorQuoted(s) " '" + (s) + "'"
+#define unreachable() assert(("Unreachable", false));
+
+#define continueOnFalse(cond) if (!(cond)) continue;
+#define returnOnFalse(cond) if (!(cond)) return false;
+
+#define check(cond, message, obj) ((cond) || raiseError(message, obj))
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+
+bool FLAG_strictErrors = false;
+bool SupressErrors = false;
+#define returnOnErrSupress() if (SupressErrors) return false;
+
+vector<string> errors;
+void raiseErrors() { // TODO sort errors based on line and file
+	for (string s : errors) {
+		cerr << s;
+	}
+	if (errors.size()) exit(1);
+}
+void addError(string message, bool strict=true) {
+	errors.push_back(message);
+	if (strict || FLAG_strictErrors) {
+		raiseErrors();
+	}
+}
+
+bool raiseError(string message, Token token, bool strict=false) {
+	returnOnErrSupress();
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	addError(err, strict);
+	return false;
+}
+bool raiseError(string message, Instr instr, bool strict=false) {
+	returnOnErrSupress();
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, strict);
+	return false;
+}
+bool raiseError(string message, Loc loc, bool strict=false) {
+	returnOnErrSupress();
+	string err = loc.toStr() + " ERROR: " + message + "\n";
+	addError(err, strict);
+	return false;
+}
+// struct Scope --------------------------------------------------------
+
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
 struct Scope {
@@ -584,122 +702,6 @@ public:
 	}
 };
 
-struct Suffix {
-	// dest ?<operation>= <reg>/<imm>
-	RegNames condReg;
-	CondNames cond;
-	OpNames modifier;
-	RegNames reg;
-
-	Suffix() {
-		condReg = Rno;
-		cond = Cno;
-		modifier = OPno;
-		reg = Rno;
-	}
-};
-struct Instr {
-	InstrNames instr = InstructionCount;
-	Suffix suffixes;
-	int immediate;
-
-	string opcodeStr;
-	Loc opcodeLoc;
-	vector<string> immFields;
-
-	Instr() {}
-	Instr(string opcodeStr,	Loc opcodeLoc) {
-		this->opcodeStr = opcodeStr;
-		this->opcodeLoc = opcodeLoc;
-	}
-	bool hasImm() { return immFields.size() != 0; }
-	bool hasCond() { return suffixes.cond != Cno; }
-	bool hasMod()  { return suffixes.modifier != OPno; }
-	bool hasReg()  { return suffixes.reg != Rno; }
-	string toStr() {
-		string out = opcodeStr;
-		for (string s : immFields) {
-			out.push_back(' ');
-			out.append(s);
-		}
-		return out;
-	}
-};
-struct Label {
-	string name;
-	int addr;
-	Loc loc;
-	Label() { name=""; }
-	Label(string name, int addr, Loc loc) {
-		this->name = name;
-		this->addr = addr;
-		this->loc = loc;
-	}
-	string toStr() {
-		return ":" + name;
-	}
-};
-struct ParseCtx {
-	vector<Instr> instrs;
-	size_t parseStartIdx;
-	map<string, Label> strToLabel;
-	Module* lastModule = nullptr;
-	optional<ofstream> dumpFile;
-
-	void close() {
-		if (!!dumpFile) dumpFile->close();
-	}
-};
-ParseCtx parseCtx;
-/// structure simulating the virtual machine during interpretation
-struct VM {
-	unsigned short head;
-	unsigned short reg;
-	unsigned short ip;
-	unsigned short mem[CELLS];
-
-	VM(unsigned short startInstr) { ip = startInstr; }
-	unsigned short& cell() {
-		return mem[head];
-	}
-};
-// checks implementation ----------------------------------------------
-bool FLAG_strictErrors = false;
-bool SupressErrors = false;
-#define returnOnErrSupress() if (SupressErrors) return false;
-
-vector<string> errors;
-void raiseErrors() { // TODO sort errors based on line and file
-	for (string s : errors) {
-		cerr << s;
-	}
-	if (errors.size()) exit(1);
-}
-void addError(string message, bool strict=true) {
-	errors.push_back(message);
-	if (strict || FLAG_strictErrors) {
-		raiseErrors();
-	}
-}
-
-bool raiseError(string message, Token token, bool strict) {
-	returnOnErrSupress();
-	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
-	addError(err, strict);
-	return false;
-}
-bool raiseError(string message, Instr instr, bool strict=false) {
-	returnOnErrSupress();
-	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
-	addError(err, strict);
-	return false;
-}
-bool raiseError(string message, Loc loc, bool strict) {
-	returnOnErrSupress();
-	string err = loc.toStr() + " ERROR: " + message + "\n";
-	addError(err, strict);
-	return false;
-}
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
 	bool num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
