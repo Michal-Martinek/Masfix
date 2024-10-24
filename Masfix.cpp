@@ -199,6 +199,13 @@ struct Token {
 	bool firstOnLine;
 
 	Token() {}
+	Token(TokenTypes type, string data, Token& token) {
+		this->type = type;
+		this->data = data;
+		this->loc = token.loc;
+		this->continued = token.continued;
+		this->firstOnLine = token.firstOnLine;
+	}
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
@@ -400,12 +407,15 @@ struct VM {
 	unsigned short ip;
 	unsigned short mem[CELLS];
 
-	VM(unsigned short startInstr) { ip = startInstr; }
+	VM() {};
+	void start(unsigned short startIdx) {
+ 		ip = startIdx;
+	}
 	unsigned short& cell() {
 		return mem[head];
 	}
 };
-VM globalCtimeVm(0);
+VM globalVm;
 
 // checks --------------------------------------------------------------------
 #define errorQuoted(s) " '" + (s) + "'"
@@ -703,7 +713,7 @@ public:
 		forceParse(&ctimeExp);
 		interpret(parseCtx.parseStartIdx);
 
-		insertToken(Token(Tnumeric, to_string(globalCtimeVm.reg), ctimeExp.loc, ctimeExp.continued, ctimeExp.firstOnLine));
+		insertToken(Token(Tnumeric, to_string(globalVm.reg), ctimeExp));
 		currList().erase(--itrs.top()++); // dark magic - erases the ctime token which is before the iterator
 		parseCtx.removeCtimeInstrs();
 	}
@@ -920,12 +930,12 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	mac.body = list(token.tlist.begin(), token.tlist.end());
 	return true;
 }
-bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
+bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope) {
 	Token token; // TODO no seps in namespace body
 	directiveEatToken(Tlist, "Namespace body expected", false);
-	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
+	scope.insertToken(Token(TInamespace, name, percentToken));
 	scope->tlist = token.tlist;
-	scope.addNewNamespace(name, percentLoc, false);
+	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
 }
 bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
@@ -938,7 +948,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 	} else if (directive == "macro") {
 		returnOnFalse(processMacroDef(scope, name, loc, percentToken.loc));
 	} else if (directive == "namespace") {
-		returnOnFalse(processNamespaceDef(name, loc, percentToken.loc, scope));
+		returnOnFalse(processNamespaceDef(name, loc, percentToken, scope));
 	} else {
 		unreachable();
 	}
@@ -946,7 +956,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 }
 void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
-	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
+	Token expanded = Token(Tnumeric, define.value, percentToken);
 	scope.insertToken(expanded);
 }
 bool preprocess(Scope& scope);
@@ -967,7 +977,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope.isCurrListType(Tseparator), "Unexpected token after macro use", scope.currToken());
 
 	bool ctime = percentToken.data == "!";
-	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken.loc, false, true);
+	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
 	scope.insertToken(expanded);
@@ -1432,12 +1442,12 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	interpInstrBody(vm, instr, right, cond, ipChanged);
 }
 void interpret(int startIdx) {
-	VM vm(startIdx);
+	globalVm.start(startIdx);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
-	while (vm.ip < parseCtx.instrs.size()) {
+	while (globalVm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
-		interpInstr(vm, parseCtx.instrs[vm.ip], ipChanged);
-		if (!ipChanged) vm.ip++;
+		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged);
+		if (!ipChanged) globalVm.ip++;
 	}
 }
 // assembly generation ------------------------------------------
@@ -1965,7 +1975,6 @@ void run(Flags& flags) {
 
 		exitCode = compileAndRun(flags);
 	}
-	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 	exit(exitCode);
 }
 int main(int argc, char *argv[]) {
@@ -1977,6 +1986,7 @@ int main(int argc, char *argv[]) {
 	preprocess(scope);
 
 	parseCtx.close();
+	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 	raiseErrors();
 
 	run(flags);
