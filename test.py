@@ -29,7 +29,7 @@ def parseTestcaseDesc(desc: str):
 		line = desc.split('\n', maxsplit=1)[0]
 		desc = desc[len(line):]
 		for fieldType, fieldName in [(int, 'returncode'), (str, 'stdout'), (str, 'stderr'), (str, 'stdin')]:
-			if not re.match(f'{fieldName} \d+', line): continue
+			if not re.match(f'{fieldName} \\d+', line): continue
 			num = int(line.split(' ')[1])
 			if fieldType == int:
 				expected[fieldName] = num
