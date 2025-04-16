@@ -42,6 +42,13 @@
 %include "includes.txt"
 %include "includes.mx"
 
+; path searching
+%include "memory.mx"
+%include "std/procedures"
+%include "fibonacci"
+%include "examples/fibonacci.mx"
+%include "tests\includes\includee"
+%include "tests/include_expansion"
 
 %hidden
 now-gonna-includeeznuts
