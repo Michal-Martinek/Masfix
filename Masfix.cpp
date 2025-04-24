@@ -502,6 +502,7 @@ private:
 	// TODO better max depth checks - maybe add depth counter
 	stack<reference_wrapper<Token>> tlists;
 	stack<list<Token>::iterator> itrs;
+	list<Token> eatenTokens; // saving eaten tokens (only last instr) to restore on ctime encounter
 	list<Module> modules;
 	list<Module>::iterator currModule = modules.begin();
 	bool isPreprocessing = true;
@@ -557,13 +558,24 @@ public:
 	bool hasNext() {
 		return itrs.top() != currList().end();
 	}
-	/// closes ended lists if necessary, returns if iteration can meaningfully continue in this situation
-	/// generally closes only lists opened in an ordinary way, the special ones will be closed elsewhere
+	/// closes ended lists if necessary;
+	/// generally closes only lists opened in an ordinary way, the special ones will be closed elsewhere;
+	/// flushes eaten tokens for every line start (in both modes)
+	/// @returns true - guarantees state ready for further processing
 	bool advanceIteration() {
 		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
 			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed
 			closeList();
 		}
+		returnOnFalse(tlists.size() && hasNext());
+		if (currToken().firstOnLine) flushEatenTokens(); // save only current instruction
+		// escape on ctime encounter (while parsing module)
+		if (!isPreprocessing && currToken().type == TIctime) {
+			restoreEatenTokens();
+			// TODO if its the parsed ctime, right?
+			return false;
+		}
+		// NOTE TODO can this be recursive?
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -600,17 +612,27 @@ public:
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
+	/// eats token from token stream and returns it
 	Token eatenToken() {
 		Token t = currToken();
+		eatenTokens.push_back(t); // TODO dont push tokens inside tlist
 		itrs.top() = currList().erase(itrs.top());
 		return t;
 	}
 	/// eats tokens upto EOL or separator
 	void eatLine(bool surelyEat=false) {
-		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator)) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator) && currToken().type != TIctime) {
 			eatenToken();
 			surelyEat = false;
 		}
+	}
+	/// restores the eaten line into TS, iteration then skips it
+	void restoreEatenTokens() {
+		// TODO layered tlists - complex ident; eat rest of line
+		currList().splice(itrs.top(), eatenTokens);
+	}
+	void flushEatenTokens() {
+		eatenTokens.clear();
 	}
 // situation checks -----------------------------------------
 	bool insideMacro() {
@@ -728,7 +750,7 @@ public:
 			assert(isCurrListType(TIctime) && tlists.top().get().data == macros.top().second);
 			closeList();
 		}
-		assert(isCurrListType(TImodule) && tlists.top().get().data == currModule->contents.data);
+		assert(isCurrListType(TImodule) && &tlists.top().get() == &currModule->contents);
 		closeList();
 		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
@@ -874,7 +896,7 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 }
 #define processArglistWrapper(body) \
 	scope.enterArglist(token); \
-	body \
+	body; \
 	scope.exitArglist(); \
 	returnOnFalse(retval);
 bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
@@ -883,8 +905,8 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
-void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
+void _eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
+	static_assert(TokenCount == 12, "Exhaustive _eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -897,9 +919,18 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 		first = false;
 	}
 }
+/// @brief joins tokens in TS as identifier (name) given naming policies
+/// @param name output ref - identifier
+/// @param loc in - loc of prev token for errs, out - loc of ident start
+/// @param identPurpose description for errors
+/// @param canStartLine is identifier expected to follow prev token or start on newline
+/// @param eatAnything the higher level - more token types are allowed: 0 - basics, 1 - :, 2 - "", 3 - []
+/// @return if identifier was successfully read (false if ctime interrupted eating)
 bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
 	Loc prevLoc = loc;
-	eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	_eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	// break if ctime was seen first, otherwise it's not part of ident because it's never continued
+	if (scope.hasNext() && scope->type == TIctime) return name != "";
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
@@ -1142,6 +1173,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		fs::path path = processIncludePath(token.data, scope);
 		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" can't be included", loc);
 		if (scope.newModuleIncluded(path)) tokenizeNewModule(path, scope);
+		// TODO unexpected token after include
 	} else {
 		unreachable();
 	}
@@ -1177,7 +1209,8 @@ bool processDirective(Token percentToken, Scope& scope) {
 }
 // NOTE silently escapes parsing on encounter with ctime
 #define eatLineOnFalse(cond) if (!(cond)) { \
-	if (scope->type != TIctime) { scope.eatLine(); errorLess = false; } \
+	scope.eatLine(); \
+	errorLess = false; \
 	continue; \
 	}
 /// preprocesses given scope, parses completed modules
@@ -1204,15 +1237,12 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 		if (token.type == Tlist) {
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
-			returnOnFalse(token.tlist.front().type != TIctime);
 			processArglistWrapper(
 				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3);
 				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
 			scope.eatenToken();
 			ident.append(fragment);
-		} else if (token.type == TIctime) {
-			return false;
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
 			canStartLine = false;
@@ -1235,15 +1265,15 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 /// parses upto EOF or possible TIctime encounter
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule)
 void parseTokenStream(Scope& scope) {
-	Loc loc; bool errorLess, labelOnLine;
+	Loc loc;
+	bool labelOnLine;
+	bool errorLess; // ignored
+outer_loop_continue:
 	while (scope.advanceIteration()) {
 		if (scope.getCurrModule() != parseCtx.lastModule) {
 			parseCtx.lastModule = scope.getCurrModule();
 			dumpExpansion(parseCtx.lastModule->abspath.string() + " ----");
 		}
-		// we end parsing on encounter with any ctime
-		if (parseCtx.ctimeOnLine(scope->loc)) break;
-
 		Token& top = scope.currToken(); loc = top.loc; string name;
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
@@ -1252,16 +1282,22 @@ void parseTokenStream(Scope& scope) {
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
+			scope.flushEatenTokens();
 			dump(':' + name);
 		} else if (top.type == Talpha) {
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
-			parseCtx.instrs.push_back(Instr(name, loc));
+			Instr instr(name, loc);
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
-				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"));
-				parseCtx.instrs.back().immFields.push_back(immFrag);
+				// NOTE break on false
+				if (!eatComplexIdentifier(scope, loc, immFrag, "immediate")) {
+					scope.eatLine();
+					goto outer_loop_continue;
+				}
+				instr.immFields.push_back(immFrag);
 			}
-			dump(parseCtx.instrs.back().toStr());
+			parseCtx.instrs.push_back(instr);
+			dump(instr.toStr());
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
@@ -1686,6 +1722,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	mov r8, 1\n"
 		"	call stderr_write\n"
 		"	mov rax, 1 ; exit(1)\n"
+		"	push QWORD 0 ; 128-bit align before call\n"
 		"	call exit\n"
 		"\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
@@ -1935,7 +1972,7 @@ fs::path checkPathArg(string arg, bool file) {
 	else if (fs::is_regular_file(p)) p = p.parent_path();
 	return p;
 }
-/// include paths will be in this order: module-rel dir, input dir, --includes, CWD, std, Masfix dir 
+/// include paths will be in this order: module-rel dir, input dir, --includes, CWD, std, Masfix dir
 void populateIncludePaths(Flags& flags) {
 	checkUsage(!flags.inputPath.empty(), "Input file path not found");
 	flags.includeFolders.insert(flags.includeFolders.begin(), flags.inputPath.parent_path());

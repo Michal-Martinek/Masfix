@@ -18,7 +18,10 @@ def check(cond, *messages, insideTestcase=True):
 def runCommand(command, stdin: str) -> dict:
 	stdin = stdin.encode()
 	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE) # TODO handle process errors
-	stdout, stderr = process.communicate(input=stdin)
+	try:
+		stdout, stderr = process.communicate(input=stdin)
+	except (Exception, KeyboardInterrupt) as e:
+		raise check(False, type(e).__name__)
 	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
 	stderr = stderr.decode().replace('\r', '')
 	return {'returncode': process.returncode, 'stdout': stdout, 'stderr': stderr}
