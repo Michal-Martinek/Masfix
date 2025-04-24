@@ -1,0 +1,54 @@
+; tests errors of using and expanding ctimes
+
+%macro m(b) {
+	ld %b
+	; outur
+}
+%macro add(a) {
+	%m(%a)
+	lda 1
+}
+
+; syntactical
+!
+%!
+!define
+!m()
+ld !m(5)
+!m(5)!m
+!m(2) %m
+two !m(5) !m(5)
+
+
+ctime !m(3) ld !m(4)
+:lab(!add(6))
+oui(!add(65535))
+
+; errors in body
+%macro unknownInstrInCtime() {
+	ff
+	ld 5 ; retval ignored
+}
+unknownInstr !add(!unknownInstrInCtime()) !jj
+
+
+%macro ee(a) {
+:lab(%a)
+	err# %a
+}
+outu !ee(5)
+:lab(5)
+str !ee(4)
+
+:lab(!ee(8)) ; expects error in body
+:lab0
+:lab((!ee(7)#)!)
+
+:: 
+:: ld !ee(1) %m
+::
+
+:("!m(z)")
+!m(2) ""
+""!m(2)
+debug ("i") !m(3) 
