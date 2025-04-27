@@ -18,6 +18,7 @@ namespace fs = std::filesystem;
 #include <functional>
 #include <cctype>
 #include <locale>
+#include <utility>
 using namespace std;
 
 // constants -------------------------------
@@ -190,7 +191,7 @@ struct Loc {
 	}
 };
 struct Token {
-	TokenTypes type;
+	TokenTypes type=TokenCount;
 	string data;
 	list<Token> tlist;
 
@@ -198,26 +199,73 @@ struct Token {
 	bool continued; // continues meaning of previous token
 	bool firstOnLine;
 
-	Token() {}
-	Token(TokenTypes type, string data, Token& token) {
-		this->type = type;
-		this->data = data;
-		this->loc = token.loc;
-		this->continued = token.continued;
-		this->firstOnLine = token.firstOnLine;
-	}
+	long long _ctimeFirstInstrIdx = -1;
+	
+	//–– construtors
+    Token() = default;
+    ~Token() = default; // TODO destructor?
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
 		this->loc = loc;
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
+		_ctimeFirstInstrIdx = -1;
 	}
+	static Token fromCtx(TokenTypes type, string data, Token const& ctx) {
+		return Token(type, move(data), ctx.loc, ctx.continued, ctx.firstOnLine);
+	}
+	//–– Copy
+	Token(const Token& other)
+		: type(other.type)
+		, data(other.data)
+		, tlist(other.tlist)
+		, loc(other.loc)
+		, continued(other.continued)
+		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(other._ctimeFirstInstrIdx)
+	{}
+	Token& operator=(const Token& other) {
+		if (this != &other) {
+			type = other.type;
+			data = other.data;
+			tlist = other.tlist;
+			loc = other.loc;
+			continued = other.continued;
+			firstOnLine = other.firstOnLine;
+			_ctimeFirstInstrIdx = other._ctimeFirstInstrIdx;
+		}
+		return *this;
+	}
+	//–– Move
+	Token(Token&& other) noexcept
+		: type(std::exchange(other.type, TokenCount))
+		, data(std::move(other.data))
+		, tlist(std::move(other.tlist))
+		, loc(std::move(other.loc))
+		, continued(other.continued)
+		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(std::exchange(other._ctimeFirstInstrIdx, -1))
+	{}
+	Token& operator=(Token&& other) noexcept {
+	  if (this != &other) {
+		type = std::exchange(other.type, TokenCount);
+		data = std::move(other.data);
+		tlist = std::move(other.tlist);
+		loc = std::move(other.loc);
+		continued = other.continued;
+		firstOnLine = other.firstOnLine;
+		_ctimeFirstInstrIdx = std::exchange(other._ctimeFirstInstrIdx, -1);
+	  }
+	  return *this;
+	}
+
 	char tlistCloseChar() {
 		assert(type == Tlist);
 		return data.at(0) + 2 - (data.at(0) == '(');
 	}
 	string toStr() {
+		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
 			if (isSeparated()) out.push_back(',');
@@ -592,32 +640,28 @@ public:
 		return itrs.top();
 	}
 // token stream manipulation ------------------------------------------
-	void insertToken(Token& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
-	}
 	void insertToken(Token&& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
+		itrs.top() = currList().insert(itrs.top(), move(token));
 	}
-	void insertList(list<Token>& tlist, Token& percentToken) {
+	/// moves Tokens / inserts copies of Tokens from tlist into currList
+	/// first inserted inherits context from percentToken
+	void insertList(list<Token>& tlist, Token& percentToken, bool copy) {
 		assert(tlist.size());
-		itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
-		itrs.top()->continued = percentToken.continued;
-		itrs.top()->firstOnLine = percentToken.firstOnLine;
-	}
-	void insertListNoCopy(list<Token>& tlist, Token& percentToken) {
-		assert(tlist.size());
-		list<Token>::iterator firstInserted = tlist.begin();
-		currList().splice(itrs.top(), tlist);
-		itrs.top() = firstInserted;
+		if (copy) {
+			itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
+		} else {
+			itrs.top() = tlist.begin();
+			currList().splice(itrs.top(), tlist);
+		}		
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
 	/// eats token from token stream and returns it
-	Token eatenToken() {
-		Token t = currToken();
-		eatenTokens.push_back(t); // TODO dont push tokens inside tlist
-		itrs.top() = currList().erase(itrs.top());
-		return t;
+	Token& eatenToken(bool skipNoEat=false) {
+		auto nextNode = std::next(itrs.top());
+		if (!skipNoEat) savedLine.splice(savedLine.end(), currList(), itrs.top());
+		itrs.top() = nextNode;
+		return skipNoEat ? *prev(itrs.top()) : savedLine.back();
 	}
 	/// eats tokens upto EOL or separator
 	void eatLine(bool surelyEat=false) {
@@ -787,8 +831,8 @@ public:
 				retval &= _addMacroArg(argSpans, ++argStart, loc);
 				argStart = itrs.top();
 			} else if (currToken().type == TIexpansion) {
-				Token exp = eatenToken();
-				if (exp.tlist.size()) insertListNoCopy(exp.tlist, exp);
+				Token& exp = eatenToken();
+				if (exp.tlist.size()) insertList(exp.tlist, exp, false);
 				continue;
 			}
 			next();
@@ -967,7 +1011,7 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
 	while (scope.hasNext()) {
 		if (!first) {
-			Token sep = scope.eatenToken(); loc = sep.loc;
+			const Token& sep = scope.eatenToken(); loc = sep.loc;
 			checkReturnOnFail(sep.type == Tseparator, "Separator expected", loc);
 		}
 		first = false;
@@ -993,12 +1037,12 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope) {
 	Token token; // TODO no seps in namespace body
 	directiveEatToken(Tlist, "Namespace body expected", false);
-	scope.insertToken(Token(TInamespace, name, percentToken));
+	scope.insertToken(Token::fromCtx(TInamespace, name, percentToken));
 	scope->tlist = token.tlist;
 	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
 }
-bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
+bool processDirectiveDef(string directive, Scope& scope, Token& percentToken, Loc loc) {
 	static_assert(DefiningDirectivesCount == 3, "Exhaustive processDirectiveDef definition");
 	string name; Token token;
 	directiveEatIdentifier(directive, true, 1);
@@ -1014,10 +1058,9 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 	}
 	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
-void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
+void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
-	Token expanded = Token(Tnumeric, define.value, percentToken);
-	scope.insertToken(expanded);
+	scope.insertToken(Token::fromCtx(Tnumeric, define.value, percentToken));
 }
 bool preprocess(Scope& scope);
 bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
@@ -1037,10 +1080,10 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine || (ctime && !scope->continued), "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
+	Token expanded = Token::fromCtx(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
-	scope.insertToken(expanded);
+	scope.insertToken(move(expanded));
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
@@ -1201,7 +1244,7 @@ bool processDirective(Token percentToken, Scope& scope) {
 	} else if (!prefixes.size() && scope.hasMacroArg(directiveName)) {
 		processDirectiveSituationChecks("macro arg");
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
-		scope.insertList(argField, percentToken);
+		scope.insertList(argField, percentToken, true);
 	} else {
 		return lookupName(percentToken, directiveName, prefixes, locs, notContinued, scope);
 	}
