@@ -620,12 +620,29 @@ public:
 		if (currToken().firstOnLine) flushSavedLine(); // save only current instruction
 		// escape when meeting ctime (while parsing module)
 		if (!isPreprocessing && currToken().type == TIctime) {
-			restoreSavedLine();
-			// TODO if its the parsed ctime, right?
-			return false;
+			return handleCtimeMeet(currToken());
 		}
-		// NOTE TODO can this be recursive?
 		return tlists.size() && hasNext();
+	}
+	/// @brief properly advances parsing when meeting ctime during module parsing
+	/// @return continue parsing?
+	bool handleCtimeMeet(Token& ctime) {
+		assert(parseCtx.parsedCtime != nullptr);
+		parseCtx.saveCtimeStart(ctime);
+		restoreSavedLine();
+		return _advanceScopesCtimeMeet(ctime);
+	}
+	bool _advanceScopesCtimeMeet(Token& ctime) {
+		if (&ctime != parseCtx.parsedCtime) {
+			next(ctime); // advance into ctime which is not parsed now
+			return advanceIteration();
+		}
+		// parsedCtime met while parsing module -> exit -> forceParse(parsedCtime)
+		while (tlists.size() && !isCurrListType(TImodule)) {
+			closeList();
+		}
+		if (tlists.size()) itrs.top() = currList().end(); // guarantee parsing exit
+		return false;
 	}
 	/// advances iteration inside current list
 	list<Token>::iterator& next() {
@@ -775,28 +792,23 @@ public:
 		currModule->contents = Token(TImodule, moduleName, loc, false, true);
 		openList(currModule->contents);
 	}
-	/// closes all excesive lists opened while parsing module
-	/// called before parsing ctime body
-	void closeScopesAfterCtimeMeet() {
-		while (tlists.size() && !isCurrListType(TImodule)) {
-			closeList();
-		}
-	}
 	bool forceParseImpl();
 	/// Scope wrapper for parsing, cleans Scope after parsing
-	/// parses whole TImodule upto possible ctime, then it's body
+	/// parses whole TImodule (upto possible ctime, then it's body)
 	bool forceParse(Token* ctime=nullptr) {
 		assert(isPreprocessing);
 		isPreprocessing = false;
 		int numTlistsBefore = tlists.size();
 		bool safeToRun=true;
+		parseCtx.parsedCtime = ctime;
+		/// NOTE all tlists are opened again specifically for parsing and discarded afterwards
 		openList(currModule->contents);
 		forceParseImpl();
 		if (ctime) {
-			closeScopesAfterCtimeMeet();
+			/* assert */(ctime->_ctimeFirstInstrIdx != -1) || raiseError("CRITICAL ctime used in unexpected context", *ctime, true);
 			openList(*ctime);
 			safeToRun = forceParseImpl();
-			assert(isCurrListType(TIctime) && tlists.top().get().data == macros.top().second);
+			assert(isCurrListType(TIctime) && &currList() == &ctime->tlist);
 			closeList();
 		}
 		assert(isCurrListType(TImodule) && &tlists.top().get() == &currModule->contents);
@@ -1292,7 +1304,14 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
 			scope.enterArglist(scope.eatenToken(), false);
 				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3, true);
+				Token* nextToken=nullptr; if (scope.hasNext()) nextToken = &scope.currToken();
 			scope.exitArglist(true);
+			if (!!nextToken && nextToken->type == TIctime) {
+				scope.handleCtimeMeet(*nextToken);
+				return false;
+			}
+			returnOnFalse(retval);
+			checkReturnOnFail(!nextToken, "Simple " + purpose + " field expected", token.loc);
 			ident.append(fragment);
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
