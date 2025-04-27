@@ -435,23 +435,22 @@ struct Label {
 };
 struct ParseCtx {
 	vector<Instr> instrs;
-	size_t parseStartIdx;
 	map<string, Label> strToLabel;
 	Module* lastModule = nullptr;
+	Token* parsedCtime; // ctime currently being parsed
 	optional<ofstream> dumpFile;
-	int ctimeRow = -1;
 
 	void close() {
 		if (!!dumpFile) dumpFile->close();
 	}
-	bool ctimeOnLine(const Loc& loc) {
-		if (ctimeRow == -1) return false;
-		bool ctimeOnLine = loc.row >= ctimeRow;
-		if (ctimeOnLine) ctimeRow = -1;
-		return ctimeOnLine;
+	/// saves idx of first instruction of ctime's body
+	void saveCtimeStart(Token& ctime) {
+		if (ctime._ctimeFirstInstrIdx == -1) {
+			ctime._ctimeFirstInstrIdx = instrs.size();
+		}
 	}
-	void removeCtimeInstrs() {
-		instrs.resize(parseStartIdx);
+	void removeCtimeInstrs(Token& ctime) {
+		instrs.resize(ctime._ctimeFirstInstrIdx);
 	}
 };
 ParseCtx parseCtx;
@@ -803,14 +802,17 @@ public:
 	/// handles ctime use after it's body has been preprocessed
 	/// parses everything needed, runs the VM, handles ctime's return value(s)
 	void parseInterpretCtime(Token& ctimeExp) {
-		parseCtx.ctimeRow = ctimeExp.loc.row;
 		bool safeToRun = forceParse(&ctimeExp);
-		if (safeToRun) interpret(parseCtx.parseStartIdx);
+		string retval;
+		if (safeToRun) {
+			interpret(ctimeExp._ctimeFirstInstrIdx);
+			retval = to_string(globalVm.reg);
+		}
 
-		insertToken(Token(Tnumeric, to_string(globalVm.reg), ctimeExp));
-		currList().erase(--itrs.top()++); // dark magic - erases the ctime token which is before the iterator
+		parseCtx.removeCtimeInstrs(ctimeExp);
+		Token retValToken = Token::fromCtx(Tnumeric, retval, ctimeExp);
+		insertToken(move(retValToken));
 		endMacroExpansion();
-		parseCtx.removeCtimeInstrs();
 	}
 
 // helpers -------------------------------------------------
@@ -1466,10 +1468,10 @@ bool parseInstrs(vector<Instr>& instrs, int startIdx) {
 	return errorLess;
 }
 bool Scope::forceParseImpl() {
-	parseCtx.parseStartIdx = parseCtx.instrs.size();
+	size_t firstUnparsed = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	return parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
+	return parseInstrs(parseCtx.instrs, firstUnparsed);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
