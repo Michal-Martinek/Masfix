@@ -1,10 +1,11 @@
 %include "memory"
+%using stack
 
 %macro proc(name, body) {
 	jmp proc_(%name)_end
 :proc_(%name)
 	%body
-	%pop()
+	%stack:impl:derefSPpop()
 	jmpm
 :proc_(%name)_end
 }

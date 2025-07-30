@@ -1,0 +1,43 @@
+%include "memory"
+
+; source of incrementing numbers
+%namespace iota {
+	%using MEMORY_LAYOUT
+	%macro get() {
+		%load(%G_IOTA)
+	}
+	%macro get_offset(off) {
+		%get()
+		lda %off
+	}
+	%macro inc() {
+		%load(%G_IOTA)
+		stra 1
+	}
+	%macro def_label(name) {
+		: (%name)_(!inc())
+	}
+}
+
+; NOTE cond - loads boolean condition to r
+%macro if(cond, body) {
+	%cond
+	beq if_(!iota:get())
+	%body
+	%def_label(if)
+}
+%macro if_else(cond, body, else) {
+	%cond
+	beq else_(!iota:get())
+		%body
+		jmp else_end_(!iota:get_offset(1))
+	%def_label(else)
+		%else
+	%def_label(else_end)
+}
+%macro do_while(cond, body) {
+	%def_label(do_start)
+	%body
+	%cond
+	bne do_start_(!iota:get())
+}
