@@ -968,6 +968,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	checkReturnOnFail(scope.hasNext(), errMissing, loc);
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
+	// TODO check before eating?
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void _eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool skipNoEat=false) {
@@ -1087,12 +1088,11 @@ void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string 
 bool preprocess(Scope& scope);
 bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	assert(token.type == Tlist);
-	if (token.tlist.size()) {
-		processArglistWrapper(
-			bool retval = preprocess(scope);
-			retval = retval && scope.sliceArglist(mac, loc);
-		);
-	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+	if (!token.tlist.size()) return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+	processArglistWrapper(
+		bool retval = preprocess(scope);
+		retval = retval && scope.sliceArglist(mac, loc);
+	);
 	return true;
 }
 bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
