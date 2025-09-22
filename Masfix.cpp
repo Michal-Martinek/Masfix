@@ -1410,16 +1410,16 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 
 void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile <<
-		"extern ExitProcess@4\n"
-		"extern GetStdHandle@4\n"
-		"extern WriteFile@20\n"
-		"extern ReadFile@20\n"
+		"extern ExitProcess\n"
+		"extern GetStdHandle\n"
+		"extern WriteFile\n"
+		"extern ReadFile\n"
 		"\n"
 		"section .text\n"
 		"exit: ; exits the program with code in rax\n"
 		"	mov rcx, rax\n"
 		"	sub rsp, 32\n"
-		"	call ExitProcess@4\n"
+		"	call ExitProcess\n"
 		"	hlt\n"
 		"error: ; prints ERROR template, instr number: rsi, message: rdx, r8, errorneous value: rcx, exit(1)\n"
 		"	push rcx\n"
@@ -1446,19 +1446,19 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
 		"	mov rcx, -10 ; stdin fd\n"
 		"	sub rsp, 32 ; call with shadow space\n"
-		"	call GetStdHandle@4\n"
+		"	call GetStdHandle\n"
 		"	add rsp, 32\n"
 		"	mov rcx, stdin_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -11 ; stdout fd\n"
 		"	sub rsp, 32\n"
-		"	call GetStdHandle@4\n"
+		"	call GetStdHandle\n"
 		"	add rsp, 32\n"
 		"	mov rcx, stdout_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -12 ; stderr fd\n"
 		"	sub rsp, 32\n"
-		"	call GetStdHandle@4\n"
+		"	call GetStdHandle\n"
 		"	add rsp, 32\n"
 		"	mov rcx, stderr_fd\n"
 		"	mov [rcx], rax\n"
@@ -1739,8 +1739,14 @@ void removeFile(fs::path file) {
 	}
 }
 void compileAndRun(Flags& flags) {
-	runCmdEchoed({"nasm", "-fwin64", flags.filePathStr("asm")}, flags);
-	runCmdEchoed({"ld", "C:\\Windows\\System32\\kernel32.dll -e _start -o", flags.filePathStr("exe"), flags.filePathStr("obj")}, flags);
+	runCmdEchoed({
+		"nasm", "-fwin64", "-g", "-F cv8",
+		flags.filePathStr("asm")
+	}, flags);
+	runCmdEchoed({
+		"gcc", "-nostartfiles", "-Wl,-e,_start", "-lkernel32",
+		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
+	}, flags);
 	if (flags.keepAsm) {
 		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":179:1\n";
 	} else {
