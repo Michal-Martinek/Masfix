@@ -240,34 +240,36 @@ The macro arguments must be numerical-value-reducible expressions.
 Any occurences of macro parameters (`%x` and `%y` in this case) in the macro body will get replaced with the supplied values (here 5 and 8).  
 
 # Setup
-This command sequence should help you set up your enviroment.
-
+This command sequence should help you set up your enviroment.  
+`nasm` and `gcc` commands shown here are  used internally during compilation. 
 ```
 # Testing of your setup
-g++ -std=c++17 Masfix.cpp -o Masfix
-Masfix --keep-asm tests\basic-test.mx
-nasm -fwin64 <Masfix-dir>\tests\basic-test.asm
-ld C:\Windows\System32\kernel32.dll -e _start -o <Masfix-dir>\tests\basic-test.exe <Masfix-dir>\tests\basic-test.obj
-<Masfix-dir>\tests\basic-test
+g++ Masfix.cpp -o Masfix
+cd tests
+..\Masfix --keep-asm --verbose basic-test.mx
+nasm -fwin64 -g -F cv8 basic-test.asm
+gcc -nostartfiles -Wl,-e,_start -lkernel32 -o basic-test.exe -g basic-test.obj
+basic-test.exe
 echo %ERRORLEVEL%
 test.py run
 
 # Normal operations
-cd <Masfix-dir> && Masfix -r -s <.mx-file-to-run>
+cd <Masfix-dir> && Masfix -r <.mx-file-to-run>
 ```
 
 Here is a list of what I'm using:
-* `g++ (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders) 12.2.0`
-* `NASM version 2.16.01 compiled on Jan 17 2023`
-* `GNU ld (Binutils for MinGW-W64 x86_64, built by Brecht Sanders) 2.40`
+* `g++ (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0`
+* `NASM version 2.16.03 compiled on Apr 17 2024`
+* `gcc version 13.2.0 (x86_64-posix-seh-rev0, Built by MinGW-Builds project)`
 * The above are from http://winlibs.com/
-* `Python 3.9.5`
+* `Python 3.13.0`
 
 <!---
-Todos
+TODOS
 
 test examples
 blobs like - 'build passing', 'code quality'
 
 maybe add summary and collapses: https://github.com/jrblevin/markdown-mode/issues/658
+^^ CAN BE DONE WITH PLAIN MD ^^
 --->
