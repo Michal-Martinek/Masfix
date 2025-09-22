@@ -1410,16 +1410,17 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 
 void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile <<
-		"extern ExitProcess@4\n"
-		"extern GetStdHandle@4\n"
-		"extern WriteFile@20\n"
-		"extern ReadFile@20\n"
+		"extern ExitProcess\n"
+		"extern GetStdHandle\n"
+		"extern WriteFile\n"
+		"extern ReadFile\n"
 		"\n"
 		"section .text\n"
 		"exit: ; exits the program with code in rax\n"
 		"	mov rcx, rax\n"
+		"	and rsp, -16 ; force 16-byte alignment\n"
 		"	sub rsp, 32\n"
-		"	call ExitProcess@4\n"
+		"	call ExitProcess\n"
 		"	hlt\n"
 		"error: ; prints ERROR template, instr number: rsi, message: rdx, r8, errorneous value: rcx, exit(1)\n"
 		"	push rcx\n"
@@ -1444,52 +1445,47 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	call exit\n"
 		"\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
+		"	sub rsp, 32 ; reserve shadow space\n"
 		"	mov rcx, -10 ; stdin fd\n"
-		"	sub rsp, 32 ; call with shadow space\n"
-		"	call GetStdHandle@4\n"
-		"	add rsp, 32\n"
+		"	call GetStdHandle\n"
 		"	mov rcx, stdin_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -11 ; stdout fd\n"
-		"	sub rsp, 32\n"
-		"	call GetStdHandle@4\n"
-		"	add rsp, 32\n"
+		"	call GetStdHandle\n"
 		"	mov rcx, stdout_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -12 ; stderr fd\n"
-		"	sub rsp, 32\n"
-		"	call GetStdHandle@4\n"
-		"	add rsp, 32\n"
+		"	call GetStdHandle\n"
 		"	mov rcx, stderr_fd\n"
 		"	mov [rcx], rax\n"
+		"	add rsp, 32 ; remove shadow space\n"
 		"	ret\n"
-		"write_file: ; rcx - fd, rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	push 0 ; number of bytes written var\n"
+		"\n"
+		"; rdx - buff, r8 - number of bytes -> rax - number written\n"
+		"stdout_write:\n"
+		"	mov rcx, QWORD [rel stdout_fd]\n"
+		"	jmp write_file\n"
+		"stderr_write:\n"
+		"	mov rcx, QWORD [rel stderr_fd]\n"
+		"	; fall through to write_file\n"
+		"\n"
+		"; rcx - fd, rdx - buff, r8 - chars / buffsize -> rax - number read/written\n"
+		"write_file:\n"
+		"	mov rax, WriteFile\n"
+		"	jmp call_winapi_file_op\n"
+		"read_file:\n"
+		"	mov rax, ReadFile\n"
+		"call_winapi_file_op:\n"
+		"	mov rbp, rsp ; save rsp @ retval\n"
+		"	and rsp, -16 ; force 16-byte alignment\n"
+		"	push 0 ; number of bytes written/read var\n"
 		"	mov r9, rsp ; ptr to that var\n"
-		"	push 0 ; OVERLAPPED struct null ptr\n"
-		"	sub rsp, 32 ; call with shadow space\n"
-		"	call WriteFile@20\n"
-		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
-		"	pop rax\n"
-		"	ret\n"
-		"read_file: ; rcx - fd, rdx - buff, r8 - buff size -> rax - number read\n"
-		"	push 0 ; number of bytes read var\n"
-		"	mov r9, rsp ; ptr to that var\n"
-		"	push 0 ; OVERLAPPED struct null ptr\n"
-		"	sub rsp, 32 ; call with shadow space\n"
-		"	call ReadFile@20\n"
-		"	add rsp, 32+8 ; get rid of the OVERLAPPED\n"
-		"	pop rax\n"
-		"	ret\n"
-		"stdout_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	mov rcx, stdout_fd\n"
-		"	mov rcx, [rcx] ; stdout fd\n"
-		"	call write_file\n"
-		"	ret\n"
-		"stderr_write: ; rdx - buff, r8 - number of bytes -> rax - number written\n"
-		"	mov rcx, stderr_fd\n"
-		"	mov rcx, [rcx] ; stderr fd\n"
-		"	call write_file\n"
+		"	push 0 ; OVERLAPPED struct null ptr (5th arg) & still aligned\n"
+		"	sub rsp, 32 ; reserve shadow space\n"
+		"	call rax\n"
+		"	add rsp, 32+8 ; remove shadow space & overlapped\n"
+		"	pop rax ; num written / read\n"
+		"	mov rsp, rbp\n"
 		"	ret\n"
 		"stdin_read:\n"
 		"	mov rcx, stdin_fd ; get chars into stdin_buff\n"
@@ -1740,10 +1736,16 @@ void removeFile(fs::path file) {
 	}
 }
 void compileAndRun(Flags& flags) {
-	runCmdEchoed({"nasm", "-fwin64", flags.filePathStr("asm")}, flags);
-	runCmdEchoed({"ld", "C:\\Windows\\System32\\kernel32.dll -e _start -o", flags.filePathStr("exe"), flags.filePathStr("obj")}, flags);
+	runCmdEchoed({
+		"nasm", "-fwin64", "-g", "-F cv8",
+		flags.filePathStr("asm")
+	}, flags);
+	runCmdEchoed({
+		"gcc", "-nostartfiles", "-Wl,-e,_start", "-lkernel32",
+		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
+	}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":179:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":180:1\n";
 	} else {
 		removeFile(flags.filePath("asm"));
 	}
