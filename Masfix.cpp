@@ -1418,6 +1418,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"section .text\n"
 		"exit: ; exits the program with code in rax\n"
 		"	mov rcx, rax\n"
+		"	and rsp, -16 ; force 16-byte alignment\n"
 		"	sub rsp, 32\n"
 		"	call ExitProcess\n"
 		"	hlt\n"
@@ -1444,24 +1445,20 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	call exit\n"
 		"\n"
 		"get_std_fds: ; prepares all std fds, regs unsafe!\n"
+		"	sub rsp, 32 ; reserve shadow space\n"
 		"	mov rcx, -10 ; stdin fd\n"
-		"	sub rsp, 32 ; call with shadow space\n"
 		"	call GetStdHandle\n"
-		"	add rsp, 32\n"
 		"	mov rcx, stdin_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -11 ; stdout fd\n"
-		"	sub rsp, 32\n"
 		"	call GetStdHandle\n"
-		"	add rsp, 32\n"
 		"	mov rcx, stdout_fd\n"
 		"	mov [rcx], rax\n"
 		"	mov rcx, -12 ; stderr fd\n"
-		"	sub rsp, 32\n"
 		"	call GetStdHandle\n"
-		"	add rsp, 32\n"
 		"	mov rcx, stderr_fd\n"
 		"	mov [rcx], rax\n"
+		"	add rsp, 32 ; remove shadow space\n"
 		"	ret\n"
 		"\n"
 		"; rdx - buff, r8 - number of bytes -> rax - number written\n"
@@ -1748,7 +1745,7 @@ void compileAndRun(Flags& flags) {
 		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
 	}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":179:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":180:1\n";
 	} else {
 		removeFile(flags.filePath("asm"));
 	}
