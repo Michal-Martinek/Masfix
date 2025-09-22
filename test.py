@@ -191,10 +191,15 @@ def test(args):
 		checkUsage(False, "Unknown mode", quoted(args[0]))
 # IO ----------------------------------------------
 def compileCompiler():
-	comm = ['g++', '-std=c++17', 'Masfix.cpp', '-o', 'Masfix']
+	comm = ['g++', 'Masfix.cpp', '-o', 'Masfix']
 	print('[CMD]', *comm)
-	code, _, _ = runCommand(comm)
-	check(code == 0, "g++ error", insideTestcase=False)
+	res = runCommand(comm, '')
+	check(res['returncode'] == 0, "g++ error", insideTestcase=False)
+def checkSourceCompiled():
+	if os.path.getmtime('Masfix.exe') < os.path.getmtime('Masfix.cpp'):
+		print("[INFO] 'Masfix.exe' seems older than it's source, recompiling it now.")
+		compileCompiler()
+		print()
 def usage():
 	print(
 """Usage: test.py <mode>
@@ -217,7 +222,7 @@ def getLineArgs() -> list[str]:
 	return args[1:]
 def main():
 	args = getLineArgs()
-	# compileCompiler() TODO
+	checkSourceCompiled()
 	test(args)
 
 if __name__ == '__main__':
