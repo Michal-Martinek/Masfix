@@ -1,10 +1,14 @@
-from subprocess import Popen, PIPE
+import subprocess
+from subprocess import Popen, PIPE, TimeoutExpired
 import os, sys
 import re
 from pathlib import Path
 
 class TestcaseException(Exception):
 	pass
+class ExecutionException(TestcaseException):
+	pass
+
 def quoted(s):
 	return "'" + str(s) + "'"
 def check(cond, *messages, insideTestcase=True):
@@ -15,13 +19,19 @@ def check(cond, *messages, insideTestcase=True):
 		else:
 			exit(1)
 # testcases ------------------------------------
-def runCommand(command, stdin: str) -> dict:
+def runCommand(command, stdin: str, timeout=None) -> dict:
 	stdin = stdin.encode()
-	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE) # TODO handle process errors
+	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE)
 	try:
-		stdout, stderr = process.communicate(input=stdin)
+		stdout, stderr = process.communicate(input=stdin, timeout=timeout)
+	except TimeoutExpired:
+		subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+		_, _ = process.communicate() # read remaining output
+		print(msg := f'[ERROR] Timed out after {timeout}s')
+		raise ExecutionException(msg)
 	except (Exception, KeyboardInterrupt) as e:
-		raise check(False, type(e).__name__)
+		print(f'[ERROR] {type(e).__name__}')
+		raise ExecutionException(type(e).__name__)
 	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
 	stderr = stderr.decode().replace('\r', '')
 	return {'returncode': process.returncode, 'stdout': stdout, 'stderr': stderr}
@@ -100,8 +110,8 @@ def updateInput(file: Path):
 		updateFileOutput(file)
 	
 # test ------------------------------------------
-def runFile(path, stdin, interpret) -> dict:
-	return runCommand(['Masfix', '-r', str(path)] + ['-I'] * interpret, stdin)
+def runFile(path, stdin, interpret, timeout=1.0) -> dict:
+	return runCommand(['Masfix', '-r', str(path)] + ['-I'] * interpret, stdin, timeout)
 def runTest(path: Path, interpret: bool) -> bool:
 	expected = getTestcaseDesc(path)
 	ran = runFile(path, expected['stdin'], interpret)
@@ -119,7 +129,10 @@ def _handleTestResult(failedTests: list[Path]):
 		print('Some testcases failed')
 		if askWhetherToDo("update outputs of failed tests"):
 			for file in failedTests:
-				updateFileOutput(file, False)
+				try:
+					updateFileOutput(file, False)
+				except ExecutionException:
+					print()
 		exit(1)
 def runTests(dir: Path, quick: bool):
 	failedTests = []
