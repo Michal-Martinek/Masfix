@@ -1,4 +1,5 @@
-from subprocess import Popen, PIPE
+import subprocess
+from subprocess import Popen, PIPE, TimeoutExpired
 import os, sys
 import re
 from pathlib import Path
@@ -18,11 +19,16 @@ def check(cond, *messages, insideTestcase=True):
 		else:
 			exit(1)
 # testcases ------------------------------------
-def runCommand(command, stdin: str) -> dict:
+def runCommand(command, stdin: str, timeout=None) -> dict:
 	stdin = stdin.encode()
-	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE) # TODO handle process errors
+	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE)
 	try:
-		stdout, stderr = process.communicate(input=stdin)
+		stdout, stderr = process.communicate(input=stdin, timeout=timeout)
+	except TimeoutExpired:
+		subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+		_, _ = process.communicate() # read remaining output
+		print(msg := f'[ERROR] Timed out after {timeout}s')
+		raise ExecutionException(msg)
 	except (Exception, KeyboardInterrupt) as e:
 		print(f'[ERROR] {type(e).__name__}')
 		raise ExecutionException(type(e).__name__)
@@ -104,8 +110,8 @@ def updateInput(file: Path):
 		updateFileOutput(file)
 	
 # test ------------------------------------------
-def runFile(path, stdin) -> dict:
-	return runCommand(['Masfix', '-r', str(path)], stdin)
+def runFile(path, stdin, timeout=1.0) -> dict:
+	return runCommand(['Masfix', '-r', str(path)], stdin, timeout)
 def runTest(path: Path) -> bool:
 	print('[TESTING]', path)
 	expected = getTestcaseDesc(path)
