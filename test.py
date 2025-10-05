@@ -5,6 +5,9 @@ from pathlib import Path
 
 class TestcaseException(Exception):
 	pass
+class ExecutionException(TestcaseException):
+	pass
+
 def quoted(s):
 	return "'" + str(s) + "'"
 def check(cond, *messages, insideTestcase=True):
@@ -18,7 +21,11 @@ def check(cond, *messages, insideTestcase=True):
 def runCommand(command, stdin: str) -> dict:
 	stdin = stdin.encode()
 	process = Popen(command, stdout=PIPE, stderr=PIPE, stdin=PIPE) # TODO handle process errors
-	stdout, stderr = process.communicate(input=stdin)
+	try:
+		stdout, stderr = process.communicate(input=stdin)
+	except (Exception, KeyboardInterrupt) as e:
+		print(f'[ERROR] {type(e).__name__}')
+		raise ExecutionException(type(e).__name__)
 	stdout = stdout.decode().replace('\r', '') # TODO handle decode errors
 	stderr = stderr.decode().replace('\r', '')
 	return {'returncode': process.returncode, 'stdout': stdout, 'stderr': stderr}
@@ -115,7 +122,10 @@ def _handleTestResult(failedTests: list[Path]):
 		print('Some testcases failed')
 		if askWhetherToDo("update outputs of failed tests"):
 			for file in failedTests:
-				updateFileOutput(file, False)
+				try:
+					updateFileOutput(file, False)
+				except ExecutionException:
+					print()
 		exit(1)
 def runTests(dir: Path):
 	failedTests = []
