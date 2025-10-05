@@ -633,7 +633,9 @@ void raiseErrors() { // TODO sort errors based on line and file
 	for (string s : errors) {
 		cerr << s;
 	}
-	if (errors.size()) exit(1);
+	if (errors.size()) {
+		exit(1);
+	}
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
