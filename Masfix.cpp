@@ -1305,7 +1305,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
 			scope.enterArglist(scope.eatenToken(), false);
-				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 2, true);
+				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3, true);
 				Token* nextToken=nullptr; if (scope.hasNext()) nextToken = &scope.currToken();
 			scope.exitArglist(true);
 			if (!!nextToken && nextToken->type == TIctime) {
