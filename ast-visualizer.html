@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <title>Masfix AST visualizer</title>
+</head>
+<body>
+  <svg width="800" height="600"></svg>
+  <script>
+    // The debugger injects the variable here:
+    const rootToken = $viz.value;
+
+    // Convert your Token struct into a plain JS hierarchy object
+    function toHierarchy(token) {
+      return {
+        name: `${token.type}: ${token.data || ""}`,
+        children: (token.tlist || []).map(toHierarchy)
+      };
+    }
+
+    const root = d3.hierarchy(toHierarchy(rootToken));
+    const treeLayout = d3.tree().size([800, 600]);
+    const treeData = treeLayout(root);
+
+    const svg = d3.select("svg");
+
+    // Draw links
+    svg.selectAll("line")
+      .data(treeData.links())
+      .enter()
+      .append("line")
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y)
+      .attr("stroke", "black");
+
+    // Draw nodes
+    svg.selectAll("circle")
+      .data(treeData.descendants())
+      .enter()
+      .append("circle")
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", 10)
+      .attr("fill", "lightblue");
+
+    // Labels
+    svg.selectAll("text")
+      .data(treeData.descendants())
+      .enter()
+      .append("text")
+      .attr("x", d => d.x + 12)
+      .attr("y", d => d.y)
+      .text(d => d.data.name);
+  </script>
+</body>
+</html>
