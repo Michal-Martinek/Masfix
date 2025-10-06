@@ -668,9 +668,10 @@ public:
 		if (copy) {
 			itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
 		} else {
-			itrs.top() = tlist.begin();
+			list<Token>::iterator inserted = tlist.begin();
 			currList().splice(itrs.top(), tlist);
-		}		
+			itrs.top() = inserted;
+		}
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
