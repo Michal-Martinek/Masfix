@@ -1,0 +1,27 @@
+%include "control"
+
+%macro print(wannabe_string) {
+	outc %wannabe_string
+}
+%macro print_spaced(instr, end) {
+	%instr
+	outc %end
+}
+
+; VM / runtime delim
+%macro print_delim(vm) {
+	outc 45
+	outc 32
+	%if_else(ld %vm,
+		outc 86
+		outc 77,
+		outc 82
+		outc 85
+		outc 78
+	)
+	outc 32
+	outc 45
+	outc 10
+}
+ld !print_delim(1)
+%print_delim(0)
