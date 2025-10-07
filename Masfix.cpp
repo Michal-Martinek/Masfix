@@ -1505,9 +1505,9 @@ bool parseInstrs(vector<Instr>& instrs, int startIdx, bool final) {
 bool Scope::forceParseImpl(Token* ctime, bool final) {
 	size_t parseStart = 0;
 	if (ctime) parseStart = final ? ctime->_ctimeFirstInstrIdx : parseCtx.instrs.size();
-	returnOnFalse(parseTokenStream(*this));
+	bool ret = parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	return parseInstrs(parseCtx.instrs, parseStart, final);
+	return parseInstrs(parseCtx.instrs, parseStart, final) && ret;
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
