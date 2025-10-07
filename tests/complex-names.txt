@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3198
+:stderr 2911
 tests\complex-names.mx:14:5 ERROR: Directive must not continue
 tests\complex-names.mx:25:5 ERROR: Missing directive name
 tests\complex-names.mx:31:17 ERROR: Directive must not continue
@@ -12,29 +12,27 @@ tests\complex-names.mx:10:7 ERROR: Unexpected token '()'
 tests\complex-names.mx:11:1 ERROR: Label redefinition 'name2'
 tests\complex-names.mx:15:1 ERROR: Invalid label name '__-__'
 tests\complex-names.mx:16:1 ERROR: Invalid label name '()'
-tests\complex-names.mx:17:2 ERROR: Simple label field expected
+tests\complex-names.mx:17:4 ERROR: Simple label field expected ','
 tests\complex-names.mx:18:5 ERROR: Unexpected token ','
 tests\complex-names.mx:22:5 ERROR: Expected label field
 tests\complex-names.mx:25:4 ERROR: Expected label field
 tests\complex-names.mx:29:1 ERROR: Invalid label name '7zaza'
-tests\complex-names.mx:30:2 ERROR: Simple label field expected
+tests\complex-names.mx:30:7 ERROR: Simple label field expected '6'
 tests\complex-names.mx:31:1 ERROR: Invalid label name 'a:b$(,)'
 tests\complex-names.mx:34:5 ERROR: Expected immediate field
 tests\complex-names.mx:35:4 ERROR: Expected instr field
 tests\complex-names.mx:36:1 ERROR: Missing immediate field name
 tests\complex-names.mx:38:4 ERROR: Expected immediate field
 tests\complex-names.mx:39:4 ERROR: Missing instr field name
-tests\complex-names.mx:43:3 ERROR: Simple instr field expected
+tests\complex-names.mx:43:6 ERROR: Simple instr field expected ','
 tests\complex-names.mx:47:3 ERROR: Expected instr field
 tests\complex-names.mx:48:1 ERROR: Unexpected token '()'
-tests\complex-names.mx:50:2 ERROR: Simple instr field expected
+tests\complex-names.mx:50:4 ERROR: Simple instr field expected ','
 tests\complex-names.mx:59:1 ERROR: Unexpected token 'ld'
 tests\complex-names.mx:60:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:67:20 ERROR: Expected immediate field
-tests\complex-names.mx:68:20 ERROR: Simple immediate field expected
-tests\complex-names.mx:34:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
+tests\complex-names.mx:68:24 ERROR: Simple immediate field expected '()'
 tests\complex-names.mx:37:1 ERROR: Unknown suffix 'inc:'
-tests\complex-names.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\complex-names.mx:40:1 ERROR: Unknown instruction 'huhutata'
 tests\complex-names.mx:41:1 ERROR: Instrs must have only imm, or 1 reg for now 'jmp'
 tests\complex-names.mx:46:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
@@ -47,8 +45,6 @@ tests\complex-names.mx:61:1 ERROR: Unknown instruction 'dll'
 tests\complex-names.mx:62:1 ERROR: Unknown condition 'l lvm'
 tests\complex-names.mx:65:1 ERROR: Unknown instruction 'debug 1 234'
 tests\complex-names.mx:66:1 ERROR: Unknown instruction 'debug 01  23 4 5'
-tests\complex-names.mx:67:1 ERROR: Unknown instruction 'triplet hh e'
-tests\complex-names.mx:68:1 ERROR: Unknown instruction 'tlists ea()'
 tests\complex-names.mx:69:1 ERROR: Unknown condition 'stst a b'
 
 
