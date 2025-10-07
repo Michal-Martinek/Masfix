@@ -2,6 +2,7 @@
 
 %include "std/memory"
 %include "std/procedures"
+%using stack
 
 %push(1)
 %push(2)
