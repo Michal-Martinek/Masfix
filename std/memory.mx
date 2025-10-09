@@ -1,0 +1,78 @@
+
+; generic memory access -------------------------
+%macro store(at, val) {
+	mov %at
+	str %val
+}
+%macro storer(addr) {
+	mov %addr
+	strr
+}
+%macro load(addr) {
+	mov %addr
+	ldm
+}
+%macro loadmov(addr, mov2) {
+	%load(%addr)
+	mov %mov2
+}
+; ----------------------------
+%namespace MEMORY_LAYOUT {
+; SEGMENTS
+	%define SEG_GLOBAL 0
+	%define SEG_TEMP 8
+	%define SEG_STACK 16
+
+; GLOBALS
+	; points to the last occupied space
+	%define G_STACK_PTR 0
+	%store(%G_STACK_PTR, %SEG_STACK)
+
+	%define G_IOTA 1
+
+}
+%using MEMORY_LAYOUT
+; interfaces -----------------------
+%namespace stack {
+	%namespace impl {
+		%macro derefSP() {
+			mov %G_STACK_PTR
+			movm
+		}
+		%macro derefSPpush() {
+			mov %G_STACK_PTR
+			stra 1
+			movm
+		}
+		%macro derefSPpop() {
+			mov %G_STACK_PTR
+			strs 1
+			movm
+			mova 1
+		}
+	}
+	%using impl
+
+	%macro top() {
+		%derefSP()
+		ldm
+	}
+	%macro push(imm) {
+		%derefSPpush()
+		str %imm
+	}
+	%macro pushr() {
+		%derefSPpush()
+		strr
+	}
+	%macro pop() {
+		%derefSPpop()
+		ldm
+	}
+}
+
+; TODO VM?
+%macro initVM() {
+	%store(%G_STACK_PTR, %SEG_STACK)
+}
+ld !initVM()
