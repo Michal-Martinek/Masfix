@@ -423,6 +423,14 @@ public:
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
+	void insertListNoCopy(list<Token>& tlist, Token& percentToken) {
+		assert(tlist.size());
+		list<Token>::iterator firstInserted = tlist.begin();
+		currList().splice(itrs.top(), tlist);
+		itrs.top() = firstInserted;
+		itrs.top()->continued = percentToken.continued;
+		itrs.top()->firstOnLine = percentToken.firstOnLine;
+	}
 	Token eatenToken() {
 		Token t = currToken();
 		itrs.top() = currList().erase(itrs.top());
@@ -486,7 +494,6 @@ public:
 		namespaces.pop();
 	}
 	void enterArglist(Token& tlist) {
-		assert(!insideArglist());
 		tlist.type = TIarglist;
 		openList(tlist);
 	}
@@ -547,24 +554,30 @@ public:
 	}
 
 // helpers -------------------------------------------------
-	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& argStart, Loc loc) {
-		checkReturnOnFail(argStart != itrs.top(), "Argument expected", loc);
-		argSpans.push_back(pair(argStart, itrs.top()));
+	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
+		checkReturnOnFail(firstArg != itrs.top(), "Argument expected", loc);
+		argSpans.push_back(pair(firstArg, itrs.top()));
 		return true;
 	}
 	bool sliceArglist(Macro& mac, Loc loc, bool retval=true) {
-		itrs.top() = currList().begin(); list<Token>::iterator argStart = itrs.top();
+		itrs.top() = currList().begin();
+		list<Token>::iterator argStart = --currList().begin(); // points before the starting element, so as not to get invalidated
 		vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
 		while (hasNext()) {
 			loc = currToken().loc;
 			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
 				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
-				retval &= _addMacroArg(argSpans, argStart, loc);
-				argStart = next();
-			} else next();
+				retval &= _addMacroArg(argSpans, ++argStart, loc);
+				argStart = itrs.top();
+			} else if (currToken().type == TIexpansion) {
+				Token exp = eatenToken();
+				if (exp.tlist.size()) insertListNoCopy(exp.tlist, exp);
+				continue;
+			}
+			next();
 		}
-		retval &= _addMacroArg(argSpans, argStart, loc);
+		retval &= _addMacroArg(argSpans, ++argStart, loc);
 		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc));
 		mac.addExpansionArgs(argSpans);
 		return true;
@@ -909,13 +922,12 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 		);
 	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
 	return true;
-;
 }
 bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope.isCurrTtype(Tseparator), "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -997,7 +1009,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist(), "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(percentToken.loc, scope, namespaceId, directiveName);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
