@@ -10,8 +10,7 @@
 :proc_(%name)_end
 }
 %macro call(name) {
-	%memory_impl:derefSPpush()
-	str 2 ; ret addr offset
+	%push(2) ; ret addr offset
 	strap
 	jmp proc_(%name)
 }

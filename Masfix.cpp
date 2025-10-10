@@ -171,16 +171,6 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ijmp, Rp},
 	// others don't have modifiable destination
 };
-// checks --------------------------------------------------------------------
-#define errorQuoted(s) " '" + (s) + "'"
-#define unreachable() assert(("Unreachable", false));
-
-#define continueOnFalse(cond) if (!(cond)) continue;
-#define returnOnFalse(cond) if (!(cond)) return false;
-
-#define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
 
 // structs -------------------------------
 struct Loc {
@@ -253,7 +243,7 @@ struct Define {
 struct MacroArg {
 	string name;
 	Loc loc;
-	stack<list<Token>> value; // TODO test multiple expansions inside each other
+	stack<list<Token>> value;
 
 	MacroArg() {}
 	MacroArg(string name, Loc loc) {
@@ -331,8 +321,138 @@ struct Module {
 		this->namespaceId = namespaceId;
 	}
 };
-bool raiseError(string message, Token token, bool strict=false);
-bool raiseError(string message, Loc loc, bool strict=false);
+
+struct Suffix {
+	// dest ?<operation>= <reg>/<imm>
+	RegNames condReg;
+	CondNames cond;
+	OpNames modifier;
+	RegNames reg;
+
+	Suffix() {
+		condReg = Rno;
+		cond = Cno;
+		modifier = OPno;
+		reg = Rno;
+	}
+};
+struct Instr {
+	InstrNames instr = InstructionCount;
+	Suffix suffixes;
+	int immediate;
+
+	string opcodeStr;
+	Loc opcodeLoc;
+	vector<string> immFields;
+
+	Instr() {}
+	Instr(string opcodeStr,	Loc opcodeLoc) {
+		this->opcodeStr = opcodeStr;
+		this->opcodeLoc = opcodeLoc;
+	}
+	bool hasImm() { return immFields.size() != 0; }
+	bool hasCond() { return suffixes.cond != Cno; }
+	bool hasMod()  { return suffixes.modifier != OPno; }
+	bool hasReg()  { return suffixes.reg != Rno; }
+	string toStr() {
+		string out = opcodeStr;
+		for (string s : immFields) {
+			out.push_back(' ');
+			out.append(s);
+		}
+		return out;
+	}
+};
+struct Label {
+	string name;
+	int addr;
+	Loc loc;
+	Label() { name=""; }
+	Label(string name, int addr, Loc loc) {
+		this->name = name;
+		this->addr = addr;
+		this->loc = loc;
+	}
+	string toStr() {
+		return ":" + name;
+	}
+};
+struct ParseCtx {
+	vector<Instr> instrs;
+	size_t parseStartIdx;
+	map<string, Label> strToLabel;
+	Module* lastModule = nullptr;
+	optional<ofstream> dumpFile;
+
+	void close() {
+		if (!!dumpFile) dumpFile->close();
+	}
+};
+ParseCtx parseCtx;
+/// structure simulating the virtual machine during interpretation
+struct VM {
+	unsigned short head;
+	unsigned short reg;
+	unsigned short ip;
+	unsigned short mem[CELLS];
+
+	VM(unsigned short startInstr) { ip = startInstr; }
+	unsigned short& cell() {
+		return mem[head];
+	}
+};
+
+// checks --------------------------------------------------------------------
+#define errorQuoted(s) " '" + (s) + "'"
+#define unreachable() assert(("Unreachable", false));
+
+#define continueOnFalse(cond) if (!(cond)) continue;
+#define returnOnFalse(cond) if (!(cond)) return false;
+
+#define check(cond, message, obj) ((cond) || raiseError(message, obj))
+#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
+#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+
+bool FLAG_strictErrors = false;
+bool SupressErrors = false;
+#define returnOnErrSupress() if (SupressErrors) return false;
+
+vector<string> errors;
+void raiseErrors() { // TODO sort errors based on line and file
+	for (string s : errors) {
+		cerr << s;
+	}
+	if (errors.size()) {
+		exit(1);
+	}
+}
+void addError(string message, bool strict=true) {
+	errors.push_back(message);
+	if (strict || FLAG_strictErrors) {
+		raiseErrors();
+	}
+}
+
+bool raiseError(string message, Token token, bool strict=false) {
+	returnOnErrSupress();
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	addError(err, strict);
+	return false;
+}
+bool raiseError(string message, Instr instr, bool strict=false) {
+	returnOnErrSupress();
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, strict);
+	return false;
+}
+bool raiseError(string message, Loc loc, bool strict=false) {
+	returnOnErrSupress();
+	string err = loc.toStr() + " ERROR: " + message + "\n";
+	addError(err, strict);
+	return false;
+}
+// struct Scope --------------------------------------------------------
+
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
 struct Scope {
@@ -423,6 +543,14 @@ public:
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
+	void insertListNoCopy(list<Token>& tlist, Token& percentToken) {
+		assert(tlist.size());
+		list<Token>::iterator firstInserted = tlist.begin();
+		currList().splice(itrs.top(), tlist);
+		itrs.top() = firstInserted;
+		itrs.top()->continued = percentToken.continued;
+		itrs.top()->firstOnLine = percentToken.firstOnLine;
+	}
 	Token eatenToken() {
 		Token t = currToken();
 		itrs.top() = currList().erase(itrs.top());
@@ -486,7 +614,6 @@ public:
 		namespaces.pop();
 	}
 	void enterArglist(Token& tlist) {
-		assert(!insideArglist());
 		tlist.type = TIarglist;
 		openList(tlist);
 	}
@@ -547,137 +674,36 @@ public:
 	}
 
 // helpers -------------------------------------------------
-	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& argStart, Loc loc) {
-		checkReturnOnFail(argStart != itrs.top(), "Argument expected", loc);
-		argSpans.push_back(pair(argStart, itrs.top()));
+	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
+		checkReturnOnFail(firstArg != itrs.top(), "Argument expected", loc);
+		argSpans.push_back(pair(firstArg, itrs.top()));
 		return true;
 	}
 	bool sliceArglist(Macro& mac, Loc loc, bool retval=true) {
-		itrs.top() = currList().begin(); list<Token>::iterator argStart = itrs.top();
+		itrs.top() = currList().begin();
+		list<Token>::iterator argStart = --currList().begin(); // points before the starting element, so as not to get invalidated
 		vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
 		while (hasNext()) {
 			loc = currToken().loc;
 			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
 				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
-				retval &= _addMacroArg(argSpans, argStart, loc);
-				argStart = next();
-			} else next();
+				retval &= _addMacroArg(argSpans, ++argStart, loc);
+				argStart = itrs.top();
+			} else if (currToken().type == TIexpansion) {
+				Token exp = eatenToken();
+				if (exp.tlist.size()) insertListNoCopy(exp.tlist, exp);
+				continue;
+			}
+			next();
 		}
-		retval &= _addMacroArg(argSpans, argStart, loc);
+		retval &= _addMacroArg(argSpans, ++argStart, loc);
 		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc));
 		mac.addExpansionArgs(argSpans);
 		return true;
 	}
 };
 
-struct Suffix {
-	// dest ?<operation>= <reg>/<imm>
-	RegNames condReg;
-	CondNames cond;
-	OpNames modifier;
-	RegNames reg;
-
-	Suffix() {
-		condReg = Rno;
-		cond = Cno;
-		modifier = OPno;
-		reg = Rno;
-	}
-};
-struct Instr {
-	InstrNames instr = InstructionCount;
-	Suffix suffixes;
-	int immediate;
-
-	string opcodeStr;
-	Loc opcodeLoc;
-	vector<string> immFields;
-
-	Instr() {}
-	Instr(string opcodeStr,	Loc opcodeLoc) {
-		this->opcodeStr = opcodeStr;
-		this->opcodeLoc = opcodeLoc;
-	}
-	bool hasImm() { return immFields.size() != 0; }
-	bool hasCond() { return suffixes.cond != Cno; }
-	bool hasMod()  { return suffixes.modifier != OPno; }
-	bool hasReg()  { return suffixes.reg != Rno; }
-	string toStr() {
-		string out = opcodeStr;
-		for (string s : immFields) {
-			out.push_back(' ');
-			out.append(s);
-		}
-		return out;
-	}
-};
-struct Label {
-	string name;
-	int addr;
-	Loc loc;
-	Label() { name=""; }
-	Label(string name, int addr, Loc loc) {
-		this->name = name;
-		this->addr = addr;
-		this->loc = loc;
-	}
-	string toStr() {
-		return ":" + name;
-	}
-};
-struct ParseCtx {
-	vector<Instr> instrs;
-	size_t parseStartIdx;
-	map<string, Label> strToLabel;
-	Module* lastModule = nullptr;
-	optional<ofstream> dumpFile;
-
-	void close() {
-		if (!!dumpFile) dumpFile->close();
-	}
-};
-ParseCtx parseCtx;
-
-// checks implementation ----------------------------------------------
-bool FLAG_strictErrors = false;
-bool SupressErrors = false;
-#define returnOnErrSupress() if (SupressErrors) return false;
-
-vector<string> errors;
-void raiseErrors() { // TODO sort errors based on line and file
-	for (string s : errors) {
-		cerr << s;
-	}
-	if (errors.size()) {
-		exit(1);
-	}
-}
-void addError(string message, bool strict=true) {
-	errors.push_back(message);
-	if (strict || FLAG_strictErrors) {
-		raiseErrors();
-	}
-}
-
-bool raiseError(string message, Token token, bool strict) {
-	returnOnErrSupress();
-	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
-	addError(err, strict);
-	return false;
-}
-bool raiseError(string message, Instr instr, bool strict=false) {
-	returnOnErrSupress();
-	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
-	addError(err, strict);
-	return false;
-}
-bool raiseError(string message, Loc loc, bool strict) {
-	returnOnErrSupress();
-	string err = loc.toStr() + " ERROR: " + message + "\n";
-	addError(err, strict);
-	return false;
-}
 // tokenization -----------------------------------------------------------------
 string getCharRun(string s) {
 	bool num = isdigit(s.at(0)), alpha = isalpha(s.at(0)), space = isspace(s.at(0));
@@ -898,13 +924,12 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 		);
 	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
 	return true;
-;
 }
 bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope.isCurrTtype(Tseparator), "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -986,7 +1011,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine && !scope.insideArglist(), "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(percentToken.loc, scope, namespaceId, directiveName);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
@@ -1273,6 +1298,108 @@ void Scope::forceParseImpl() {
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
 	parseInstrs(parseCtx.instrs);
 }
+// interpreting -------------------------------------------------
+unsigned short interpGetReg(VM& vm, RegNames reg) {
+	static_assert(RegisterCount == 5, "Exhaustive interpGetReg definition");
+	if (reg == Rh) return vm.head;
+	else if (reg == Rm) return vm.cell();
+	else if (reg == Rr) return vm.reg;
+	else if (reg == Rp) return vm.ip;
+	else unreachable();
+}
+unsigned short interpOperation(VM& vm, OpNames op, unsigned short left, unsigned short right) {
+	static_assert(OperationCount == 10, "Exhaustive interpOperation definition");
+	if (op == OPa) return left + right;
+	else if (op == OPs) return left - right;
+	else if (op == OPt) return left * right;
+	else if (op == OPand) return left & right;
+	else if (op == OPor) return left | right;
+	else if (op == OPxor) return left ^ right;
+	else if (op == OPshl) return left << right;
+	else if (op == OPshr) return left >> right;
+	else if (op == OPbit) return !!(left & (1 << right));
+	else unreachable();
+}
+bool interpCond(VM& vm, Instr& instr, signed short target) {
+	static_assert(ConditionCount == 7, "Exhaustive interpCond definition");
+	short reg = (signed short) interpGetReg(vm, instr.suffixes.condReg);
+	if (instr.instr == Ib) target = 0;
+
+	if (instr.suffixes.cond == Ceq) return reg == target;
+	if (instr.suffixes.cond == Cne) return reg != target;
+	if (instr.suffixes.cond == Clt) return reg <  target;
+	if (instr.suffixes.cond == Cle) return reg <= target;
+	if (instr.suffixes.cond == Cgt) return reg >  target;
+	if (instr.suffixes.cond == Cge) return reg >= target;
+	unreachable();
+}
+void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
+	static_assert(InstructionCount == 14, "Exhaustive interpInstrBody definition");
+	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
+	if (instr.instr == Imov) vm.head = target;
+	else if (instr.instr == Istr) {
+		vm.cell() = target;
+	} else if (instr.instr == Ild) {
+		vm.reg = target;
+	} else if (instr.instr == Ijmp) {
+		vm.ip = target;
+		ipChanged = true;
+	} else if (instr.instr == Ib) {
+		if (cond) {
+			vm.ip = target;
+			ipChanged = true;
+		}
+	} else if (instr.instr == Il) {
+		vm.reg = cond ? 1 : 0;
+	} else if (instr.instr == Is) {
+		vm.cell() = cond ? 1 : 0;
+	} else if (instr.instr == Iswap) {
+		unsigned short temp = vm.cell();
+		vm.cell() = vm.reg;
+		vm.reg = temp;
+	} else if (instr.instr == Ioutu) {
+		cout << target;
+	} else if (instr.instr == Ioutc) {
+		cout << (char)target;
+	} else if (instr.instr == Iinc) {
+		char c;
+		cin >> c;
+		inputReg = c;
+	} else if (instr.instr == Iipc) {
+		inputReg = cin.peek();
+	} else if (instr.instr == Iinu) {
+		cin >> inputReg; // NOTE inu maxes out on overflow
+		cin.clear();
+	} else if (instr.instr == Iinl) {
+		char c = 0;
+		while (c != '\n') cin >> c;
+	}
+	else unreachable();
+}
+void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
+	unsigned short left, right;
+	if (instr.hasImm()) right = instr.immediate;
+	else if (instr.hasReg()) right = interpGetReg(vm, instr.suffixes.reg);
+
+	if (instr.hasMod()) {
+		left = interpGetReg(vm, InstrToModReg[instr.instr]);
+		right = interpOperation(vm, instr.suffixes.modifier, left, right);
+	}
+	bool cond;
+	if (instr.hasCond()) {
+		cond = interpCond(vm, instr, (signed short) right);
+	}
+	interpInstrBody(vm, instr, right, cond, ipChanged);
+}
+void interpret() {
+	VM vm(0);
+	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
+	while (vm.ip < parseCtx.instrs.size()) {
+		bool ipChanged = false;
+		interpInstr(vm, parseCtx.instrs[vm.ip], ipChanged);
+		if (!ipChanged) vm.ip++;
+	}
+}
 // assembly generation ------------------------------------------
 void genRegisterFetch(ofstream& outFile, RegNames reg, int instrNum, bool toSecond=true) {
 	static_assert(RegisterCount == 5, "Exhaustive genRegisterFetch definition");
@@ -1399,7 +1526,6 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		outFile << "	call stdin_peek\n"
 			"	mov " << inputDest << ", dx\n";
 	} else if (instr == Iinu) {
-		string dest = inputToR ? "r15w" : "[2*r14+r13]";
 		outFile << "	call input_unsigned\n"
 			"	mov " << inputDest << ", ax\n";
 	} else if (instr == Iinl) {
@@ -1590,7 +1716,11 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	pop rax\n"
 		"	mov r10, 10\n"
 		"	mul r10\n"
-		"	add rax, rcx\n"
+		"	add rax, rcx ; rax = 10 * rax + rcx\n"
+		"\n"
+		"	mov r10, 65535\n"
+		"	cmp rax, r10\n"
+		"	cmova rax, r10\n"
 		"	jmp input_unsigned_loop\n"
 		"input_unsigned_end:\n"
 		"	pop rax\n"
@@ -1670,6 +1800,7 @@ struct Flags {
 	bool run = false;
 	bool keepAsm = false;
 	bool dump = false;
+	bool interpret = false;
 
 	fs::path inputPath = "";
 
@@ -1685,6 +1816,7 @@ void printUsage() {
 			"	flags:\n"
 			"		-v / --verbose   - additional compilation messages\n"
 			"		-r / --run       - run executable after compilation\n"
+			"		-I / --interpret - interpret instead of compile\n"
 			"		-A / --keep-asm  - keep assembly file\n"
 			"		-S / --strict    - disables multiple errors\n"
 			"		-D / --dump      - dumps prepocessed code into file\n";
@@ -1718,6 +1850,8 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.verbose = true;
 		} else if (arg == "-r" || arg == "--run") {
 			flags.run = true;
+		} else if (arg == "-I" || arg == "--interpret") {
+			flags.interpret = true;
 		} else if (arg == "-A" || arg == "--keep-asm") {
 			flags.keepAsm = true;
 		} else if (arg == "-S" || arg == "--strict") {
@@ -1742,7 +1876,7 @@ ofstream openOutputFile(fs::path path) {
 	checkCond(ofs.good(), "The output file" errorQuoted(path.string()) " couldn't be opened");
 	return ofs;
 }
-void runCmdEchoed(vector<string> args, Flags& flags) {
+int runCmdEchoed(vector<string> args, Flags& flags, bool exitOnErr=true) {
 	string s = accumulate(args.begin() + 1, args.end(), args.front(), // concat args with spaces
 		[](string s0, const string& s1) { return s0 += " " + s1; });
 	const char* command = s.c_str();
@@ -1750,9 +1884,10 @@ void runCmdEchoed(vector<string> args, Flags& flags) {
 		cout << "[CMD] " << command << '\n';
 	}
 	int returnCode = system(command);
-	if (returnCode) {
+	if (exitOnErr && returnCode) {
 		exit(returnCode);
 	}
+	return returnCode;
 }
 void removeFile(fs::path file) {
 	bool ret = remove(file.string().c_str());
@@ -1760,7 +1895,7 @@ void removeFile(fs::path file) {
 		cerr << "WARNING: error on removing the file '" << file.filename() << "'\n";
 	}
 }
-void compileAndRun(Flags& flags) {
+int compileAndRun(Flags& flags) {
 	runCmdEchoed({
 		"nasm", "-fwin64", "-g", "-F cv8",
 		flags.filePathStr("asm")
@@ -1770,18 +1905,31 @@ void compileAndRun(Flags& flags) {
 		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
 	}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":180:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("asm") << ":183:1\n";
 	} else {
 		removeFile(flags.filePath("asm"));
 	}
 	removeFile(flags.filePath("obj"));
-	if (flags.run) runCmdEchoed({flags.filePathStr("exe")}, flags);
+	if (flags.run) return runCmdEchoed({flags.filePathStr("exe")}, flags, false);
+	return 0;
 }
 void initParseCtx(Flags& flags, string mainRelPath) {
 	if (flags.dump) parseCtx.dumpFile = openOutputFile(flags.filePath("dump"));
 	parseCtx.strToLabel = {{"begin", Label("begin", 0, Loc(mainRelPath, 1, 1))}, {"end", Label("end", 0, Loc(mainRelPath, 1, 1))}};
 }
+void run(Flags& flags) {
+	int exitCode = 0;
+	if (flags.interpret) {
+		interpret();
+	} else {
+		ofstream outFile = openOutputFile(flags.filePath("asm"));
+		generate(outFile, parseCtx.instrs);
 
+		exitCode = compileAndRun(flags);
+	}
+	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
+	exit(exitCode);
+}
 int main(int argc, char *argv[]) {
 	Flags flags = processLineArgs(argc, argv);
 	Scope scope;
@@ -1793,9 +1941,5 @@ int main(int argc, char *argv[]) {
 	parseCtx.close();
 	raiseErrors();
 
-	ofstream outFile = openOutputFile(flags.filePath("asm"));
-	generate(outFile, parseCtx.instrs);
-
-	compileAndRun(flags);
-	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
+	run(flags);
 }
