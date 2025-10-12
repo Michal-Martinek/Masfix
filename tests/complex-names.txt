@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3198
+:stderr 2890
 tests\complex-names.mx:14:5 ERROR: Directive must not continue
 tests\complex-names.mx:25:5 ERROR: Missing directive name
 tests\complex-names.mx:31:17 ERROR: Directive must not continue
@@ -32,9 +32,7 @@ tests\complex-names.mx:59:1 ERROR: Unexpected token 'ld'
 tests\complex-names.mx:60:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:67:20 ERROR: Expected immediate field
 tests\complex-names.mx:68:20 ERROR: Simple immediate field expected
-tests\complex-names.mx:34:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
 tests\complex-names.mx:37:1 ERROR: Unknown suffix 'inc:'
-tests\complex-names.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\complex-names.mx:40:1 ERROR: Unknown instruction 'huhutata'
 tests\complex-names.mx:41:1 ERROR: Instrs must have only imm, or 1 reg for now 'jmp'
 tests\complex-names.mx:46:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
@@ -47,8 +45,6 @@ tests\complex-names.mx:61:1 ERROR: Unknown instruction 'dll'
 tests\complex-names.mx:62:1 ERROR: Unknown condition 'l lvm'
 tests\complex-names.mx:65:1 ERROR: Unknown instruction 'debug 1 234'
 tests\complex-names.mx:66:1 ERROR: Unknown instruction 'debug 01  23 4 5'
-tests\complex-names.mx:67:1 ERROR: Unknown instruction 'triplet hh e'
-tests\complex-names.mx:68:1 ERROR: Unknown instruction 'tlists ea()'
 tests\complex-names.mx:69:1 ERROR: Unknown condition 'stst a b'
 
 
