@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3198
+:stderr 2890
 tests\complex-names.mx:14:5 ERROR: Directive must not continue
 tests\complex-names.mx:25:5 ERROR: Missing directive name
 tests\complex-names.mx:31:17 ERROR: Directive must not continue

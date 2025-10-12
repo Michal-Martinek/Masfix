@@ -797,9 +797,10 @@ public:
 		currModule->contents = Token(TImodule, moduleName, loc, false, true);
 		openList(currModule->contents);
 	}
-	bool forceParseImpl();
+	bool forceParseImpl(Token* ctime, bool final=true);
 	/// Scope wrapper for parsing, cleans Scope after parsing
 	/// parses whole TImodule (upto possible ctime, then it's body)
+	/// returns if instrs are ready to execute
 	bool forceParse(Token* ctime=nullptr) {
 		assert(isPreprocessing);
 		isPreprocessing = false;
@@ -808,11 +809,11 @@ public:
 		parseCtx.parsedCtime = ctime;
 		/// NOTE all tlists are opened again specifically for parsing and discarded afterwards
 		openList(currModule->contents);
-		forceParseImpl();
+		forceParseImpl(ctime, ctime == nullptr);
 		if (ctime) {
 			/* assert */(ctime->_ctimeFirstInstrIdx != -1) || raiseError("CRITICAL ctime used in unexpected context", *ctime, true);
 			openList(*ctime);
-			safeToRun = forceParseImpl();
+			safeToRun = forceParseImpl(ctime);
 			assert(isCurrListType(TIctime) && &currList() == &ctime->tlist);
 			closeList();
 		}
@@ -1347,10 +1348,9 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 /// registers asm labels, creates unprocessed assembly instruction fields
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
 /// module body parses upto EOF or possible TIctime encounter
-void parseTokenStream(Scope& scope) {
+bool parseTokenStream(Scope& scope) {
 	Loc loc;
-	bool labelOnLine;
-	bool errorLess; // ignored
+	bool labelOnLine = false, errorLess = true;
 outer_loop_continue:
 	while (scope.advanceIteration()) {
 		if (scope.getCurrModule() != parseCtx.lastModule) {
@@ -1383,9 +1383,11 @@ outer_loop_continue:
 			scope.next(top);
 		} else {
 			raiseError("Unexpected token", top);
+			errorLess = false;
 			scope.eatLine(true);
 		}
 	}
+	return errorLess;
 }
 // parsing instruction fields -------------------------------------------------------------------
 bool parseCond(Instr& instr, string& s) {
@@ -1447,22 +1449,24 @@ bool verifyNotInstrOpcode(string name) {
 	SupressErrors = false;
 	return ans;
 }
-bool parseInstrImmediate(Instr& instr) {
+bool parseInstrImmediate(Instr& instr, bool maybeUndefined) {
 	checkReturnOnFail(instr.immFields.size() == 1, "Only simple immediates for now", instr);
 	string immVal = instr.immFields[0];
 	if (parseCtx.strToLabel.count(immVal) > 0) {
 		instr.immediate = parseCtx.strToLabel[immVal].addr;
 		return true;
 	}
+	if (maybeUndefined && !isdigit(immVal.at(0))) 
+	return false;
 	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
 	instr.immediate = stoi(immVal);
 	checkReturnOnFail(to_string(instr.immediate) == immVal, "Invalid instruction immediate", instr);
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
-bool parseInstrFields(Instr& instr) {
+bool parseInstrFields(Instr& instr, bool final) {
 	returnOnFalse(parseInstrOpcode(instr));
 	if (instr.hasImm()) {
-		returnOnFalse(parseInstrImmediate(instr));
+		returnOnFalse(parseInstrImmediate(instr, !final));
 	}
 	return true;
 }
@@ -1491,22 +1495,27 @@ bool checkValidity(Instr& instr) {
 	}
 	return true;
 }
-/// parses instructions and immediates for their meaning
-bool parseInstrs(vector<Instr>& instrs, int startIdx) {
+/// @brief parses instructions and immediates for their meaning
+/// @param final if false silently ignores use of undefined labels
+/// @return if instrs are ready to be executed
+bool parseInstrs(vector<Instr>& instrs, int startIdx, bool final) {
 	bool errorLess = true;
 	for (size_t i = startIdx; i < instrs.size(); ++i) {
 		Instr& instr = instrs[i];
-		continueOnFalse(parseInstrFields(instr));
-		continueOnFalse(checkValidity(instr));
+		bool good = parseInstrFields(instr, final);
+		good = good && checkValidity(instr);
+		if (!good) instr.instr = InstructionCount; // ensure noone tries executing it
+		errorLess &= good;
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 	return errorLess;
 }
-bool Scope::forceParseImpl() {
-	size_t firstUnparsed = parseCtx.instrs.size();
-	parseTokenStream(*this);
+bool Scope::forceParseImpl(Token* ctime, bool final) {
+	size_t parseStart = parseCtx.instrs.size();
+	if (ctime && final) parseStart = ctime->_ctimeFirstInstrIdx;
+	bool ret = parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	return parseInstrs(parseCtx.instrs, firstUnparsed);
+	return parseInstrs(parseCtx.instrs, parseStart, final) && ret;
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
@@ -1604,7 +1613,7 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 void interpret(int startIdx) {
 	globalVm.start(startIdx);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
-	while (globalVm.ip < parseCtx.instrs.size()) {
+	while (globalVm.ip < parseCtx.instrs.size()) { // TODO infinite loop prevention
 		bool ipChanged = false;
 		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged);
 		if (!ipChanged) globalVm.ip++;
