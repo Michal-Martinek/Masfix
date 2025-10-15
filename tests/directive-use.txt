@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 6990
+:stderr 6928
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -10,7 +10,7 @@ tests\directive-use.mx:25:2 ERROR: Invalid directive name 'defined1%defined2'
 tests\directive-use.mx:29:6 ERROR: Directive must not continue
 tests\directive-use.mx:34:9 ERROR: Unexpected macro use
 tests\directive-use.mx:36:5 ERROR: Unexpected macro use
-tests\directive-use.mx:37:13 ERROR: Unexpected macro use
+tests\directive-use.mx:37:13 ERROR: Unexpected token after macro use '%'
 tests\directive-use.mx:38:5 ERROR: Unexpected macro use
 tests\directive-use.mx:39:14 ERROR: Unexpected macro use
 tests\directive-use.mx:45:1 ERROR: Expansion arglist expected
@@ -70,7 +70,6 @@ tests\directive-use.mx:18:1 ERROR: Only simple immediates for now 'ld 1 9'
 tests\directive-use.mx:19:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\directive-use.mx:21:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\directive-use.mx:36:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
-tests\directive-use.mx:7:21 ERROR: Invalid instruction immediate 'ld insides'
 tests\directive-use.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'str'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu _'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu labelInside1'

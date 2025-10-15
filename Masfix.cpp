@@ -1112,7 +1112,9 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine
+		|| (ctime && !scope->continued) || scope->type == Tseparator,
+	"Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token::fromCtx(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());

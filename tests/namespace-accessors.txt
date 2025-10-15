@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4707
+:stderr 4709
 tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
 tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
 tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
@@ -33,7 +33,7 @@ tests\namespace-accessors.mx:46:9 ERROR: Missing directive name
 tests\namespace-accessors.mx:47:6 ERROR: Namespace used as directive 'Bar'
 tests\namespace-accessors.mx:48:10 ERROR: Undeclared identifier 'kk'
 tests\namespace-accessors.mx:50:9 ERROR: Invalid define name '%Foo'
-tests\namespace-accessors.mx:51:10 ERROR: Namespace used as directive 'Foo'
+tests\namespace-accessors.mx:51:9 ERROR: Unexpected token after macro use '%'
 tests\namespace-accessors.mx:58:3 ERROR: Missing namespace name
 tests\namespace-accessors.mx:59:9 ERROR: Invalid namespace name '_-'
 tests\namespace-accessors.mx:60:3 ERROR: Missing namespace name
