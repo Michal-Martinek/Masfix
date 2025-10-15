@@ -1,0 +1,63 @@
+
+%define num 69
+%macro cout() {
+; NOTE outputs ordinals for each succesful (ctime) expansion
+	mova 1
+	outuh
+	; no tokens should leak through end of macro expansion
+}
+%macro rstCou_n_t() {
+	outc 10
+	outc 83
+	mov 0
+}
+
+; Unexpected tokens after macro use
+%cout()
+%cout()8
+!cout()8
+%cout() 8
+!cout() 8
+%cout()%
+!cout()%
+%cout() %
+!cout() %
+%cout()%num
+!cout()%num
+%cout() %num
+!cout() %num
+
+%cout(),
+!cout(),
+%cout() ,
+!cout() ,
+%cout()()
+!cout()()
+%cout() ()
+!cout() ()
+
+ld !rstCou_n_t()
+
+; Unexpected macro use (situation before %)
+%macro expInArglist(exp) {}
+%expInArglist(%num)
+%expInArglist(%cout())
+%expInArglist(!cout())
+%expInArglist( %cout())
+%expInArglist( !cout())
+%expInArglist(
+	%cout())
+%expInArglist(
+	!cout())
+
+
+%macro afterSep(a, b) { %b } ; if it complains then this mac was expanded
+	%macro E() { & }
+%afterSep(%num,%E())
+%afterSep(%num,!cout())
+%afterSep(%num, %E())
+%afterSep(%num, !cout())
+%afterSep(%num,
+	%E())
+%afterSep(%num,
+	!cout())

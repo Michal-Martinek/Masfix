@@ -1,0 +1,38 @@
+:returncode 1
+
+:stdout 14
+123456
+S123456
+
+:stderr 1767
+tests\macro-use-ctx.mx:17:8 ERROR: Unexpected token after macro use '8'
+tests\macro-use-ctx.mx:18:8 ERROR: Unexpected token after macro use '8'
+tests\macro-use-ctx.mx:21:8 ERROR: Unexpected token after macro use '%'
+tests\macro-use-ctx.mx:22:8 ERROR: Unexpected token after macro use '%'
+tests\macro-use-ctx.mx:23:9 ERROR: Missing directive name
+tests\macro-use-ctx.mx:24:9 ERROR: Missing directive name
+tests\macro-use-ctx.mx:25:8 ERROR: Unexpected token after macro use '%'
+tests\macro-use-ctx.mx:26:8 ERROR: Unexpected token after macro use '%'
+tests\macro-use-ctx.mx:34:8 ERROR: Unexpected token after macro use '()'
+tests\macro-use-ctx.mx:35:8 ERROR: Unexpected token after macro use '()'
+tests\macro-use-ctx.mx:44:15 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:46:16 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:56:16 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:58:17 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:19:9 ERROR: Unexpected token '8'
+tests\macro-use-ctx.mx:20:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:24:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:27:9 ERROR: Unexpected token '69'
+tests\macro-use-ctx.mx:28:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:30:8 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:31:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:32:9 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:33:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:36:9 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:37:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:57:16 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:59:17 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:55:15 ERROR: Unexpected token '&'
+tests\macro-use-ctx.mx:63:2 ERROR: Unexpected token '0'
+
+
