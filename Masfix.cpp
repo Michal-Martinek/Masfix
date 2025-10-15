@@ -655,7 +655,7 @@ public:
 	list<Token>::iterator& next(Token& tlist) {
 		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
 		++itrs.top();
-		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
+		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime || tlist.type == TIarglist) {
 			openList(tlist);
 		}
 		return itrs.top();
@@ -678,7 +678,8 @@ public:
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
-	/// eats token from token stream and returns it
+	/// eats token from token stream and returns reference to it
+	/// @param skipNoEat leave token in token stream, skip iteration over it
 	Token& eatenToken(bool skipNoEat=false) {
 		auto nextNode = std::next(itrs.top());
 		if (!skipNoEat) savedLine.splice(savedLine.end(), currList(), itrs.top());
@@ -972,14 +973,21 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 	}
 	return true;
 }
-#define processArglistWrapper(body) \
+#define processArglistWrapper(body, cleanup) \
+	bool retval = true; \
 	scope.enterArglist(token); \
 	body; \
 	scope.exitArglist(); \
+	cleanup; \
 	returnOnFalse(retval);
-bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
+
+bool _checkBeforeEatingToken(Scope& scope, Loc& loc, string errMissing, bool sameLine) {
 	checkReturnOnFail(scope.hasNext(), errMissing, loc);
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
+	return true;
+}
+bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
+	returnOnFalse(_checkBeforeEatingToken(scope, loc, errMissing, sameLine));
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
@@ -1060,9 +1068,7 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	scope.currNamespace().macros[name] = Macro(name, percentLoc);
 	Macro& mac = scope.currNamespace().macros[name];
 	directiveEatToken(Tlist, "Macro arglist expected", true);
-	if (token.tlist.size()) {
-		processArglistWrapper( bool retval = arglistFromTlist(scope, loc, mac); )
-	}
+	processArglistWrapper( retval = arglistFromTlist(scope, loc, mac), );
 	directiveEatToken(Tlist, "Macro body expected", false);
 	checkReturnOnFail(!token.isSeparated(), "No separators expected in macro body", loc);
 	mac.body = list(token.tlist.begin(), token.tlist.end());
@@ -1097,21 +1103,34 @@ void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string 
 	scope.insertToken(Token::fromCtx(Tnumeric, define.value, percentToken));
 }
 bool preprocess(Scope& scope);
-bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
+/// checks proper macro arglist presence
+/// preprocesses it's contents (leaves it in TS)
+/// then splits it into macro arg fields
+bool processExpansionArglist(Scope& scope, Macro& mac, Loc& loc) {
+	returnOnFalse(_checkBeforeEatingToken(scope, loc, "Expansion arglist expected", true));
+	Token& token = scope.currToken(); loc = token.loc;
 	assert(token.type == Tlist);
-	if (token.tlist.size()) {
-		processArglistWrapper(
-			bool retval = preprocess(scope);
+
+	processArglistWrapper(
+		if (token.tlist.size()) {
+			token.continued = false;
+			token.firstOnLine = true;
+			
+			retval = preprocess(scope);
 			retval = retval && scope.sliceArglist(mac, loc);
-		);
-	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+		} else {
+			retval = check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+		},
+		// NOTE removing arglist left in TS after it's fully preprocessed
+		Token outT;
+		assert(eatToken(scope, loc, outT, TIarglist, "ASSERTION: removing TIarglist", false));
+	);
 	return true;
 }
 bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
 	bool ctime = percentToken.data == "!";
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
-	directiveEatToken(Tlist, "Expansion arglist expected", true);
-	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
+	returnOnFalse(processExpansionArglist(scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine
 		|| (ctime && !scope->continued) || scope->type == Tseparator,
 	"Unexpected token after macro use", scope.currToken());
@@ -1380,7 +1399,7 @@ outer_loop_continue:
 			}
 			dump(instr.toStr());
 			parseCtx.instrs.push_back(instr);
-		} else if (top.type == TIexpansion || top.type == TInamespace) {
+		} else if (top.type == TIexpansion || top.type == TInamespace || top.type == TIarglist) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
 		} else {
