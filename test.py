@@ -125,21 +125,26 @@ def _handleTestResult(failedTests: list[Path]):
 	if not len(failedTests):
 		print('All testcases passed')
 	else:
-		print('Some testcases failed')
+		print(f'Some testcases failed ({len(failedTests)})')
+		print('\n'.join(map(str, failedTests[:5])))
 		if askWhetherToDo("update outputs of failed tests"):
-			for file in failedTests:
-				try:
-					updateFileOutput(file, False)
-				except ExecutionException:
-					print()
+			updateFileOutputs(failedTests)
 		exit(1)
-def runTests(dir: Path, quick: bool):
-	failedTests = []
+def updateFileOutputs(files: list[Path], verbose=False):
+	for file in files:
+		try:
+			updateFileOutput(file, verbose)
+		except ExecutionException:
+			print()
+def iterTestsInDirectory(dir):
 	for file in os.listdir(dir):
 		path = Path(os.path.join(dir, file))
 		if path.is_dir(): path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
-		if path.suffix != '.mx':
-			continue
+		if path.suffix == '.mx':
+			yield path
+def runTests(dir: Path, quick: bool):
+	failedTests = []
+	for path in iterTestsInDirectory(dir):
 		try:
 			check(os.path.exists(path), 'Testcase not found', quoted(path))
 			print('[TESTING]', path)
@@ -184,9 +189,11 @@ def modeRun(args, quick: bool):
 		print()
 		runTests('examples', quick)
 def modeUpdate(args):
-	checkUsage(len(args) >= 1, 'Update specifier expected')
-	update = args[0]
-	checkUsage(update in ['output', 'o', 'input', 'i'], 'Unknown update specifier', quoted(update))
+	update = 'all'
+	if len(args) >= 1: update = args[0]
+	checkUsage(update in ['output', 'o', 'input', 'i', 'all', 'a'], 'Unknown update specifier', quoted(update))
+	if update in ['all', 'a']:
+		return updateFileOutputs(iterTestsInDirectory('tests'))
 	args = args[1:]
 	checkUsage(len(args) >= 1, 'Updated file expected')
 	file = processFileArg(args[0])
@@ -216,16 +223,17 @@ def usage():
 	print(
 """Usage: test.py <mode>
 modes:
-	quick                  - test all by only interpretting (also the default behavior)
-	run                    - test all in 'tests', 'examples' by compilation and interpretting
+	q, quick               - test all by only interpretting (also the default behavior)
+	r, run                 - test all in 'tests', 'examples' by compilation and interpretting
+	u, update              - update all tests output
 	update output <test>   - update the expected output of <test> to the actual output
 	update input <test>    - update the stdin passed to <test>"""
 	)
 def checkUsage(cond, *messages):
 	if not cond:
-		print('ERROR:', *messages)
-		print()
 		usage()
+		print()
+		print('ERROR:', *messages)
 		exit(1)
 def getLineArgs() -> list[str]:
 	args = sys.argv.copy()
