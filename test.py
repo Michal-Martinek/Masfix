@@ -208,8 +208,8 @@ def compileCompiler():
 	res = runCommand(comm, '')
 	check(res['returncode'] == 0, "g++ error", insideTestcase=False)
 def checkSourceCompiled():
-	if os.path.getmtime('Masfix.exe') < os.path.getmtime('Masfix.cpp'):
-		print("[INFO] 'Masfix.exe' seems older than it's source, recompiling it now.")
+	if not os.path.exists('Masfix.exe') or os.path.getmtime('Masfix.exe') < os.path.getmtime('Masfix.cpp'):
+		print("[INFO] 'Masfix.exe' not found or outdated, recompiling it now.")
 		compileCompiler()
 		print()
 def usage():
