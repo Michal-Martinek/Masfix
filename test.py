@@ -217,7 +217,7 @@ def usage():
 """Usage: test.py <mode>
 modes:
 	quick                  - test all by only interpretting (also the default behavior)
-	run                    - test all in the 'tests', 'examples' folders
+	run                    - test all in 'tests', 'examples' by compilation and interpretting
 	update output <test>   - update the expected output of <test> to the actual output
 	update input <test>    - update the stdin passed to <test>"""
 	)
