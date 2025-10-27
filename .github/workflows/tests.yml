@@ -1,0 +1,28 @@
+name: Test
+description: test Masfix compiler with test.py
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install nasm and mingw (Chocolatey)
+        shell: cmd
+        run: |
+          where nasm || choco install -y nasm
+          where gcc || choco install -y mingw
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Test with test.py
+        shell: cmd
+        run: python test.py run
