@@ -834,17 +834,16 @@ bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bo
 	if (definition) returnOnFalse(checkIdentRedefinitions(name, loc, false, &scope.currNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
 
+/// constructs relative path from last 'Masfix' directory
 string relPathFromMasfix(fs::path p) {
 	fs::path out;
-	bool found = false;
 	for (fs::path part : p) {
-		string s = part.string();
-		if (found) out.append(s);
-		if (s == "Masfix") {
-			found = true;
+		out /= part;
+		if (part == "Masfix") {
+			out.clear();
 		}
 	}
-	return (found ? out : p).string();
+	return (out.empty() ? p : out).string();
 }
 ifstream openInputFile(fs::path path);
 string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) {
