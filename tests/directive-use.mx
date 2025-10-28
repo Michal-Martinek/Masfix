@@ -52,11 +52,11 @@ ld %defined1 %test_mac()
 %jnn(0, 1,2,3)
 %print(_)
 
-%jnn(!,% define b 33, unreachable)
-%jnn(!, %define b 33, unreachable)
-%jnn(!,
+%jnn(/,% define b 33, unreachable)
+%jnn(/, %define b 33, unreachable)
+%jnn(/,
 	%define b 33, unreachable)
-%jnn(!, nonex,
+%jnn(/, nonex,
 	%macro inside() {})
 %jnn(
 	%defined3,
