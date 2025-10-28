@@ -506,7 +506,8 @@ private:
 		tlists.push(tlist);
 		itrs.push(tlist.tlist.begin());
 	}
-	/// closes single list
+	/// handles the ending of a single token list
+	/// forces parsing if apropriate
 	void closeList() {
 		static_assert(TokenCount == 12, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
@@ -521,6 +522,8 @@ private:
 			forceParse();
 			exitNamespace();
 			currModule++;
+		} else if (closedList.type == TIctime) {
+			parseInterpretCtime(closedList);
 		}
 	}
 
@@ -549,9 +552,13 @@ public:
 	bool hasNext() {
 		return itrs.top() != currList().end();
 	}
-	/// closes ended lists if necessary, returns if iteration can continue in this situation
+	/// closes ended lists if necessary, returns if iteration can meaningfully continue in this situation
+	/// generally closes only lists opened in an ordinary way, the special ones will be closed elsewhere
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) closeList();
+		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
+			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed
+			closeList();
+		}
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -692,18 +699,45 @@ public:
 		currModule->contents = Token(TImodule, moduleName, loc, false, true);
 		openList(currModule->contents);
 	}
-
+	/// closes all excesive lists opened while parsing module
+	/// called before parsing ctime body
+	void closeScopesAfterCtimeMeet() {
+		while (tlists.size() && !isCurrListType(TImodule)) {
+			closeList();
+		}
+	}
 	void forceParseImpl();
-	/// prepares for parsing, cleans Scope after parsing
-	void forceParse() {
+	/// Scope wrapper for parsing, cleans Scope after parsing
+	/// parses whole TImodule, then ctime if supplied
+	void forceParse(Token* ctime=nullptr) {
+		assert(isPreprocessing);
 		isPreprocessing = false;
-		openList(currModule->contents);
 		int numTlistsBefore = tlists.size();
+		
+		openList(currModule->contents);
 		forceParseImpl();
-		assert(tlists.size() == numTlistsBefore && isCurrListType(TImodule));
-		assert(tlists.top().get().data == currModule->contents.data);
+		if (ctime) {
+			closeScopesAfterCtimeMeet();
+			openList(*ctime);
+			forceParseImpl();
+			assert(isCurrListType(TIctime) && tlists.top().get().data == macros.top().second);
+			closeList();
+		}
+		assert(isCurrListType(TImodule) && tlists.top().get().data == currModule->contents.data);
 		closeList();
+		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
+	}
+	/// processes ctime after it's body has been preprocessed
+	/// parses everything needed, runs the VM, handles ctime's return value(s) 
+	void parseInterpretCtime(Token& ctimeExp) {
+		forceParse(&ctimeExp);
+		interpret(parseCtx.parseStartIdx);
+
+		insertToken(Token(Tnumeric, to_string(globalVm.reg), ctimeExp));
+		currList().erase(--itrs.top()++); // dark magic - erases the ctime token which is before the iterator
+		endMacroExpansion();
+		parseCtx.removeCtimeInstrs();
 	}
 
 // helpers -------------------------------------------------
@@ -1180,8 +1214,8 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 }
 #define dump(str) (!!parseCtx.dumpFile) && dumpImpl(parseCtx.dumpFile, scope.expansionDepth(), str)
 #define dumpExpansion(str) dump("; " + str)
-/// parses suplied module's token stream upto EOF or possible CTF
-/// registers labels, creates list of unprocessed assembly instructions
+/// parses suplied token stream from tokens to instruction fields
+/// parses upto EOF or possible TIctime encounter
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule)
 void parseTokenStream(Scope& scope) {
 	Loc loc; bool errorLess, labelOnLine;
@@ -1211,6 +1245,8 @@ void parseTokenStream(Scope& scope) {
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
+		} else if (top.type == TIctime) {
+			return; // we let forceParse call us again
 		} else {
 			raiseError("Unexpected token", top);
 			scope.eatLine(true);
