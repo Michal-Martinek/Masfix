@@ -654,11 +654,11 @@ public:
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
 	/// eats token from token stream and returns it
-	Token eatenToken() {
-		Token t = currToken();
-		eatenTokens.push_back(t); // TODO dont push tokens inside tlist
-		itrs.top() = currList().erase(itrs.top());
-		return t;
+	Token& eatenToken(bool skipNoEat=false) {
+		auto nextNode = std::next(itrs.top());
+		if (!skipNoEat) eatenTokens.splice(eatenTokens.end(), currList(), itrs.top());
+		itrs.top() = nextNode;
+		return skipNoEat ? *prev(itrs.top()) : eatenTokens.back();
 	}
 	/// eats tokens upto EOL or separator
 	void eatLine(bool surelyEat=false) {
