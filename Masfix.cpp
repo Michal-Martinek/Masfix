@@ -387,6 +387,9 @@ struct ParseCtx {
 	void close() {
 		if (!!dumpFile) dumpFile->close();
 	}
+	void removeCtimeInstrs() {
+		instrs.resize(parseStartIdx);
+	}
 };
 ParseCtx parseCtx;
 /// structure simulating the virtual machine during interpretation
@@ -396,11 +399,15 @@ struct VM {
 	unsigned short ip;
 	unsigned short mem[CELLS];
 
-	VM(unsigned short startInstr) { ip = startInstr; }
+	VM() {};
+	void start(unsigned short startIdx) {
+ 		ip = startIdx;
+	}
 	unsigned short& cell() {
 		return mem[head];
 	}
 };
+VM globalVm;
 
 // checks --------------------------------------------------------------------
 #define errorQuoted(s) " '" + (s) + "'"
@@ -452,6 +459,7 @@ bool raiseError(string message, Loc loc, bool strict=false) {
 	return false;
 }
 // struct Scope --------------------------------------------------------
+void interpret(int startIdx=0);
 
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
@@ -1280,8 +1288,9 @@ bool checkValidity(Instr& instr) {
 	}
 	return true;
 }
-void parseInstrs(vector<Instr>& instrs) {
-	for (size_t i = parseCtx.parseStartIdx; i < instrs.size(); ++i) {
+/// parses instructions and immediates for their meaning
+void parseInstrs(vector<Instr>& instrs, int startIdx) {
+	for (size_t i = startIdx; i < instrs.size(); ++i) {
 		Instr& instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
@@ -1292,7 +1301,7 @@ void Scope::forceParseImpl() {
 	parseCtx.parseStartIdx = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	parseInstrs(parseCtx.instrs);
+	parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
@@ -1387,13 +1396,13 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	}
 	interpInstrBody(vm, instr, right, cond, ipChanged);
 }
-void interpret() {
-	VM vm(0);
+void interpret(int startIdx) {
+	globalVm.start(startIdx);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
-	while (vm.ip < parseCtx.instrs.size()) {
+	while (globalVm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
-		interpInstr(vm, parseCtx.instrs[vm.ip], ipChanged);
-		if (!ipChanged) vm.ip++;
+		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged);
+		if (!ipChanged) globalVm.ip++;
 	}
 }
 // assembly generation ------------------------------------------
