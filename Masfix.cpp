@@ -929,13 +929,13 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
 	return true;
 }
-bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
-	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
+bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
+	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
+	Token expanded = Token(TIexpansion, macroName, percentToken.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
 	scope.insertToken(expanded);
@@ -1016,7 +1016,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
-		return expandMacroUse(percentToken.loc, scope, namespaceId, directiveName);
+		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
