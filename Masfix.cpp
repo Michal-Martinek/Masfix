@@ -44,6 +44,7 @@ enum TokenTypes {
 	// intermediate preprocess tokens
 	TImodule,
 	TIexpansion,
+	TIctime,
 	TInamespace,
 	TIarglist,
 
@@ -507,7 +508,7 @@ private:
 	}
 	/// closes single list
 	void closeList() {
-		static_assert(TokenCount == 11, "Exhaustive closeList definition");
+		static_assert(TokenCount == 12, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -559,8 +560,9 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
+		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
 		++itrs.top();
-		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace) {
+		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
 		}
 		return itrs.top();
@@ -752,7 +754,7 @@ string getCharRun(string s) {
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 12, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
@@ -841,7 +843,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 11, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -961,14 +963,15 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(TIexpansion, macroName, percentToken);
+	bool ctime = percentToken.data == "!";
+	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
 	scope.insertToken(expanded);
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
-	static_assert(TokenCount == 11, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1104,6 +1107,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 }
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
+	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken); \
 	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
 		checkReturnOnFail(!scope.isCurrListType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
@@ -1111,7 +1115,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
 	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
 	if (DefiningDirectivesSet.count(directiveName)) {
@@ -1136,7 +1140,7 @@ bool preprocess(Scope& scope) {
 	bool errorLess = true;
 	while (scope.advanceIteration()) {
 		Token& currToken = scope.currToken();
-		if (currToken.type == Tspecial && currToken.data == "%") {
+		if (currToken.type == Tspecial && (currToken.data == "%" || currToken.data == "!")) {
 			eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 			eatLineOnFalse(processDirective(scope.eatenToken(), scope));
 			continue;
