@@ -642,16 +642,18 @@ public:
 		return _advanceScopesCtimeMeet(ctime);
 	}
 	bool _advanceScopesCtimeMeet(Token& ctime) {
+		// arglist is guaranteed to be preprocessed, we dont have to parse (arglistst / ctimes) inside current expansion tree?
+		// mark ctime start here
 		if (ctime.type == TIarglist) {
 			next(ctime); // advance into Arglist which is parsed now
 			return advanceIteration();
 		}
 		// TODO don't step into??
-		if (&ctime != parseCtx.parsedCtime) {
-			next(ctime); // advance into ctime which is not parsed now
-			/// why? - we need to meet parsed ctime, couldnt we just exit parsing right now?
-			return advanceIteration();
-		}
+		// if (&ctime != parseCtx.parsedCtime) {
+		// 	next(ctime); // advance into ctime which is not parsed now
+		// 	/// why? - we need to meet parsed ctime, couldnt we just exit parsing right now?
+		// 	return advanceIteration();
+		// }
 		// parsedCtime met while parsing module -> exit -> forceParse(parsedCtime)
 		while (tlists.size() && !isCurrListType(TImodule)) {
 			closeList();
