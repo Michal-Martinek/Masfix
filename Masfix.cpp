@@ -391,9 +391,16 @@ struct ParseCtx {
 	map<string, Label> strToLabel;
 	Module* lastModule = nullptr;
 	optional<ofstream> dumpFile;
+	int ctimeRow = -1;
 
 	void close() {
 		if (!!dumpFile) dumpFile->close();
+	}
+	bool ctimeOnLine(const Loc& loc) {
+		if (ctimeRow == -1) return false;
+		bool ctimeOnLine = loc.row >= ctimeRow;
+		if (ctimeOnLine) ctimeRow = -1;
+		return ctimeOnLine;
 	}
 	void removeCtimeInstrs() {
 		instrs.resize(parseStartIdx);
@@ -440,12 +447,12 @@ Flags flags;
 #define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
 
-#define continueOnFalse(cond) if (!(cond)) continue;
+#define continueOnFalse(cond) if (!(cond)) { errorLess = false; continue; }
 #define returnOnFalse(cond) if (!(cond)) return false;
 
 #define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+#define checkContinueOnFail(cond, message, obj) continueOnFalse(check(cond, message, obj));
+#define checkReturnOnFail(cond, message, obj) returnOnFalse(check(cond, message, obj));
 
 bool FLAG_strictErrors = false;
 bool SupressErrors = false;
@@ -706,20 +713,20 @@ public:
 			closeList();
 		}
 	}
-	void forceParseImpl();
+	bool forceParseImpl();
 	/// Scope wrapper for parsing, cleans Scope after parsing
-	/// parses whole TImodule, then ctime if supplied
-	void forceParse(Token* ctime=nullptr) {
+	/// parses whole TImodule upto possible ctime, then it's body
+	bool forceParse(Token* ctime=nullptr) {
 		assert(isPreprocessing);
 		isPreprocessing = false;
 		int numTlistsBefore = tlists.size();
-		
+		bool safeToRun=true;
 		openList(currModule->contents);
 		forceParseImpl();
 		if (ctime) {
 			closeScopesAfterCtimeMeet();
 			openList(*ctime);
-			forceParseImpl();
+			safeToRun = forceParseImpl();
 			assert(isCurrListType(TIctime) && tlists.top().get().data == macros.top().second);
 			closeList();
 		}
@@ -727,12 +734,14 @@ public:
 		closeList();
 		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
+		return safeToRun;
 	}
-	/// processes ctime after it's body has been preprocessed
-	/// parses everything needed, runs the VM, handles ctime's return value(s) 
+	/// handles ctime use after it's body has been preprocessed
+	/// parses everything needed, runs the VM, handles ctime's return value(s)
 	void parseInterpretCtime(Token& ctimeExp) {
-		forceParse(&ctimeExp);
-		interpret(parseCtx.parseStartIdx);
+		parseCtx.ctimeRow = ctimeExp.loc.row;
+		bool safeToRun = forceParse(&ctimeExp);
+		if (safeToRun) interpret(parseCtx.parseStartIdx);
 
 		insertToken(Token(Tnumeric, to_string(globalVm.reg), ctimeExp));
 		currList().erase(--itrs.top()++); // dark magic - erases the ctime token which is before the iterator
@@ -816,7 +825,7 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					addToken(Tlist);
 					keepContinued = false;
 				} else if (first == ')' || first == ']' || first == '}') {
-					continueOnFalse(scope.tokenizeCloseList(first, loc));
+					if (!scope.tokenizeCloseList(first, loc)) continue;
 				} else if (first == ':') {
 					addToken(Tcolon);
 				} else if (first == ',') {
@@ -992,12 +1001,12 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	return true;
 }
 bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
+	bool ctime = percentToken.data == "!";
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	bool ctime = percentToken.data == "!";
 	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
@@ -1078,7 +1087,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued), "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
@@ -1167,7 +1176,11 @@ bool processDirective(Token percentToken, Scope& scope) {
 	}
 	return true;
 }
-#define eatLineOnFalse(cond) if (!(cond)) { scope.eatLine(); errorLess = false; continue; }
+// NOTE silently escapes parsing on encounter with ctime
+#define eatLineOnFalse(cond) if (!(cond)) { \
+	if (scope->type != TIctime) { scope.eatLine(); errorLess = false; } \
+	continue; \
+	}
 /// preprocesses given scope, parses completed modules
 /// closes all scopes
 bool preprocess(Scope& scope) {
@@ -1192,14 +1205,18 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 		if (token.type == Tlist) {
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
+			returnOnFalse(token.tlist.front().type != TIctime);
 			processArglistWrapper(
-				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 3);
+				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3);
 				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
 			scope.eatenToken();
 			ident.append(fragment);
+		} else if (token.type == TIctime) {
+			return false;
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
+			canStartLine = false;
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);
@@ -1209,6 +1226,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 }
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
+	// TODO disable in ctime
 	dumpFile.value() << string(indent, '\t') << s << '\n';
 	return true;
 }
@@ -1224,6 +1242,9 @@ void parseTokenStream(Scope& scope) {
 			parseCtx.lastModule = scope.getCurrModule();
 			dumpExpansion(parseCtx.lastModule->abspath.string() + " ----");
 		}
+		// we end parsing on encounter with any ctime
+		if (parseCtx.ctimeOnLine(scope->loc)) break;
+
 		Token& top = scope.currToken(); loc = top.loc; string name;
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
@@ -1245,8 +1266,6 @@ void parseTokenStream(Scope& scope) {
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);
-		} else if (top.type == TIctime) {
-			return; // we let forceParse call us again
 		} else {
 			raiseError("Unexpected token", top);
 			scope.eatLine(true);
@@ -1358,19 +1377,21 @@ bool checkValidity(Instr& instr) {
 	return true;
 }
 /// parses instructions and immediates for their meaning
-void parseInstrs(vector<Instr>& instrs, int startIdx) {
+bool parseInstrs(vector<Instr>& instrs, int startIdx) {
+	bool errorLess = true;
 	for (size_t i = startIdx; i < instrs.size(); ++i) {
 		Instr& instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
+	return errorLess;
 }
-void Scope::forceParseImpl() {
+bool Scope::forceParseImpl() {
 	parseCtx.parseStartIdx = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
+	return parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
