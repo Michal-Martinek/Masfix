@@ -408,6 +408,25 @@ struct VM {
 	}
 };
 VM globalVm;
+/// holds all compile time flags and settings
+struct Flags {
+	bool verbose = false;
+	bool run = false;
+	bool keepAsm = false;
+	bool dump = false;
+	bool interpret = false;
+
+	fs::path inputPath = "";
+	vector<fs::path> includeFolders;
+
+	fs::path filePath(string fileExt) {
+		return inputPath.replace_extension(fileExt);
+	}
+	string filePathStr(string fileExt) {
+		return '"' + filePath(fileExt).string() + '"';
+	}
+};
+Flags flags;
 
 // checks --------------------------------------------------------------------
 #define errorQuoted(s) " '" + (s) + "'"
@@ -1051,7 +1070,10 @@ bool processUsing(Loc loc, Scope& scope) {
 fs::path processIncludePath(string str, Scope& scope) {
 	fs::path path = fs::path(str);
 	if (path.has_extension() && path.extension() != ".mx") return fs::path();
-	for (fs::path prepath : {scope.currModuleFolder(), fs::current_path()}) { // TODO crystalize scopes
+	fs::path moduleRel = scope.currModuleFolder() / path.replace_extension(".mx");
+	if (fs::exists(moduleRel)) return fs::canonical(moduleRel);
+
+	for (fs::path prepath : flags.includeFolders) {
 		path = prepath;
 		path /= fs::path(str).replace_extension(".mx");
 		if (fs::exists(path)) break;
@@ -1066,7 +1088,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	} else if (directive == "include") {
 		directiveEatToken(Tstring, "Missing included path string", true);
 		fs::path path = processIncludePath(token.data, scope);
-		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" couldn't be found", loc);
+		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" can't be included", loc);
 		if (scope.newModuleIncluded(path)) tokenizeNewModule(path, scope);
 	} else {
 		unreachable();
@@ -1800,30 +1822,17 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile.close();
 }
 // IO ---------------------------------------
-struct Flags {
-	bool verbose = false;
-	bool run = false;
-	bool keepAsm = false;
-	bool dump = false;
-	bool interpret = false;
-
-	fs::path inputPath = "";
-
-	fs::path filePath(string fileExt) {
-		return inputPath.replace_extension(fileExt);
-	}
-	string filePathStr(string fileExt) {
-		return '"' + filePath(fileExt).string() + '"';
-	}
-};
 void printUsage() {
 	cout << "usage: Masfix [flags] <masfix-file-path>\n"
 			"	flags:\n"
 			"		-v / --verbose   - additional compilation messages\n"
+			"		-S / --strict    - disables multiple errors\n"
+			"		-i / --include   - additional include paths\n"
+			"	mode:\n"
 			"		-r / --run       - run executable after compilation\n"
 			"		-I / --interpret - interpret instead of compile\n"
+			"	side effects:\n"
 			"		-A / --keep-asm  - keep assembly file\n"
-			"		-S / --strict    - disables multiple errors\n"
 			"		-D / --dump      - dumps prepocessed code into file\n";
 }
 void checkUsage(bool cond, string message) {
@@ -1846,6 +1855,23 @@ vector<string> getLineArgs(int argc, char *argv[]) {
 	}
 	return args;
 }
+fs::path _masfixFolder = fs::canonical("C:/Users/micha/source/Langs/Masfix"); // NOTE fs::canonical(__FILE__) DNW - mixes compile / runtime
+fs::path checkPathArg(string arg, bool file) {
+	fs::path p = fs::weakly_canonical(arg);
+	if (!fs::exists(p)) p = _masfixFolder/p;
+	checkUsage(fs::exists(p), "Invalid argument or file not found" errorQuoted(arg));
+	if (file) checkUsage(fs::is_regular_file(p), "File expected" errorQuoted(arg));
+	else if (fs::is_regular_file(p)) p = p.parent_path();
+	return p;
+}
+/// include paths will be in this order: module-rel dir, input dir, --includes, CWD, std, Masfix dir 
+void populateIncludePaths(Flags& flags) {
+	checkUsage(!flags.inputPath.empty(), "Input file path not found");
+	flags.includeFolders.insert(flags.includeFolders.begin(), flags.inputPath.parent_path());
+	flags.includeFolders.insert(flags.includeFolders.end(), fs::current_path());
+	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std");
+	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder);
+}
 Flags processLineArgs(int argc, char *argv[]) {
 	checkUsage(argc >= 2, "Insufficent number of command line args");
 	Flags flags = Flags();
@@ -1857,6 +1883,9 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.run = true;
 		} else if (arg == "-I" || arg == "--interpret") {
 			flags.interpret = true;
+		} else if (arg == "-i" || arg == "--include") {
+			checkUsage(++i < argc, "Include path expected");
+			flags.includeFolders.push_back(checkPathArg(argv[i], false));
 		} else if (arg == "-A" || arg == "--keep-asm") {
 			flags.keepAsm = true;
 		} else if (arg == "-S" || arg == "--strict") {
@@ -1865,10 +1894,10 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.dump = true;
 		} else {
 			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
-			checkUsage(fs::exists(arg) && fs::is_regular_file(arg), "Invalid argument or file not found" errorQuoted(arg));
-			flags.inputPath = fs::canonical(arg);
+			flags.inputPath = checkPathArg(arg, true);
 		}
 	}
+	populateIncludePaths(flags);
 	return flags;
 }
 ifstream openInputFile(fs::path path) {
@@ -1935,7 +1964,7 @@ void run(Flags& flags) {
 	exit(exitCode);
 }
 int main(int argc, char *argv[]) {
-	Flags flags = processLineArgs(argc, argv);
+	flags = processLineArgs(argc, argv);
 	Scope scope;
 	string mainRelPath = tokenizeNewModule(flags.inputPath, scope, true);
 	initParseCtx(flags, mainRelPath);
