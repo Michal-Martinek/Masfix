@@ -199,6 +199,8 @@ struct Token {
 	bool continued; // continues meaning of previous token
 	bool firstOnLine;
 
+	long long _ctimeFirstInstrIdx = -1;
+	
 	//–– construtors
     Token() = default;
     ~Token() = default; // TODO destructor?
@@ -209,6 +211,7 @@ struct Token {
 		this->loc = loc;
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
+		_ctimeFirstInstrIdx = -1;
 	}
 	static Token fromCtx(TokenTypes type, string data, Token const& ctx) {
 		return Token(type, move(data), ctx.loc, ctx.continued, ctx.firstOnLine);
@@ -221,6 +224,7 @@ struct Token {
 		, loc(other.loc)
 		, continued(other.continued)
 		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(other._ctimeFirstInstrIdx)
 	{}
 	Token& operator=(const Token& other) {
 		if (this != &other) {
@@ -230,6 +234,7 @@ struct Token {
 			loc = other.loc;
 			continued = other.continued;
 			firstOnLine = other.firstOnLine;
+			_ctimeFirstInstrIdx = other._ctimeFirstInstrIdx;
 		}
 		return *this;
 	}
@@ -241,6 +246,7 @@ struct Token {
 		, loc(std::move(other.loc))
 		, continued(other.continued)
 		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(std::exchange(other._ctimeFirstInstrIdx, -1))
 	{}
 	Token& operator=(Token&& other) noexcept {
 	  if (this != &other) {
@@ -250,6 +256,7 @@ struct Token {
 		loc = std::move(other.loc);
 		continued = other.continued;
 		firstOnLine = other.firstOnLine;
+		_ctimeFirstInstrIdx = std::exchange(other._ctimeFirstInstrIdx, -1);
 	  }
 	  return *this;
 	}
@@ -429,7 +436,6 @@ struct Label {
 };
 struct ParseCtx {
 	vector<Instr> instrs;
-	size_t parseStartIdx;
 	map<string, Label> strToLabel;
 	Module* lastModule = nullptr;
 	optional<ofstream> dumpFile;
@@ -437,8 +443,14 @@ struct ParseCtx {
 	void close() {
 		if (!!dumpFile) dumpFile->close();
 	}
-	void removeCtimeInstrs() {
-		instrs.resize(parseStartIdx);
+	/// saves idx of first instruction of ctime's body
+	void saveCtimeStart(Token& ctime) {
+		if (ctime._ctimeFirstInstrIdx == -1) {
+			ctime._ctimeFirstInstrIdx = instrs.size();
+		}
+	}
+	void removeCtimeInstrs(Token& ctime) {
+		instrs.resize(ctime._ctimeFirstInstrIdx);
 	}
 };
 ParseCtx parseCtx;
@@ -802,12 +814,12 @@ public:
 		bool safeToRun = forceParse(&ctimeExp);
 		int retval = 0;
 		if (safeToRun) {
-			interpret(parseCtx.parseStartIdx);
+			interpret(ctimeExp._ctimeFirstInstrIdx);
 			retval = globalVm.reg;
 		}
 		_updateTSafterCtime(ctimeExp, retval);
 		endMacroExpansion();
-		parseCtx.removeCtimeInstrs();
+		parseCtx.removeCtimeInstrs(ctimeExp);
 	}
 	/// removes ctime from token stream, inserts it's return value(s)
 	void _updateTSafterCtime(Token& ctimeExp, int retval) {
@@ -1469,10 +1481,10 @@ bool parseInstrs(vector<Instr>& instrs, int startIdx) {
 	return errorLess;
 }
 bool Scope::forceParseImpl() {
-	parseCtx.parseStartIdx = parseCtx.instrs.size();
+	size_t firstUnparsed = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	return parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
+	return parseInstrs(parseCtx.instrs, firstUnparsed);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
