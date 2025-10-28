@@ -474,18 +474,19 @@ private:
 	/// closes single list
 	void closeList() {
 		static_assert(TokenCount == 11, "Exhaustive closeList definition");
-		if (isPreprocessing) // NOTE extra work only when isPreprocessing
-		if (isCurrTtype(TIexpansion)) {
+		Token& closedList = tlists.top().get();
+		tlists.pop(); itrs.pop();
+		if (!isPreprocessing) return;
+		if (closedList.type == TIexpansion) {
 			endMacroExpansion();
-		} else if (isCurrTtype(TInamespace)) {
+		} else if (closedList.type == TInamespace) {
 			assert(currNamespace().isUpperAccesible);
 			exitNamespace();
-		} else if (isCurrTtype(TImodule)) {
+		} else if (closedList.type == TImodule) {
 			forceParse();
 			exitNamespace();
 			currModule++;
 		}
-		tlists.pop(); itrs.pop();
 	}
 
 public:
@@ -499,8 +500,8 @@ public:
 	Token* operator->() {
 		return &currToken();
 	}
-	/// is topmost (current) token of the specified type?
-	bool isCurrTtype(TokenTypes type) {
+	/// is current token list of the specified type
+	bool isCurrListType(TokenTypes type) {
 		return tlists.top().get().type == type;
 	}
 	int expansionDepth() {
@@ -515,7 +516,7 @@ public:
 	}
 	/// closes ended lists if necessary, returns if iteration can continue in this situation
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !insideArglist() && (isPreprocessing || !isCurrTtype(TImodule))) closeList();
+		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) closeList();
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -558,7 +559,7 @@ public:
 	}
 	/// eats tokens upto EOL or separator
 	void eatLine(bool surelyEat=false) {
-		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(insideArglist() && currToken().type == Tseparator)) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator)) {
 			eatenToken();
 			surelyEat = false;
 		}
@@ -566,10 +567,6 @@ public:
 // situation checks -----------------------------------------
 	bool insideMacro() {
 		return macros.size();
-	}
-	/// is CLOSEST tlist an arglist
-	bool insideArglist() {
-		return isCurrTtype(TIarglist);
 	}
 	int currNamespaceId() {
 		assert(namespaces.size());
@@ -618,12 +615,12 @@ public:
 		openList(tlist);
 	}
 	void exitArglist() {
-		assert(insideArglist());
+		assert(isCurrListType(TIarglist));
 		closeList();
 	}
 // tokenization -----------------------------------------
 	bool tokenizeHasTlist() {
-		return tlists.size() && isCurrTtype(Tlist);
+		return tlists.size() && isCurrListType(Tlist);
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
 		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
@@ -636,7 +633,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() && isCurrTtype(TImodule));
+		assert(tlists.size() && isCurrListType(TImodule));
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
@@ -667,7 +664,7 @@ public:
 		openList(currModule->contents);
 		int numTlistsBefore = tlists.size();
 		forceParseImpl();
-		assert(tlists.size() == numTlistsBefore && isCurrTtype(TImodule));
+		assert(tlists.size() == numTlistsBefore && isCurrListType(TImodule));
 		assert(tlists.top().get().data == currModule->contents.data);
 		closeList();
 		isPreprocessing = true;
@@ -928,7 +925,7 @@ bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope.isCurrTtype(Tseparator), "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -1072,7 +1069,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
 	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
-		checkReturnOnFail(!scope.insideArglist(), type " not allowed inside arglist", percentToken.loc); \
+		checkReturnOnFail(!scope.isCurrListType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
 		checkReturnOnFail(!scope.insideMacro(), type " not allowed inside macro", percentToken.loc); \
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
