@@ -199,6 +199,7 @@ struct Token {
 	bool continued; // continues meaning of previous token
 	bool firstOnLine;
 
+	long long _ctimeFirstInstrIdx = -1;
 	
 	//–– construtors
     Token() = default;
@@ -209,6 +210,7 @@ struct Token {
 		this->loc = loc;
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
+		_ctimeFirstInstrIdx = -1;
 	}
 	static Token fromCtx(TokenTypes type, string data, Token const& ctx) {
 		return Token(type, move(data), ctx.loc, ctx.continued, ctx.firstOnLine);
@@ -221,6 +223,7 @@ struct Token {
 		, loc(other.loc)
 		, continued(other.continued)
 		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(other._ctimeFirstInstrIdx)
 	{}
 	Token& operator=(const Token& other) {
 		if (this != &other) {
@@ -230,6 +233,7 @@ struct Token {
 			loc = other.loc;
 			continued = other.continued;
 			firstOnLine = other.firstOnLine;
+			_ctimeFirstInstrIdx = other._ctimeFirstInstrIdx;
 		}
 		return *this;
 	}
@@ -241,6 +245,7 @@ struct Token {
 		, loc(std::move(other.loc))
 		, continued(other.continued)
 		, firstOnLine(other.firstOnLine)
+		, _ctimeFirstInstrIdx(std::exchange(other._ctimeFirstInstrIdx, -1))
 	{}
 	Token& operator=(Token&& other) noexcept {
 	  if (this != &other) {
@@ -250,6 +255,7 @@ struct Token {
 		loc = std::move(other.loc);
 		continued = other.continued;
 		firstOnLine = other.firstOnLine;
+		_ctimeFirstInstrIdx = std::exchange(other._ctimeFirstInstrIdx, -1);
 	  }
 	  return *this;
 	}
