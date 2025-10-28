@@ -625,19 +625,31 @@ public:
 		if (!isPreprocessing && currToken().type == TIctime) {
 			return handleCtimeMeet(currToken());
 		}
+		if (!isPreprocessing && currToken().type == TIarglist) {
+			cout << "advaceItr - met arglist\n";
+			return handleCtimeMeet(currToken());
+		}
 		return tlists.size() && hasNext();
 	}
 	/// @brief properly advances parsing when meeting ctime during module parsing
+	/// - crucial for determining start of ctime's asm instructions
+	/// - restores instrs which depend on ctime results (already eaten on current line) -> back to TS
 	/// @return continue parsing?
 	bool handleCtimeMeet(Token& ctime) {
-		assert(parseCtx.parsedCtime != nullptr);
+		assert(!isPreprocessing && parseCtx.parsedCtime != nullptr);
 		parseCtx.saveCtimeStart(ctime);
 		restoreSavedLine();
 		return _advanceScopesCtimeMeet(ctime);
 	}
 	bool _advanceScopesCtimeMeet(Token& ctime) {
+		if (ctime.type == TIarglist) {
+			next(ctime); // advance into Arglist which is parsed now
+			return advanceIteration();
+		}
+		// TODO don't step into??
 		if (&ctime != parseCtx.parsedCtime) {
 			next(ctime); // advance into ctime which is not parsed now
+			/// why? - we need to meet parsed ctime, couldnt we just exit parsing right now?
 			return advanceIteration();
 		}
 		// parsedCtime met while parsing module -> exit -> forceParse(parsedCtime)
@@ -1103,10 +1115,9 @@ void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string 
 	scope.insertToken(Token::fromCtx(Tnumeric, define.value, percentToken));
 }
 bool preprocess(Scope& scope);
-/// checks proper macro arglist presence
-/// preprocesses it's contents (leaves it in TS)
-/// then splits it into macro arg fields
-bool processExpansionArglist(Scope& scope, Macro& mac, Loc& loc) {
+/// checks proper macro arglist presence & preprocesses it's contents, then chops it into macro arguments
+/// arglist is left in TS and it's iteration is opened & closed only here
+bool processExpansionArglist(Scope& scope, Macro& mac, Loc& loc, Token& percentToken) {
 	returnOnFalse(_checkBeforeEatingToken(scope, loc, "Expansion arglist expected", true));
 	Token& token = scope.currToken(); loc = token.loc;
 	assert(token.type == Tlist);
@@ -1115,6 +1126,7 @@ bool processExpansionArglist(Scope& scope, Macro& mac, Loc& loc) {
 		if (token.tlist.size()) {
 			token.continued = false;
 			token.firstOnLine = true;
+			// token.firstOnLine = percentToken.firstOnLine;
 			
 			retval = preprocess(scope);
 			retval = retval && scope.sliceArglist(mac, loc);
@@ -1130,7 +1142,7 @@ bool processExpansionArglist(Scope& scope, Macro& mac, Loc& loc) {
 bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
 	bool ctime = percentToken.data == "!";
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
-	returnOnFalse(processExpansionArglist(scope, mac, loc));
+	returnOnFalse(processExpansionArglist(scope, mac, loc, percentToken));
 	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine
 		|| (ctime && !scope->continued) || scope->type == Tseparator,
 	"Unexpected token after macro use", scope.currToken());
@@ -1340,6 +1352,9 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3, true);
 				Token* nextToken=nullptr; if (scope.hasNext()) nextToken = &scope.currToken();
 			scope.exitArglist(true);
+			// TODO hide here?
+			// returnOnFalse(scope.advanceIteration());
+			// return false;
 			if (!!nextToken && nextToken->type == TIctime) {
 				scope.handleCtimeMeet(*nextToken);
 				return false;
@@ -1392,6 +1407,7 @@ outer_loop_continue:
 			// NOTE ignores whole instr on any err in parsing
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
 			Instr instr(name, loc);
+			// while (scope.advanceIteration() && !scope->firstOnLine) {
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
 				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"), goto outer_loop_continue);
@@ -1399,8 +1415,12 @@ outer_loop_continue:
 			}
 			dump(instr.toStr());
 			parseCtx.instrs.push_back(instr);
-		} else if (top.type == TIexpansion || top.type == TInamespace || top.type == TIarglist) {
+		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
+			scope.next(top);
+		} else if (top.type == TIarglist) {
+			// met only when ctime is used in arglist, when preprocessing module body
+			cout << "Met arglist in parseTS\n";
 			scope.next(top);
 		} else {
 			raiseError("Unexpected token", top);
