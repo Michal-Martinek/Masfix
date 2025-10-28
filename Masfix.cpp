@@ -1926,7 +1926,6 @@ void run(Flags& flags) {
 
 		exitCode = compileAndRun(flags);
 	}
-	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 	exit(exitCode);
 }
 int main(int argc, char *argv[]) {
@@ -1938,6 +1937,7 @@ int main(int argc, char *argv[]) {
 	preprocess(scope);
 
 	parseCtx.close();
+	if (flags.dump) cout << "\n[NOTE] dump file: \"" << flags.filePath("dump").string() << "\"\n";
 	raiseErrors();
 
 	run(flags);
