@@ -199,19 +199,16 @@ struct Token {
 	bool firstOnLine;
 
 	Token() {}
-	Token(TokenTypes type, string data, Token& token) {
-		this->type = type;
-		this->data = data;
-		this->loc = token.loc;
-		this->continued = token.continued;
-		this->firstOnLine = token.firstOnLine;
-	}
+
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
 		this->loc = loc;
 		this->continued = continued;
 		this->firstOnLine = firstOnLine;
+	}
+	static Token fromCtx(TokenTypes type, string data, Token const& ctx) {
+		return Token(type, move(data), ctx.loc, ctx.continued, ctx.firstOnLine);
 	}
 	char tlistCloseChar() {
 		assert(type == Tlist);
@@ -717,7 +714,7 @@ public:
 	}
 	/// removes ctime from token stream, inserts it's return value(s)
 	void _updateTSafterCtime(Token& ctimeExp, int retval) {
-		Token retValToken = Token(Tnumeric, to_string(retval), ctimeExp);
+		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval), ctimeExp);
 		// return itr to ctime expansion to remove it
 		assert(&*--itrs.top() == &ctimeExp);	
 		eatenToken();
@@ -938,7 +935,7 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope) {
 	Token token; // TODO no seps in namespace body
 	directiveEatToken(Tlist, "Namespace body expected", false);
-	scope.insertToken(Token(TInamespace, name, percentToken));
+	scope.insertToken(Token::fromCtx(TInamespace, name, percentToken));
 	scope->tlist = token.tlist;
 	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
@@ -959,10 +956,9 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 	}
 	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
-void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
+void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
-	Token expanded = Token(Tnumeric, define.value, percentToken);
-	scope.insertToken(expanded);
+	scope.insertToken(Token::fromCtx(Tnumeric, define.value, percentToken));
 }
 bool preprocess(Scope& scope);
 bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
@@ -982,7 +978,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
+	Token expanded = Token::fromCtx(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
 	return true;
