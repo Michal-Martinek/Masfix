@@ -541,10 +541,11 @@ private:
 	// TODO better max depth checks - maybe add depth counter
 	stack<reference_wrapper<Token>> tlists;
 	stack<list<Token>::iterator> itrs;
+	list<Token> savedLine; // saving eaten tokens (from last instr) to restore when meeting ctime
 	list<Module> modules;
 	list<Module>::iterator currModule = modules.begin();
 	bool isPreprocessing = true;
-	
+
 	/// opens new tlist for iteration
 	void openList(Token& tlist) {
 		tlists.push(tlist);
@@ -598,12 +599,22 @@ public:
 	}
 	/// closes ended tlists if necessary
 	/// - generally closes only basic tlist types, special ones are left open for respective funcs to handle
-	/// @returns if iteration can meaningfully continue in current situation
+	/// - flushes eaten tokens for every line start (in both modes, irrelevant for preprocessing)
+	/// @returns true - guarantees if iteration can meaningfully continue in current situation
 	bool advanceIteration() {
 		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
 			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed, leave it open!
 			closeList();
 		}
+		returnOnFalse(tlists.size() && hasNext());
+		if (currToken().firstOnLine) flushSavedLine(); // save only current instruction
+		// escape when meeting ctime (while parsing module)
+		if (!isPreprocessing && currToken().type == TIctime) {
+			restoreSavedLine();
+			// TODO if its the parsed ctime, right?
+			return false;
+		}
+		// NOTE TODO can this be recursive?
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -637,8 +648,10 @@ public:
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
+	/// eats token from token stream and returns it
 	Token eatenToken() {
 		Token t = currToken();
+		savedLine.push_back(t); // TODO dont push tokens inside tlist
 		itrs.top() = currList().erase(itrs.top());
 		return t;
 	}
@@ -649,6 +662,14 @@ public:
 			eatenToken();
 			surelyEat = false;
 		}
+	}
+	/// restores the eaten line into TS, iteration then skips it
+	/// used because instruction is not ready yet due to pending ctime expansion
+	void restoreSavedLine() {
+		currList().splice(itrs.top(), savedLine);
+	}
+	void flushSavedLine() {
+		savedLine.clear();
 	}
 // situation checks -----------------------------------------
 	bool insideMacro() {
@@ -794,6 +815,7 @@ public:
 		// return itr to ctime expansion to remove it
 		assert(&*--itrs.top() == &ctimeExp);	
 		eatenToken();
+		flushSavedLine(); // rather: eat, but dont save?
 		insertToken(move(retValToken));
 	}
 
@@ -947,9 +969,18 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 		first = false;
 	}
 }
+/// @brief joins tokens in TS as identifier (name) given naming policies
+/// @param name output ref - identifier
+/// @param loc in - loc of prev token for errs, out - loc of ident start
+/// @param identPurpose description for errors
+/// @param canStartLine is identifier expected to follow prev token or start on newline
+/// @param eatAnything the higher level - more token types are allowed: 0 - basics, 1 - :, 2 - "", 3 - []
+/// @return if identifier was successfully read (false if ctime interrupted eating)
 bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
 	Loc prevLoc = loc;
 	eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	// break if ctime was seen first, otherwise it's not part of ident because it's never continued
+	if (scope.hasNext() && scope->type == TIctime) return name != "";
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
@@ -1281,7 +1312,7 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 /// chops given token stream into individual asm instructions
 /// registers asm labels, creates unprocessed assembly instruction fields
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
-/// parses upto EOF or possible TIctime encounter
+/// module body parses upto EOF or possible TIctime encounter
 void parseTokenStream(Scope& scope) {
 	Loc loc;
 	bool labelOnLine;
@@ -1300,6 +1331,7 @@ outer_loop_continue:
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
+			scope.flushSavedLine(); // label and instr can be independently on same line
 			dump(':' + name);
 		} else if (top.type == Talpha) {
 			// NOTE ignores whole instr on any err in parsing
