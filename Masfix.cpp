@@ -731,12 +731,14 @@ public:
 		assert(namespaces.size() >= 1);
 		namespaces.pop();
 	}
-	void enterArglist(Token& tlist) {
-		tlist.type = TIarglist;
+	void enterArglist(Token& tlist, bool changeType=true) {
+		if (changeType) tlist.type = TIarglist;
 		openList(tlist);
 	}
-	void exitArglist() {
-		assert(isCurrListType(TIarglist));
+	/// @brief closes curr tlist
+	/// @param allowAnyType allows any tlist type
+	void exitArglist(bool allowAnyType=false) {
+		if (!allowAnyType) assert(isCurrListType(TIarglist));
 		closeList();
 	}
 // tokenization -----------------------------------------
@@ -1299,11 +1301,9 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 		if (token.type == Tlist) {
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
-			processArglistWrapper(
-				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3);
-				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
-			)
-			scope.eatenToken();
+			scope.enterArglist(scope.eatenToken(), false);
+				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3, true);
+			scope.exitArglist(true);
 			ident.append(fragment);
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
