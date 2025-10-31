@@ -487,9 +487,10 @@ private:
 		tlists.push(tlist);
 		itrs.push(tlist.tlist.begin());
 	}
-	/// closes single list
+	/// handles the ending of a single token list
+	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 11, "Exhaustive closeList definition");
+		static_assert(TokenCount == 12, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -502,6 +503,8 @@ private:
 			forceParse(closedList);
 			exitNamespace();
 			currModule++;
+		} else if (closedList.type == TIctime) {
+			parseInterpretCtime(closedList);
 		}
 	}
 
@@ -694,6 +697,23 @@ public:
 			closeList();
 		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
+	}
+
+	/// processes ctime after it's body has been preprocessed
+	/// parses ctime body, runs the VM, handles ctime's return value(s) 
+	void parseInterpretCtime(Token& ctimeExp) {
+		forceParse(ctimeExp);
+		interpret(parseCtx.parseStartIdx);
+		
+		_updateTSafterCtime(ctimeExp);
+		endMacroExpansion();
+		parseCtx.removeCtimeInstrs();
+	}
+	/// removes ctime from token stream, inserts it's return value(s)
+	void _updateTSafterCtime(Token& ctimeExp) {
+		// return itr to ctime expansion to remove it
+		assert(&*--itrs.top() == &ctimeExp);	
+		eatenToken();
 	}
 
 // helpers -------------------------------------------------
