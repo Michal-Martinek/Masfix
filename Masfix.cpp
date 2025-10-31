@@ -704,18 +704,22 @@ public:
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
 	void parseInterpretCtime(Token& ctimeExp) {
 		bool safeToRun = forceParse(ctimeExp);
+		int retval = 0;
 		if (safeToRun) {
 			interpret(parseCtx.parseStartIdx);
+			retval = globalVm.reg;
 		}
-		_updateTSafterCtime(ctimeExp);
+		_updateTSafterCtime(ctimeExp, retval);
 		endMacroExpansion();
 		parseCtx.removeCtimeInstrs();
 	}
 	/// removes ctime from token stream, inserts it's return value(s)
-	void _updateTSafterCtime(Token& ctimeExp) {
+	void _updateTSafterCtime(Token& ctimeExp, int retval) {
+		Token retValToken = Token(Tnumeric, to_string(retval), ctimeExp);
 		// return itr to ctime expansion to remove it
 		assert(&*--itrs.top() == &ctimeExp);	
 		eatenToken();
+		insertToken(move(retValToken));
 	}
 
 // helpers -------------------------------------------------
