@@ -44,6 +44,7 @@ enum TokenTypes {
 	// intermediate preprocess tokens
 	TImodule,
 	TIexpansion,
+	TIctime,
 	TInamespace,
 	TIarglist,
 
@@ -735,7 +736,7 @@ string getCharRun(string s) {
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 12, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
@@ -824,7 +825,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 11, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -951,7 +952,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
-	static_assert(TokenCount == 11, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1084,6 +1085,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 }
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
+	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken); \
 	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
 		checkReturnOnFail(!scope.isCurrListType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
@@ -1091,7 +1093,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
 	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
 	if (DefiningDirectivesSet.count(directiveName)) {
