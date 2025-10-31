@@ -649,11 +649,11 @@ public:
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
 	/// eats token from token stream and returns it
-	Token eatenToken() {
-		Token t = currToken();
-		savedLine.push_back(t); // TODO dont push tokens inside tlist
-		itrs.top() = currList().erase(itrs.top());
-		return t;
+	Token& eatenToken() {
+		auto nextNode = std::next(itrs.top());
+		savedLine.splice(savedLine.end(), currList(), itrs.top()); // TODO dont push tokens inside tlist
+		itrs.top() = nextNode;
+		return savedLine.back();
 	}
 	/// eats tokens upto EOL or separator
 	/// meeting ctime is ignored
@@ -837,7 +837,7 @@ public:
 				retval &= _addMacroArg(argSpans, ++argStart, loc);
 				argStart = itrs.top();
 			} else if (currToken().type == TIexpansion) {
-				Token exp = eatenToken();
+				Token& exp = eatenToken();
 				if (exp.tlist.size()) insertList(exp.tlist, exp, false);
 				continue;
 			}
@@ -1016,7 +1016,7 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
 	while (scope.hasNext()) {
 		if (!first) {
-			Token sep = scope.eatenToken(); loc = sep.loc;
+			const Token& sep = scope.eatenToken(); loc = sep.loc;
 			checkReturnOnFail(sep.type == Tseparator, "Separator expected", loc);
 		}
 		first = false;
