@@ -18,6 +18,7 @@ namespace fs = std::filesystem;
 #include <functional>
 #include <cctype>
 #include <locale>
+#include <utility>
 using namespace std;
 
 // constants -------------------------------
@@ -190,7 +191,7 @@ struct Loc {
 	}
 };
 struct Token {
-	TokenTypes type;
+	TokenTypes type=TokenCount;
 	string data;
 	list<Token> tlist;
 
@@ -198,7 +199,9 @@ struct Token {
 	bool continued; // continues meaning of previous token
 	bool firstOnLine;
 
-	Token() {}
+	//–– construtors
+    Token() = default;
+    ~Token() = default; // TODO destructor?
 
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
@@ -210,11 +213,53 @@ struct Token {
 	static Token fromCtx(TokenTypes type, string data, Token const& ctx) {
 		return Token(type, move(data), ctx.loc, ctx.continued, ctx.firstOnLine);
 	}
+	//–– Copy
+	Token(const Token& other)
+		: type(other.type)
+		, data(other.data)
+		, tlist(other.tlist)
+		, loc(other.loc)
+		, continued(other.continued)
+		, firstOnLine(other.firstOnLine)
+	{}
+	Token& operator=(const Token& other) {
+		if (this != &other) {
+			type = other.type;
+			data = other.data;
+			tlist = other.tlist;
+			loc = other.loc;
+			continued = other.continued;
+			firstOnLine = other.firstOnLine;
+		}
+		return *this;
+	}
+	//–– Move
+	Token(Token&& other) noexcept
+		: type(std::exchange(other.type, TokenCount))
+		, data(std::move(other.data))
+		, tlist(std::move(other.tlist))
+		, loc(std::move(other.loc))
+		, continued(other.continued)
+		, firstOnLine(other.firstOnLine)
+	{}
+	Token& operator=(Token&& other) noexcept {
+	  if (this != &other) {
+		type = std::exchange(other.type, TokenCount);
+		data = std::move(other.data);
+		tlist = std::move(other.tlist);
+		loc = std::move(other.loc);
+		continued = other.continued;
+		firstOnLine = other.firstOnLine;
+	  }
+	  return *this;
+	}
+
 	char tlistCloseChar() {
 		assert(type == Tlist);
 		return data.at(0) + 2 - (data.at(0) == '(');
 	}
 	string toStr() {
+		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
 			if (isSeparated()) out.push_back(',');
@@ -556,23 +601,20 @@ public:
 		return itrs.top();
 	}
 // token stream manipulation ------------------------------------------
-	void insertToken(Token& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
-	}
 	void insertToken(Token&& token) {
-		itrs.top() = currList().insert(itrs.top(), token);
+		itrs.top() = currList().insert(itrs.top(), move(token));
 	}
-	void insertList(list<Token>& tlist, Token& percentToken) {
+	/// moves Tokens / inserts copies of Tokens from tlist into currList
+	/// first inserted inherits context from percentToken
+	void insertList(list<Token>& tlist, Token& percentToken, bool copy) {
 		assert(tlist.size());
-		itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
-		itrs.top()->continued = percentToken.continued;
-		itrs.top()->firstOnLine = percentToken.firstOnLine;
-	}
-	void insertListNoCopy(list<Token>& tlist, Token& percentToken) {
-		assert(tlist.size());
-		list<Token>::iterator firstInserted = tlist.begin();
-		currList().splice(itrs.top(), tlist);
-		itrs.top() = firstInserted;
+		if (copy) {
+			itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
+		} else {
+			list<Token>::iterator inserted = tlist.begin();
+			currList().splice(itrs.top(), tlist);
+			itrs.top() = inserted;
+		}
 		itrs.top()->continued = percentToken.continued;
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
@@ -740,7 +782,7 @@ public:
 				argStart = itrs.top();
 			} else if (currToken().type == TIexpansion) {
 				Token exp = eatenToken();
-				if (exp.tlist.size()) insertListNoCopy(exp.tlist, exp);
+				if (exp.tlist.size()) insertList(exp.tlist, exp, false);
 				continue;
 			}
 			next();
@@ -940,7 +982,7 @@ bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope
 	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
 }
-bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
+bool processDirectiveDef(string directive, Scope& scope, Token& percentToken, Loc loc) {
 	static_assert(DefiningDirectivesCount == 3, "Exhaustive processDirectiveDef definition");
 	string name; Token token;
 	directiveEatIdentifier(directive, true, 1);
@@ -1137,7 +1179,7 @@ bool processDirective(Token percentToken, Scope& scope) {
 	} else if (!prefixes.size() && scope.hasMacroArg(directiveName)) {
 		processDirectiveSituationChecks("macro arg");
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
-		scope.insertList(argField, percentToken);
+		scope.insertList(argField, percentToken, true);
 	} else {
 		return lookupName(percentToken, directiveName, prefixes, locs, notContinued, scope);
 	}
