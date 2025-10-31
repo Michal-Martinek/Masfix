@@ -661,11 +661,11 @@ public:
 		itrs.top()->firstOnLine = percentToken.firstOnLine;
 	}
 	/// eats token from token stream and returns it
-	Token& eatenToken() {
+	Token& eatenToken(bool skipNoEat=false) {
 		auto nextNode = std::next(itrs.top());
-		savedLine.splice(savedLine.end(), currList(), itrs.top()); // TODO dont push tokens inside tlist
+		if (!skipNoEat) savedLine.splice(savedLine.end(), currList(), itrs.top());
 		itrs.top() = nextNode;
-		return savedLine.back();
+		return skipNoEat ? *prev(itrs.top()) : savedLine.back();
 	}
 	/// eats tokens upto EOL or separator
 	/// meeting ctime is ignored
@@ -958,7 +958,7 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 }
 #define processArglistWrapper(body) \
 	scope.enterArglist(token); \
-	body \
+	body; \
 	scope.exitArglist(); \
 	returnOnFalse(retval);
 bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string errMissing, bool sameLine) {
@@ -967,8 +967,8 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
-void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
+void _eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool skipNoEat=false) {
+	static_assert(TokenCount == 12, "Exhaustive _eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -977,7 +977,7 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 	if (eatAnything >= 2) allowedTypes.insert(Tstring);
 	if (eatAnything >= 3) allowedTypes.insert(Tlist);
 	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
-		name += scope.eatenToken().toStr();
+		name += scope.eatenToken(skipNoEat).toStr();
 		first = false;
 	}
 }
@@ -987,10 +987,11 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 /// @param identPurpose description for errors
 /// @param canStartLine is identifier expected to follow prev token or start on newline
 /// @param eatAnything the higher level - more token types are allowed: 0 - basics, 1 - :, 2 - "", 3 - []
+/// @param skipNoEat skips tokens instead of eating them
 /// @return if identifier was successfully read (false if ctime interrupted eating)
-bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
+bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0, bool skipNoEat=false) {
 	Loc prevLoc = loc;
-	eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	_eatTokenRun(scope, name, loc, canStartLine, eatAnything, skipNoEat);
 	// break if ctime was seen first, otherwise it's not part of ident because it's never continued
 	if (scope.hasNext() && scope->type == TIctime) return name != "";
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
@@ -1232,6 +1233,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		fs::path path = processIncludePath(token.data, scope);
 		checkReturnOnFail(fs::exists(path), "Input file \"" + token.data + "\" can't be included", loc);
 		if (scope.newModuleIncluded(path)) tokenizeNewModule(path, scope);
+		// TODO unexpected token after include
 	} else {
 		unreachable();
 	}
