@@ -546,8 +546,9 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
+		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
 		++itrs.top();
-		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace) {
+		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
 		}
 		return itrs.top();
@@ -606,11 +607,13 @@ public:
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
 	}
+	/// adds macro expansion to macro scoping stack
 	void addMacroExpansion(int namespaceId, Token& expansionToken) {
 		if (macros.size() > MAX_EXPANSION_DEPTH) { // TODO?
 			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
 		}
 		macros.push(pair(namespaceId, expansionToken.data));
+		insertToken(move(expansionToken));
 	}
 	void endMacroExpansion() {
 		currMacro().closeExpansionScope();
@@ -950,10 +953,10 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(TIexpansion, macroName, percentToken);
+	bool ctime = percentToken.data == "!";
+	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
-	scope.insertToken(expanded);
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
@@ -1123,7 +1126,7 @@ bool preprocess(Scope& scope) {
 	bool errorLess = true;
 	while (scope.advanceIteration()) {
 		Token& currToken = scope.currToken();
-		if (currToken.type == Tspecial && currToken.data == "%") {
+		if (currToken.type == Tspecial && (currToken.data == "%" || currToken.data == "!")) {
 			eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 			eatLineOnFalse(processDirective(scope.eatenToken(), scope));
 			continue;
