@@ -498,7 +498,7 @@ private:
 			assert(currNamespace().isUpperAccesible);
 			exitNamespace();
 		} else if (closedList.type == TImodule) {
-			forceParse();
+			forceParse(closedList);
 			exitNamespace();
 			currModule++;
 		}
@@ -673,15 +673,17 @@ public:
 	}
 
 	void forceParseImpl();
-	/// prepares for parsing, cleans Scope after parsing
-	void forceParse() {
+	/// Scope wrapper for parsing, returns Scope to same state afterwards
+	/// - used for parsing either whole TImodule or only ctime body
+	void forceParse(Token& tlist) {
+		assert(isPreprocessing);
 		isPreprocessing = false;
-		openList(currModule->contents);
 		int numTlistsBefore = tlists.size();
-		forceParseImpl();
-		assert(tlists.size() == numTlistsBefore && isCurrListType(TImodule));
-		assert(tlists.top().get().data == currModule->contents.data);
-		closeList();
+			openList(tlist);
+			forceParseImpl();
+			assert(isCurrListType(tlist.type) && &currList() == &tlist.tlist);
+			closeList();
+		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
 	}
 
