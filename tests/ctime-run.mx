@@ -1,0 +1,78 @@
+; test run-like behaviour of compile time directives
+
+; %include "io"
+
+; ctime / runtime delim
+outc 10
+outc 36
+outc 36
+outc 10
+
+; %include "control"
+%macro ldReg(val) {
+	ld %val
+}
+ld 7
+%macro emptyCtime() {}
+outu !emptyCtime()
+mov !ldReg(65)
+outc !emptyCtime()
+outc 10
+
+; reg preservation
+%macro generate3(dbg) {
+	%ldReg(1)
+	str %dbg
+	bmeq end
+	outc %dbg
+
+	str 1
+	str<r
+	strar
+	swap
+}
+%macro move2act() {
+	mov !generate3(66)
+	mov< !generate3(0)
+}
+%macro store5() {
+	%move2act()
+	str !generate3(89)
+	stra 2
+}
+%macro act() { 
+	%store5()
+	ldm ; 5
+}
+%macro m() {
+	ld 4
+	mov 0
+	str !act()
+	outuh
+	ldm ; return 5 (stored retval)
+}
+%move2act()
+outu !m()
+outc 32
+outuh
+ld !generate3(36)
+
+
+; TODO add when macros are supported in arglists
+; %macro A(b) {
+; 	ld %b
+; 	; outur
+; }
+; %macro add(a) {
+; 	ld %a
+; 	lda 1
+; }
+
+; ; outu !add(!add(4
+; ; ))
+; ; %m(!add(3))
+
+; ; :_(!add(7))
+
+; ; outu _8
+
