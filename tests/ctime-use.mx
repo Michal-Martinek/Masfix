@@ -1,5 +1,7 @@
 ; tests errors with using ctimes in contexts of preprocessing, instructions, labels x complex idents, strings
 
+%include "io"
+
 %macro m(b) {
 	ld %b
 	; outur
@@ -45,3 +47,37 @@ outu 69 ; good
 ld "s"!m(2)
 ld (t)!m(2)
 debug ("i") !m(3) 
+
+
+
+; TODO label then ctime
+; :goto !proper_instr_gen()
+
+; testing of recursive ctime-meets
+%macro deep_forward_expansion1() {}
+	%macro deep_forward_expansion2() {
+		!deep_forward_expansion1()
+	}
+	%macro deep_forward_expansion() {
+		!deep_forward_expansion2()
+	}
+ld !deep_forward_expansion()
+
+%macro exec_order1() { outu 1 }
+	%macro exec_order2() {
+		outu 2
+		ld !exec_order1()
+		outu 3
+	}
+	%macro exec_order() {
+		outu 4
+		ld !exec_order2()
+		outu 5
+		outc 10
+	}
+; ld !exec_order()
+
+
+
+; březiněves final boss
+; :ld(!()) ou(t)(!c()) !oo()(!num())
