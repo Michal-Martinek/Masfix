@@ -1,0 +1,34 @@
+:returncode 1
+
+:stderr 1708
+tests\ctime-use.mx:13:1 ERROR: Missing directive name
+tests\ctime-use.mx:14:2 ERROR: Invalid directive name '!'
+tests\ctime-use.mx:15:1 ERROR: Unexpected ctime forcing '!'
+tests\ctime-use.mx:16:3 ERROR: Missing expansion arguments
+tests\ctime-use.mx:18:6 ERROR: Unexpected token after macro use '!'
+tests\ctime-use.mx:19:7 ERROR: Unexpected macro use
+tests\ctime-use.mx:30:2 ERROR: Directive must not continue
+tests\ctime-use.mx:32:4 ERROR: Directive must not continue
+tests\ctime-use.mx:4:2 ERROR: Invalid instruction immediate 'ld c'
+tests\ctime-use.mx:40:8 ERROR: Directive must not continue
+tests\ctime-use.mx:46:7 ERROR: Directive must not continue
+tests\ctime-use.mx:19:1 ERROR: Unexpected token '2'
+tests\ctime-use.mx:30:1 ERROR: Missing label name
+tests\ctime-use.mx:31:1 ERROR: Invalid label name '2'
+tests\ctime-use.mx:34:1 ERROR: Invalid label name '!m(z)'
+tests\ctime-use.mx:35:1 ERROR: Invalid label name '0'
+tests\ctime-use.mx:36:1 ERROR: Invalid label name '2'
+tests\ctime-use.mx:37:1 ERROR: Invalid label name '!m(z)'
+tests\ctime-use.mx:38:1 ERROR: Label redefinition 'l'
+tests\ctime-use.mx:39:1 ERROR: Label redefinition 'l'
+tests\ctime-use.mx:40:1 ERROR: Label redefinition 'l'
+tests\ctime-use.mx:44:1 ERROR: Unexpected token '2'
+tests\ctime-use.mx:20:1 ERROR: Unknown instruction 'two 5 5'
+tests\ctime-use.mx:23:1 ERROR: Unknown instruction 'ctime 3 ld 4'
+tests\ctime-use.mx:25:1 ERROR: Unknown instruction 'oui0'
+tests\ctime-use.mx:27:1 ERROR: Invalid instruction immediate 'jmp labNO'
+tests\ctime-use.mx:45:1 ERROR: Only simple immediates for now 'ld s 2'
+tests\ctime-use.mx:46:1 ERROR: Invalid instruction immediate 'ld t'
+tests\ctime-use.mx:47:1 ERROR: Unknown instruction 'debug i 3'
+
+
