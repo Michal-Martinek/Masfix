@@ -563,7 +563,7 @@ private:
 			assert(currNamespace().isUpperAccesible);
 			exitNamespace();
 		} else if (closedList.type == TImodule) {
-			forceParse(closedList);
+			forceParse(&closedList);
 			exitNamespace();
 			currModule++;
 		} else if (closedList.type == TIctime) {
@@ -743,18 +743,32 @@ public:
 		currModule->contents = Token(TImodule, moduleName, loc, false, true);
 		openList(currModule->contents);
 	}
-
+	/// closes all excesive lists opened while parsing module
+	/// called before parsing ctime body
+	void closeScopesAfterCtimeMeet() {
+		while (tlists.size() && !isCurrListType(TImodule)) {
+			closeList();
+		}
+	}
 	bool forceParseImpl();
-	/// Scope wrapper for parsing, returns Scope to same state afterwards
-	/// - used for parsing either whole TImodule or only ctime body
-	bool forceParse(Token& tlist) {
+	/// Scope wrapper for parsing, cleans Scope after parsing
+	/// parses whole TImodule, then ctime if supplied
+	bool forceParse(Token* ctime=nullptr) {
 		assert(isPreprocessing);
 		isPreprocessing = false;
 		int numTlistsBefore = tlists.size();
-			openList(tlist);
-			bool safeToRun = forceParseImpl();
-			assert(isCurrListType(tlist.type) && &currList() == &tlist.tlist);
+		bool safeToRun=true;
+		openList(currModule->contents);
+		forceParseImpl();
+		if (ctime) {
+			closeScopesAfterCtimeMeet();
+			openList(*ctime);
+			safeToRun = forceParseImpl();
+			assert(isCurrListType(TIctime) && tlists.top().get().data == macros.top().second);
 			closeList();
+		}
+		assert(isCurrListType(TImodule) && &tlists.top().get() == &currModule->contents);
+		closeList();
 		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
 		return safeToRun;
@@ -763,7 +777,7 @@ public:
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
 	void parseInterpretCtime(Token& ctimeExp) {
-		bool safeToRun = forceParse(ctimeExp);
+		bool safeToRun = forceParse(&ctimeExp);
 		int retval = 0;
 		if (safeToRun) {
 			interpret(parseCtx.parseStartIdx);
@@ -1266,6 +1280,7 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 /// chops given token stream into individual asm instructions
 /// registers asm labels, creates unprocessed assembly instruction fields
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
+/// parses upto EOF or possible TIctime encounter
 void parseTokenStream(Scope& scope) {
 	Loc loc;
 	bool labelOnLine;
