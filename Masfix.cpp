@@ -440,6 +440,8 @@ void raiseErrors() { // TODO sort errors based on line and file
 	if (errors.size()) {
 		exit(1);
 	}
+	cout.flush();
+	cerr.flush();
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
