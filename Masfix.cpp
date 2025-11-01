@@ -44,6 +44,7 @@ enum TokenTypes {
 	// intermediate preprocess tokens
 	TImodule,
 	TIexpansion,
+	TIctime,
 	TInamespace,
 	TIarglist,
 
@@ -198,6 +199,13 @@ struct Token {
 	bool firstOnLine;
 
 	Token() {}
+	Token(TokenTypes type, string data, Token& token) {
+		this->type = type;
+		this->data = data;
+		this->loc = token.loc;
+		this->continued = token.continued;
+		this->firstOnLine = token.firstOnLine;
+	}
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
@@ -413,12 +421,12 @@ VM globalVm;
 #define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
 
-#define continueOnFalse(cond) if (!(cond)) continue;
+#define continueOnFalse(cond) if (!(cond)) { errorLess = false; continue; }
 #define returnOnFalse(cond) if (!(cond)) return false;
 
 #define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) if(!check(cond, message, obj)) continue;
-#define checkReturnOnFail(cond, message, obj) if(!check(cond, message, obj)) return false;
+#define checkContinueOnFail(cond, message, obj) continueOnFalse(check(cond, message, obj));
+#define checkReturnOnFail(cond, message, obj) returnOnFalse(check(cond, message, obj));
 
 bool FLAG_strictErrors = false;
 bool SupressErrors = false;
@@ -432,6 +440,8 @@ void raiseErrors() { // TODO sort errors based on line and file
 	if (errors.size()) {
 		exit(1);
 	}
+	cout.flush();
+	cerr.flush();
 }
 void addError(string message, bool strict=true) {
 	errors.push_back(message);
@@ -479,9 +489,10 @@ private:
 		tlists.push(tlist);
 		itrs.push(tlist.tlist.begin());
 	}
-	/// closes single list
+	/// handles the ending of a single token list
+	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 11, "Exhaustive closeList definition");
+		static_assert(TokenCount == 12, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -491,9 +502,11 @@ private:
 			assert(currNamespace().isUpperAccesible);
 			exitNamespace();
 		} else if (closedList.type == TImodule) {
-			forceParse();
+			forceParse(closedList);
 			exitNamespace();
 			currModule++;
+		} else if (closedList.type == TIctime) {
+			parseInterpretCtime(closedList);
 		}
 	}
 
@@ -522,9 +535,14 @@ public:
 	bool hasNext() {
 		return itrs.top() != currList().end();
 	}
-	/// closes ended lists if necessary, returns if iteration can continue in this situation
+	/// closes ended tlists if necessary
+	/// - generally closes only basic tlist types, special ones are left open for respective funcs to handle
+	/// @returns if iteration can meaningfully continue in current situation
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) closeList();
+		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
+			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed, leave it open!
+			closeList();
+		}
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -533,8 +551,9 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
+		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
 		++itrs.top();
-		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace) {
+		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
 		}
 		return itrs.top();
@@ -593,11 +612,13 @@ public:
 	bool hasMacroArg(string& name) {
 		return insideMacro() && currMacro().hasArg(name);
 	}
+	/// adds macro expansion to macro scoping stack
 	void addMacroExpansion(int namespaceId, Token& expansionToken) {
 		if (macros.size() > MAX_EXPANSION_DEPTH) { // TODO?
 			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
 		}
 		macros.push(pair(namespaceId, expansionToken.data));
+		insertToken(move(expansionToken));
 	}
 	void endMacroExpansion() {
 		currMacro().closeExpansionScope();
@@ -665,17 +686,42 @@ public:
 		openList(currModule->contents);
 	}
 
-	void forceParseImpl();
-	/// prepares for parsing, cleans Scope after parsing
-	void forceParse() {
+	bool forceParseImpl();
+	/// Scope wrapper for parsing, returns Scope to same state afterwards
+	/// - used for parsing either whole TImodule or only ctime body
+	bool forceParse(Token& tlist) {
+		assert(isPreprocessing);
 		isPreprocessing = false;
-		openList(currModule->contents);
 		int numTlistsBefore = tlists.size();
-		forceParseImpl();
-		assert(tlists.size() == numTlistsBefore && isCurrListType(TImodule));
-		assert(tlists.top().get().data == currModule->contents.data);
-		closeList();
+			openList(tlist);
+			bool safeToRun = forceParseImpl();
+			assert(isCurrListType(tlist.type) && &currList() == &tlist.tlist);
+			closeList();
+		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
+		return safeToRun;
+	}
+
+	/// processes ctime after it's body has been preprocessed
+	/// parses ctime body, runs the VM, handles ctime's return value(s) 
+	void parseInterpretCtime(Token& ctimeExp) {
+		bool safeToRun = forceParse(ctimeExp);
+		int retval = 0;
+		if (safeToRun) {
+			interpret(parseCtx.parseStartIdx);
+			retval = globalVm.reg;
+		}
+		_updateTSafterCtime(ctimeExp, retval);
+		endMacroExpansion();
+		parseCtx.removeCtimeInstrs();
+	}
+	/// removes ctime from token stream, inserts it's return value(s)
+	void _updateTSafterCtime(Token& ctimeExp, int retval) {
+		Token retValToken = Token(Tnumeric, to_string(retval), ctimeExp);
+		// return itr to ctime expansion to remove it
+		assert(&*--itrs.top() == &ctimeExp);	
+		eatenToken();
+		insertToken(move(retValToken));
 	}
 
 // helpers -------------------------------------------------
@@ -726,9 +772,9 @@ string getCharRun(string s) {
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 12, "Exhaustive tokenize definition");
 	string line;
-	bool continued, firstOnLine, keepContinued;
+	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
 		continued = false; firstOnLine = true;
 		line = line.substr(0, line.find(';'));
@@ -815,7 +861,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 11, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -889,12 +935,12 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	mac.body = list(token.tlist.begin(), token.tlist.end());
 	return true;
 }
-bool processNamespaceDef(string name, Loc loc, Loc percentLoc, Scope& scope) {
+bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope) {
 	Token token; // TODO no seps in namespace body
 	directiveEatToken(Tlist, "Namespace body expected", false);
-	scope.insertToken(Token(TInamespace, name, percentLoc, false, true));
+	scope.insertToken(Token(TInamespace, name, percentToken));
 	scope->tlist = token.tlist;
-	scope.addNewNamespace(name, percentLoc, false);
+	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
 }
 bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc loc) {
@@ -907,7 +953,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 	} else if (directive == "macro") {
 		returnOnFalse(processMacroDef(scope, name, loc, percentToken.loc));
 	} else if (directive == "namespace") {
-		returnOnFalse(processNamespaceDef(name, loc, percentToken.loc, scope));
+		returnOnFalse(processNamespaceDef(name, loc, percentToken, scope));
 	} else {
 		unreachable();
 	}
@@ -915,7 +961,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token percentToken, Loc
 }
 void expandDefineUse(Token percentToken, Scope& scope, int namespaceId, string defineName) {
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
-	Token expanded = Token(Tnumeric, define.value, percentToken.loc, false, percentToken.firstOnLine);
+	Token expanded = Token(Tnumeric, define.value, percentToken);
 	scope.insertToken(expanded);
 }
 bool preprocess(Scope& scope);
@@ -929,20 +975,20 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
 	return true;
 }
-bool expandMacroUse(Loc loc, Scope& scope, int namespaceId, string macroName) {
-	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token;
+bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
+	bool ctime = percentToken.data == "!";
+	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
 	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
 
-	Token expanded = Token(TIexpansion, macroName, mac.loc, false, true);
+	Token expanded = Token(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
-	scope.insertToken(expanded);
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
-	static_assert(TokenCount == 11, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1015,8 +1061,8 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine, "Unexpected macro use", percentToken.loc);
-		return expandMacroUse(percentToken.loc, scope, namespaceId, directiveName);
+		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued), "Unexpected macro use", percentToken.loc);
+		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
@@ -1075,6 +1121,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 }
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
+	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken); \
 	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
 		checkReturnOnFail(!scope.isCurrListType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
@@ -1082,7 +1129,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 11, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
 	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
 	if (DefiningDirectivesSet.count(directiveName)) {
@@ -1107,7 +1154,7 @@ bool preprocess(Scope& scope) {
 	bool errorLess = true;
 	while (scope.advanceIteration()) {
 		Token& currToken = scope.currToken();
-		if (currToken.type == Tspecial && currToken.data == "%") {
+		if (currToken.type == Tspecial && (currToken.data == "%" || currToken.data == "!")) {
 			eatLineOnFalse(check(!currToken.continued, "Directive must not continue", currToken.loc));
 			eatLineOnFalse(processDirective(scope.eatenToken(), scope));
 			continue;
@@ -1126,13 +1173,14 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 			fragLoc = token.loc;
 			checkReturnOnFail(token.tlist.size(), "Expected " + purpose + " field", fragLoc);
 			processArglistWrapper(
-				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 3);
+				bool retval = eatIdentifier(scope, fragment, fragLoc, purpose + " field", false, 3);
 				retval = retval && check(!scope.hasNext(), "Simple " + purpose + " field expected", token.loc);
 			)
 			scope.eatenToken();
 			ident.append(fragment);
 		} else {
 			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
+			canStartLine = false;
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);
@@ -1142,14 +1190,15 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) 
 }
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
+	// TODO disable in ctime
 	dumpFile.value() << string(indent, '\t') << s << '\n';
 	return true;
 }
 #define dump(str) (!!parseCtx.dumpFile) && dumpImpl(parseCtx.dumpFile, scope.expansionDepth(), str)
 #define dumpExpansion(str) dump("; " + str)
-/// parses suplied module's token stream upto EOF or possible CTF
-/// registers labels, creates list of unprocessed assembly instructions
-/// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule)
+/// chops given token stream into individual asm instructions
+/// registers asm labels, creates unprocessed assembly instruction fields
+/// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
 void parseTokenStream(Scope& scope) {
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
@@ -1289,19 +1338,21 @@ bool checkValidity(Instr& instr) {
 	return true;
 }
 /// parses instructions and immediates for their meaning
-void parseInstrs(vector<Instr>& instrs, int startIdx) {
+bool parseInstrs(vector<Instr>& instrs, int startIdx) {
+	bool errorLess = true;
 	for (size_t i = startIdx; i < instrs.size(); ++i) {
 		Instr& instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
+	return errorLess;
 }
-void Scope::forceParseImpl() {
+bool Scope::forceParseImpl() {
 	parseCtx.parseStartIdx = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
+	return parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {

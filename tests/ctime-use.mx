@@ -1,0 +1,47 @@
+; tests errors with using ctimes in contexts of preprocessing, instructions, labels x complex idents, strings
+
+%macro m(b) {
+	ld %b
+	; outur
+}
+%macro add(a) {
+	%m(%a)
+	lda 1
+}
+
+; syntactical
+!
+%!
+!define
+!m()
+ld !m(5)
+!m(5)!m
+!m(2) %m
+two !m(5) !m(5)
+
+
+ctime !m(3) ld !m(4)
+:lab(!add(6))
+oui(!add(65535))
+jmp lab7 ; labelDefined?
+jmp labNO
+
+; syntactically against label definition 
+:!m(z)
+: !m(2)
+: l!m(z)
+
+:"!m(z)"
+:(!m(c))
+:(!m(2))
+:("!m(z)")
+: "l"!m(3)
+: "l"(!m(3))
+: ("l")!m(3)
+: ("l")(!m(69))
+outu 69 ; good
+
+!m(2) ""
+ld "s"!m(2)
+ld (t)!m(2)
+debug ("i") !m(3) 

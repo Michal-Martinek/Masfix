@@ -1,0 +1,8 @@
+:returncode 0
+
+:stdout 15
+BBY0$
+$$
+0A
+5 6
+
