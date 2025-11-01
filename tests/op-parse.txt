@@ -1,6 +1,7 @@
 :returncode 1
 
-:stderr 1505
+:stderr 1589
+tests\op-parse.mx:12:4 ERROR: Directive must not continue
 tests\op-parse.mx:2:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|'
 tests\op-parse.mx:4:1 ERROR: Instrs must have only imm, or 1 reg for now 'str^'
 tests\op-parse.mx:6:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|r 5'

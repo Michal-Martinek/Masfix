@@ -8,6 +8,7 @@ tests\strings.mx:8:9 ERROR: Expected string termination
 tests\strings.mx:9:13 ERROR: Expected string termination
 tests\strings.mx:10:21 ERROR: Invalid directive name 'no-where-is-it'
 tests\strings.mx:14:3 ERROR: Missing define name
+tests\strings.mx:27:15 ERROR: Undeclared identifier 'a'
 tests\strings.mx:2:1 ERROR: Unexpected token ''
 tests\strings.mx:3:1 ERROR: Unexpected token ' '
 tests\strings.mx:4:1 ERROR: Unexpected token 'Hello, world!'
