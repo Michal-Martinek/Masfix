@@ -1,0 +1,32 @@
+
+
+%macro multiple(a) {
+:lab(%a) ; pretty much undefined behavior
+	err# %a
+:gg$notgg  err# %a
+:after(%a)
+}
+outu !multiple(5) ?
+:lab(5)
+:after(5)
+:(!multiple(4))
+
+%macro ee(a) {
+	err# %a
+}
+
+:lab(!ee(8)) ; expects error in body
+:lab0
+:lab((!ee(7)#)!)
+
+:: 
+:: ld !ee(1) %u
+::
+
+; ; TODO enable after ctimes in arglist are allowed
+; ; errors in body
+; %macro unknownInstrInCtime() {
+; 	ff
+; 	ld 5 ; retval ignored
+; }
+; unknownInstr !add(!unknownInstrInCtime()) !jj
