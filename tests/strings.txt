@@ -25,7 +25,7 @@ tests\strings.mx:9:1 ERROR: Unknown instruction 'He:replied:'
 tests\strings.mx:24:1 ERROR: Unknown instruction 'a \n'
 tests\strings.mx:25:1 ERROR: Missing condition 'b s trin g'
 tests\strings.mx:26:1 ERROR: Unknown instruction 'debug'
-tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa sd !a   ld  	  \t'
+tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa sd $a   ld  	  \t'
 tests\strings.mx:28:1 ERROR: Unknown instruction 'NASA's  deepspace banger Juice'
 tests\strings.mx:29:1 ERROR: Unknown instruction 'help mouse	is'
 

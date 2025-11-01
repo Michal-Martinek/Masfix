@@ -11,7 +11,7 @@
 : name(%defd2)
 
 ; specials
-:a(b!c)d
+:a(b$c)d
 : _(_-_)_
 :(())
 :(a, b)
@@ -22,13 +22,13 @@
 :not()ok
 :it_(is)_ok
 :z1(2)3
-:n8(!)5
+:n8($)5
 
 :(rrr)name_(6)
 :(rrr)(6)
 :(7)(zaza)
 :(rrr 6)
-:(a):(b)$((o,o))!
+:(a):(b)$((o,o))$
 
 ; wrong use in instructions
 mov ()

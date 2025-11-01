@@ -9,7 +9,7 @@ strt
 strth
 strrt
 str t
-str! 5
+str$ 5
 
 b|
 beq|
