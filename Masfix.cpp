@@ -530,9 +530,14 @@ public:
 	bool hasNext() {
 		return itrs.top() != currList().end();
 	}
-	/// closes ended lists if necessary, returns if iteration can continue in this situation
+	/// closes ended tlists if necessary
+	/// - generally closes only basic tlist types, special ones are left open for respective funcs to handle
+	/// @returns if iteration can meaningfully continue in current situation
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) closeList();
+		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
+			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed, leave it open!
+			closeList();
+		}
 		return tlists.size() && hasNext();
 	}
 	/// advances iteration inside current list
@@ -1158,9 +1163,9 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 }
 #define dump(str) (!!parseCtx.dumpFile) && dumpImpl(parseCtx.dumpFile, scope.expansionDepth(), str)
 #define dumpExpansion(str) dump("; " + str)
-/// parses suplied module's token stream upto EOF or possible CTF
-/// registers labels, creates list of unprocessed assembly instructions
-/// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule)
+/// chops given token stream into individual asm instructions
+/// registers asm labels, creates unprocessed assembly instruction fields
+/// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
 void parseTokenStream(Scope& scope) {
 	Loc loc; bool errorLess, labelOnLine;
 	while (scope.advanceIteration()) {
