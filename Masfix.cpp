@@ -643,8 +643,9 @@ public:
 		return t;
 	}
 	/// eats tokens upto EOL or separator
+	/// meeting ctime is ignored
 	void eatLine(bool surelyEat=false) {
-		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator)) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator) && currToken().type != TIctime) {
 			eatenToken();
 			surelyEat = false;
 		}
