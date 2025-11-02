@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 7122
+:stderr 6990
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -96,14 +96,12 @@ tests\directive-use.mx:155:2 ERROR: Unknown instruction 'vaccine pawn'
 tests\directive-use.mx:162:2 ERROR: Unknown instruction 'ew vaccine'
 tests\directive-use.mx:177:1 ERROR: Conditions can test only r/m 'sheep'
 tests\directive-use.mx:151:23 ERROR: Unknown instruction 'here 3'
-tests\directive-use.mx:151:23 ERROR: Unknown instruction 'here I'
 tests\directive-use.mx:180:2 ERROR: Unknown condition 'sekuret here 3'
 tests\directive-use.mx:162:2 ERROR: Unknown instruction 'ew sekuret'
 tests\directive-use.mx:181:1 ERROR: Unknown instruction 'rec'
 tests\directive-use.mx:183:5 ERROR: Unknown instruction 'k8'
 tests\directive-use.mx:151:23 ERROR: Unknown instruction 'here I sk8'
 tests\directive-use.mx:162:2 ERROR: Unknown instruction 'ew 420'
-tests\directive-use.mx:151:23 ERROR: Unknown instruction 'here I'
 tests\directive-use.mx:183:15 ERROR: Unknown instruction 'ULL69 k8'
 tests\directive-use.mx:151:23 ERROR: Unknown instruction 'here I sk8'
 tests\directive-use.mx:162:2 ERROR: Unknown instruction 'ew 420'

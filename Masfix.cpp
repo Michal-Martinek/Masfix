@@ -1185,7 +1185,14 @@ bool processDirective(Token percentToken, Scope& scope) {
 	}
 	return true;
 }
-#define eatLineOnFalse(cond) if (!(cond)) { scope.eatLine(); errorLess = false; continue; }
+
+#define _eatLineOnFalseCONTINUE_OP(cond, continueOP, ...) if (!(cond)) { \
+		scope.eatLine(); \
+		errorLess = false; \
+		continueOP; \
+	}
+#define eatLineOnFalse(...) _eatLineOnFalseCONTINUE_OP(__VA_ARGS__, continue)
+
 /// preprocesses given scope, parses completed modules
 /// closes all scopes
 bool preprocess(Scope& scope) {
@@ -1238,7 +1245,10 @@ bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 /// registers asm labels, creates unprocessed assembly instruction fields
 /// leaves intermediate Tlists in token stream (TIexpansion, TInamespace, parsed TImodule, TIctime)
 void parseTokenStream(Scope& scope) {
-	Loc loc; bool errorLess, labelOnLine;
+	Loc loc;
+	bool labelOnLine;
+	bool errorLess; // ignored
+outer_loop_continue:
 	while (scope.advanceIteration()) {
 		if (scope.getCurrModule() != parseCtx.lastModule) {
 			parseCtx.lastModule = scope.getCurrModule();
@@ -1254,14 +1264,16 @@ void parseTokenStream(Scope& scope) {
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
 			dump(':' + name);
 		} else if (top.type == Talpha) {
+			// NOTE ignores whole instr on any err in parsing
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
-			parseCtx.instrs.push_back(Instr(name, loc));
+			Instr instr(name, loc);
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
-				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"));
-				parseCtx.instrs.back().immFields.push_back(immFrag);
+				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"), goto outer_loop_continue);
+				instr.immFields.push_back(immFrag);
 			}
-			dump(parseCtx.instrs.back().toStr());
+			dump(instr.toStr());
+			parseCtx.instrs.push_back(instr);
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
 			dumpExpansion(top.loc.toStr() + ' ' + top.data);
 			scope.next(top);

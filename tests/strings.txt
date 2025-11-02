@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1598
+:stderr 1476
 tests\strings.mx:1:1 ERROR: Expected string termination
 tests\strings.mx:5:1 ERROR: Expected string termination
 tests\strings.mx:6:13 ERROR: Expected string termination
@@ -24,9 +24,7 @@ tests\strings.mx:8:1 ERROR: Unknown instruction 'Where's'
 tests\strings.mx:9:1 ERROR: Unknown instruction 'He:replied:'
 tests\strings.mx:24:1 ERROR: Unknown instruction 'a \n'
 tests\strings.mx:25:1 ERROR: Missing condition 'b s trin g'
-tests\strings.mx:26:1 ERROR: Unknown instruction 'debug'
 tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa sd $a   ld  	  \t'
 tests\strings.mx:28:1 ERROR: Unknown instruction 'NASA's  deepspace banger Juice'
-tests\strings.mx:29:1 ERROR: Unknown instruction 'help mouse	is'
 
 
