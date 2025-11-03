@@ -15,8 +15,8 @@ jobs:
       - name: Install nasm and mingw (Chocolatey)
         shell: cmd
         run: |
-          where nasm || choco install -y nasm
-          where gcc || choco install -y mingw
+          nasm -v || choco install -y nasm
+          gcc -v || choco install -y mingw
 
       - name: Set up Python
         uses: actions/setup-python@v4
