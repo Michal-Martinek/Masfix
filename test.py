@@ -18,6 +18,8 @@ def check(cond, *messages, insideTestcase=True):
 			raise TestcaseException(*messages)
 		else:
 			exit(1)
+	return cond
+
 # testcases ------------------------------------
 def runCommand(command, stdin: str, timeout=None) -> dict:
 	stdin = stdin.encode()
@@ -112,14 +114,23 @@ def updateInput(file: Path):
 # test ------------------------------------------
 def runFile(path, stdin, interpret, timeout=1.0) -> dict:
 	return runCommand(['Masfix', '-r', str(path)] + ['-I'] * interpret, stdin, timeout)
+
+def checkTestResult(expected: dict, ran: dict, keyName: str):
+	if expected[keyName] == ran[keyName]: return True
+	if keyName == 'returncode':
+		print(f'[ERROR] {keyName.upper()} is not as expected ({expected[keyName]}), got {ran[keyName]}')
+	else:
+		print(f'[ERROR] {keyName.upper()} is not as expected, diff / actual:')
+		print(*['\t' + line for line in ran[keyName].split('\n') if line + '\n' not in expected[keyName]], sep='\n')
+	return False
 def runTest(path: Path, interpret: bool) -> bool:
 	expected = getTestcaseDesc(path)
 	ran = runFile(path, expected['stdin'], interpret)
-	check(expected['stdout'] == ran['stdout'], 'The stdout is not as expected')
+	res = checkTestResult(expected, ran, 'stdout')
 	if not interpret or 'jmp destination out of bounds' not in expected['stderr']:
-		check(expected['returncode'] == ran['returncode'], 'The return code is not as expected')
-		check(expected['stderr'] == ran['stderr'], 'The stderr is not as expected')
-	return True
+		res &= checkTestResult(expected, ran, 'returncode')
+		res &= checkTestResult(expected, ran, 'stderr')
+	return res
 def _handleTestResult(failedTests: list[Path]):
 	print()
 	if not len(failedTests):
