@@ -1956,7 +1956,10 @@ vector<string> getLineArgs(int argc, char *argv[]) {
 	}
 	return args;
 }
-fs::path _masfixFolder = fs::canonical("C:/Users/micha/source/Langs/Masfix"); // NOTE fs::canonical(__FILE__) DNW - mixes compile / runtime
+fs::path _masfixFolder = fs::exists(__FILE__) ?
+		fs::canonical(__FILE__).parent_path() :
+		fs::canonical("C:/Users/micha/source/Langs/Masfix");
+
 fs::path checkPathArg(string arg, bool file) {
 	fs::path p = fs::weakly_canonical(arg);
 	if (!fs::exists(p)) p = _masfixFolder/p;
