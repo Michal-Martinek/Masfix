@@ -1,9 +1,11 @@
 :returncode 0
 
-:stdout 40
+:stdout 47
 BBY0$
 94537864
 >53
+12345
+
 $$
 0A
 5 6

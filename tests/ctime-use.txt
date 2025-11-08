@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1708
+:stderr 2237
 tests\ctime-use.mx:13:1 ERROR: Missing directive name
 tests\ctime-use.mx:14:2 ERROR: Invalid directive name '!'
 tests\ctime-use.mx:15:1 ERROR: Unexpected ctime forcing '!'
@@ -12,6 +12,11 @@ tests\ctime-use.mx:32:4 ERROR: Directive must not continue
 tests\ctime-use.mx:4:2 ERROR: Invalid instruction immediate 'ld c'
 tests\ctime-use.mx:40:8 ERROR: Directive must not continue
 tests\ctime-use.mx:46:7 ERROR: Directive must not continue
+tests\ctime-use.mx:4:2 ERROR: Invalid instruction immediate 'ld err'
+tests\ctime-use.mx:4:2 ERROR: Invalid instruction immediate 'ld grr'
+tests\ctime-use.mx:60:27 ERROR: Undeclared identifier 'c'
+tests\ctime-use.mx:60:40 ERROR: Expected instr field
+tests\ctime-use.mx:60:45 ERROR: Undeclared identifier 'oo'
 tests\ctime-use.mx:19:1 ERROR: Unexpected token '2'
 tests\ctime-use.mx:30:1 ERROR: Missing label name
 tests\ctime-use.mx:31:1 ERROR: Invalid label name '2'
@@ -30,5 +35,8 @@ tests\ctime-use.mx:27:1 ERROR: Invalid instruction immediate 'jmp labNO'
 tests\ctime-use.mx:45:1 ERROR: Only simple immediates for now 'ld s 2'
 tests\ctime-use.mx:46:1 ERROR: Invalid instruction immediate 'ld t'
 tests\ctime-use.mx:47:1 ERROR: Unknown instruction 'debug i 3'
+tests\ctime-use.mx:52:13 ERROR: Instrs must have only imm, or 1 reg for now 'strr 0'
+tests\ctime-use.mx:60:18 ERROR: Unknown instruction 'outx 1'
+tests\ctime-use.mx:61:1 ERROR: Invalid instruction immediate 'ld lvl1boss'
 
 

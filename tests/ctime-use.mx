@@ -45,3 +45,17 @@ outu 69 ; good
 ld "s"!m(2)
 ld (t)!m(2)
 debug ("i") !m(3) 
+
+; label then ctime
+:l1 str !m(err)
+ld l1
+:l(!m(grr)) strr !m(0)
+ld l0
+
+; březiněves final boss
+%macro exp(xpnd) {
+	%xpnd
+}
+ld !exp( ld 69 ) ; prepare retvals
+:lvl(!m(1))crook ou(t)(x !c()) !exp(num()) !oo(!num())
+ld lvl1boss

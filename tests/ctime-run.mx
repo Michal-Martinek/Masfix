@@ -105,4 +105,18 @@ outu _(!ldEmit(8))
 	)
 )
 
+%macro exec_order1() { outu 1 }
+%macro exec_order2() {
+	outu 2
+	ld !exec_order1()
+	outu 3
+}
+%macro exec_order() {
+	outu 4
+	ld !exec_order2()
+	outu 5
+	outc 10
+}
+ld !endl()
+ld !exec_order()
 
