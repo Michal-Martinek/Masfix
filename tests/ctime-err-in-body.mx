@@ -23,10 +23,13 @@ outu !multiple(5) ?
 :: ld !ee(1) %u
 ::
 
-; ; TODO enable after ctimes in arglist are allowed
-; ; errors in body
-; %macro unknownInstrInCtime() {
-; 	ff
-; 	ld 5 ; retval ignored
-; }
-; unknownInstr !add(!unknownInstrInCtime()) !jj
+; errors in body
+%macro add(a) {
+	ld %a
+	lda 1
+}
+%macro unknownInstrInCtime() {
+	ff
+	ld 5 ; retval ignored
+}
+unknownInstr !add(!unknownInstrInCtime()) !jj

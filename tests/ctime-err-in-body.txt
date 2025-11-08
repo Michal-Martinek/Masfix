@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1208
+:stderr 1415
 tests\ctime-err-in-body.mx:6:1 ERROR: Invalid label name 'gg$notgg'
 tests\ctime-err-in-body.mx:5:2 ERROR: Unknown instruction 'err# 5'
 tests\ctime-err-in-body.mx:6:1 ERROR: Invalid label name 'gg$notgg'
@@ -10,6 +10,8 @@ tests\ctime-err-in-body.mx:20:13 ERROR: Unexpected token after macro use '#'
 tests\ctime-err-in-body.mx:20:15 ERROR: Directive must not continue
 tests\ctime-err-in-body.mx:15:2 ERROR: Unknown instruction 'err# 1'
 tests\ctime-err-in-body.mx:23:15 ERROR: Undeclared identifier 'u'
+tests\ctime-err-in-body.mx:32:2 ERROR: Unknown instruction 'ff'
+tests\ctime-err-in-body.mx:35:44 ERROR: Undeclared identifier 'jj'
 tests\ctime-err-in-body.mx:10:1 ERROR: Label redefinition 'lab5'
 tests\ctime-err-in-body.mx:11:1 ERROR: Label redefinition 'after5'
 tests\ctime-err-in-body.mx:12:1 ERROR: Invalid label name '0'
@@ -19,5 +21,6 @@ tests\ctime-err-in-body.mx:22:1 ERROR: Invalid label name ':'
 tests\ctime-err-in-body.mx:23:1 ERROR: Invalid label name ':'
 tests\ctime-err-in-body.mx:24:1 ERROR: Invalid label name ':'
 tests\ctime-err-in-body.mx:9:1 ERROR: Only simple immediates for now 'outu 0 ?'
+tests\ctime-err-in-body.mx:35:1 ERROR: Unknown instruction 'unknownInstr 1'
 
 

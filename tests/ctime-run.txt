@@ -1,8 +1,13 @@
 :returncode 0
 
-:stdout 15
+:stdout 40
 BBY0$
+94537864
+>53
 $$
 0A
 5 6
+64
+22
+73713
 

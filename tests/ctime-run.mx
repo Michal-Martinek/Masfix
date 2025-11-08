@@ -58,21 +58,51 @@ outuh
 ld !generate3(36)
 
 
-; TODO add when macros are supported in arglists
-; %macro A(b) {
-; 	ld %b
-; 	; outur
-; }
-; %macro add(a) {
-; 	ld %a
-; 	lda 1
-; }
+; macros in arglists
+%macro ldEmit(b) {
+	ld %b
+	outur
+}
+%macro add(a) {
+	%ldEmit(%a)
+	lda 1
+}
+%macro endl() {
+	outc 10
+}
+ld !endl()
+outc !add(9)
+; ^ delim ^
+outu !add(!add(4))
+%add(!add(3))
 
-; ; outu !add(!add(4
-; ; ))
-; ; %m(!add(3))
+%endl()
+:_(!add(7))
+outu _(!ldEmit(8))
 
-; ; :_(!add(7))
 
-; ; outu _8
+%macro seeAsmLength(mac) {
+	strp
+	%mac
+	ldp
+	ldsm
+	lds 1
+	outur
+}
+; mix of % and !
+%endl()
+%seeAsmLength(
+	%add(7)
+)
+%seeAsmLength(
+	outu !add(6)
+)
+%ldEmit(
+	!seeAsmLength(
+		outc 10
+		outc 62
+		outu !add(4)
+	)
+)
+
 
