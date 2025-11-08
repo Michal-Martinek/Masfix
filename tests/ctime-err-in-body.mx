@@ -33,3 +33,15 @@ outu !multiple(5) ?
 	ld 5 ; retval ignored
 }
 unknownInstr !add(!unknownInstrInCtime()) !jj
+
+; error in preprocess vs parsing
+%macro ppErr() {
+	%--8
+	outx
+}
+ld !ppErr()
+%macro parseErr() {
+	: :// ;( sad http?s-)
+	outz
+}
+ld !parseErr()
