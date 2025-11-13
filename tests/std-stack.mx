@@ -1,0 +1,44 @@
+
+
+%include "std/memory"
+%using stack
+; test VM above
+
+%top()
+str 11 ; forbidden
+
+; %pushr()
+%push(1)
+mov 69
+%push(2)
+movs 13
+%push(3)
+
+ld 4
+%pushr()
+lda 1
+%pushr()
+lda 1
+mov< 3
+%pushr() ; 6
+lda 1
+
+%pop()
+outum
+mov 14
+%pop()
+outum
+%top() ; 4, not eaten
+outum
+
+:pop_all_loop
+	ldh
+	lds 1
+	lgt %MEMORY_LAYOUT:SEG_STACK
+	beq loop_end
+
+	%pop()
+	outum
+	jmp pop_all_loop
+:loop_end
+outc 10

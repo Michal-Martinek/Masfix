@@ -1,0 +1,52 @@
+
+
+%include "std/memory"
+%include "std/procedures"
+%using stack
+
+
+%proc(cout, ; arg on stack
+	%top()
+	movs 1
+	; ^ arg[0] ^
+	outum
+	outc 44
+	outc 32
+)
+%proc(printPair,
+	outc 40 ; '('
+
+	%top()
+	movs 2
+	; ^ args[0] ^
+	outum
+	outc 44
+	outc 32
+
+	; args[1]
+	mova 1
+	outum
+	outc 41
+	outc 32
+)
+
+%proc(sharfesS,
+; NOTE changes on chcp 852 / 65001
+	outc 195
+	outc 159
+	; outc 225
+	outc 32
+)
+; calling with args
+%callWith1Arg(cout, 69)
+%call(sharfesS)
+%callWith1Arg(cout, 420)
+
+outu 5
+outc 10
+
+%callWith2Arg(printPair, 8, 9)
+outc 10
+
+%top()
+outuh
