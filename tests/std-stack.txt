@@ -1,6 +1,10 @@
 :returncode 0
 
-:stdout 8
+:stdout 28
+18 16
+75
+C6616
+17 9
 6544321
 
 

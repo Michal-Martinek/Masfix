@@ -2,10 +2,40 @@
 
 %include "std/memory"
 %using stack
-; test VM above
 
+
+%load(%MEMORY_LAYOUT:G_STACK_PTR)
+outur
 %top()
 str 11 ; forbidden
+ld !push(66)
+
+outc 10
+
+; VM
+mov 5
+%macro ad(val) {
+	%stack:push(%val)
+	ldh
+	outuh
+	outc 32
+}
+ld !ad(7) ; 18_
+outu !stack:pop() ; 7
+outuh ; 5
+outc 10
+
+; clear VM stack
+outc 67
+outu !pop()
+outu !load(%MEMORY_LAYOUT:G_STACK_PTR) ; STACK should be empty
+outc 10
+
+; runtime -----------------------------
+%ad(9) ; 17
+%stack:pop() ; 9
+outur
+outc 10
 
 ; %pushr()
 %push(1)
