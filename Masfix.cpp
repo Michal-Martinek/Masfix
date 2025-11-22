@@ -650,6 +650,12 @@ public:
 	bool insideTlistOfType(TokenTypes type) {
 		return tlists.top().get().type == type;
 	}
+	/// inside arglist, at start / after separator
+	bool macroUseAllowed() {
+		returnOnFalse(insideTlistOfType(TIarglist));
+		// NOTE tokens are not eaten at this stage (only directives) - so its pretty safe to check previous token
+		return itrs.top() == currList().begin() || std::prev(itrs.top())->type == Tseparator;
+	}
 	bool insideMacro() {
 		return macros.size();
 	}
@@ -1117,7 +1123,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued), "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued) || scope.macroUseAllowed(), "Unexpected macro use", percentToken.loc);
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
