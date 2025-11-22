@@ -61,3 +61,43 @@ ld !rstCou_n_t()
 	%E())
 %afterSep(%num,
 	!cout())
+
+ld !rstCou_n_t()
+
+; inline after tokens
+: %cout()
+: !cout()
+:l1 %cout()
+:l2 !cout()
+ld %cout()
+ld !cout()
+:l3 ld %cout()
+:l4 ld !cout()
+
+ld !rstCou_n_t()
+
+,%cout()
+,!cout()
+, %cout()
+, !cout()
+()%cout()
+()!cout()
+() %cout()
+() !cout()
+(%cout())
+(!cout())
+( %cout())
+( !cout())
+(
+	%cout())
+(
+	!cout())
+
+; macro in arglist, but not first in it's field
+%macro seeArglist1(a)    { see %a }
+%macro seeArglist2(a, b) { see %b }
+
+%seeArglist1(6 %cout())
+%seeArglist1(7 !cout())
+%seeArglist2(%cout(),7 %cout())
+%seeArglist2(%cout(),8 !cout())
