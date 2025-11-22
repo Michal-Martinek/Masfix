@@ -1,10 +1,13 @@
 :returncode 1
 
-:stdout 14
+:stdout 37
 123456
 S123456
+S1234
+S123456789
+S1234
 
-:stderr 1767
+:stderr 4584
 tests\macro-use-ctx.mx:17:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:18:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:21:8 ERROR: Unexpected token after macro use '%'
@@ -15,10 +18,22 @@ tests\macro-use-ctx.mx:25:8 ERROR: Unexpected token after macro use '%'
 tests\macro-use-ctx.mx:26:8 ERROR: Unexpected token after macro use '%'
 tests\macro-use-ctx.mx:34:8 ERROR: Unexpected token after macro use '()'
 tests\macro-use-ctx.mx:35:8 ERROR: Unexpected token after macro use '()'
-tests\macro-use-ctx.mx:44:15 ERROR: Unexpected macro use
-tests\macro-use-ctx.mx:46:16 ERROR: Unexpected macro use
-tests\macro-use-ctx.mx:56:16 ERROR: Unexpected macro use
-tests\macro-use-ctx.mx:58:17 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:68:3 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:70:5 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:72:4 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:74:8 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:79:2 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:81:3 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:83:3 ERROR: Directive must not continue
+tests\macro-use-ctx.mx:84:3 ERROR: Directive must not continue
+tests\macro-use-ctx.mx:85:4 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:87:2 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:89:3 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:100:16 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:102:24 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:112:22 ERROR: Unexpected token after macro use '3'
+tests\macro-use-ctx.mx:113:22 ERROR: Unexpected token after macro use '4'
+tests\macro-use-ctx.mx:118:15 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:19:9 ERROR: Unexpected token '8'
 tests\macro-use-ctx.mx:20:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:24:1 ERROR: Unexpected token '0'
@@ -30,9 +45,44 @@ tests\macro-use-ctx.mx:32:9 ERROR: Unexpected token ','
 tests\macro-use-ctx.mx:33:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:36:9 ERROR: Unexpected token '()'
 tests\macro-use-ctx.mx:37:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:55:15 ERROR: Unexpected token '&'
 tests\macro-use-ctx.mx:57:16 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:55:15 ERROR: Unexpected token '&'
 tests\macro-use-ctx.mx:59:17 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:55:15 ERROR: Unexpected token '&'
 tests\macro-use-ctx.mx:63:2 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:68:1 ERROR: Missing label name
+tests\macro-use-ctx.mx:69:1 ERROR: Invalid label name '0'
+tests\macro-use-ctx.mx:71:5 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:79:1 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:80:1 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:81:1 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:82:1 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:83:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:84:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:85:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:86:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:87:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:88:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:89:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:90:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:91:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:93:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:107:5 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:115:6 ERROR: Unexpected token '3'
+tests\macro-use-ctx.mx:117:6 ERROR: Unexpected token '4'
+tests\macro-use-ctx.mx:119:14 ERROR: Simple immediate field expected
+tests\macro-use-ctx.mx:121:9 ERROR: Unexpected token '6'
+tests\macro-use-ctx.mx:122:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:123:8 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:124:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:72:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\macro-use-ctx.mx:74:5 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 7 0'
+tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8 0'
+tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8'
+tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 9'
+tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see mova 1'
+tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 0'
 
 

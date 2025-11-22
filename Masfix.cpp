@@ -582,10 +582,6 @@ public:
 	Token* operator->() {
 		return &currToken();
 	}
-	/// is current token list of the specified type
-	bool isCurrListType(TokenTypes type) {
-		return tlists.top().get().type == type;
-	}
 	int expansionDepth() {
 		return max(0, (int)tlists.size() - 2);
 	}
@@ -600,8 +596,8 @@ public:
 	/// - generally closes only basic tlist types, special ones are left open for respective funcs to handle
 	/// @returns if iteration can meaningfully continue in current situation
 	bool advanceIteration() {
-		while (tlists.size() && !hasNext() && !isCurrListType(TIarglist) && (isPreprocessing || !isCurrListType(TImodule))) {
-			if (!isPreprocessing && isCurrListType(TIctime)) return false; // escape after ctime's body was parsed, leave it open!
+		while (tlists.size() && !hasNext() && !insideTlistOfType(TIarglist) && (isPreprocessing || !insideTlistOfType(TImodule))) {
+			if (!isPreprocessing && insideTlistOfType(TIctime)) return false; // escape after ctime's body was parsed, leave it open!
 			closeList();
 		}
 		return tlists.size() && hasNext();
@@ -644,12 +640,22 @@ public:
 	}
 	/// eats tokens upto EOL or separator
 	void eatLine(bool surelyEat=false) {
-		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(isCurrListType(TIarglist) && currToken().type == Tseparator)) {
+		while (hasNext() && (surelyEat || !currToken().firstOnLine) && !(insideTlistOfType(TIarglist) && currToken().type == Tseparator)) {
 			eatenToken();
 			surelyEat = false;
 		}
 	}
 // situation checks -----------------------------------------
+	/// is closest token list of type?
+	bool insideTlistOfType(TokenTypes type) {
+		return tlists.top().get().type == type;
+	}
+	/// inside arglist, at start / after separator
+	bool macroUseAllowed() {
+		returnOnFalse(insideTlistOfType(TIarglist));
+		// NOTE tokens are not eaten at this stage (only directives) - so its pretty safe to check previous token
+		return itrs.top() == currList().begin() || std::prev(itrs.top())->type == Tseparator;
+	}
 	bool insideMacro() {
 		return macros.size();
 	}
@@ -702,12 +708,12 @@ public:
 		openList(tlist);
 	}
 	void exitArglist() {
-		assert(isCurrListType(TIarglist));
+		assert(insideTlistOfType(TIarglist));
 		closeList();
 	}
 // tokenization -----------------------------------------
 	bool tokenizeHasTlist() {
-		return tlists.size() && isCurrListType(Tlist);
+		return tlists.size() && insideTlistOfType(Tlist);
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
 		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
@@ -720,7 +726,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() && isCurrListType(TImodule));
+		assert(tlists.size() && insideTlistOfType(TImodule));
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
@@ -753,7 +759,7 @@ public:
 		int numTlistsBefore = tlists.size();
 			openList(tlist);
 			bool safeToRun = forceParseImpl();
-			assert(isCurrListType(tlist.type) && &currList() == &tlist.tlist);
+			assert(insideTlistOfType(tlist.type) && &currList() == &tlist.tlist);
 			closeList();
 		assert(tlists.size() == numTlistsBefore);
 		isPreprocessing = true;
@@ -1037,14 +1043,15 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine || scope->type == Tseparator ||
+		(!scope->continued && !scope.insideTlistOfType(TIarglist)), "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token::fromCtx(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
 	scope.addMacroExpansion(namespaceId, expanded);
 	return true;
 }
-bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, bool& notContinued, string identPurpose="directive") {
+bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, string identPurpose="directive") {
 	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
@@ -1056,7 +1063,6 @@ bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& 
 		if (!scope.hasNext() || scope->type != Tcolon || scope->firstOnLine) break;
 		loc = scope.eatenToken().loc;
 	}
-	notContinued = !scope.hasNext() || !scope->continued;
 	return true;
 }
 bool defineDefined(string& name, int& namespaceId, bool firstPrefix=false) {
@@ -1112,19 +1118,20 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
 	}
 	return check(false, "Namespace not found" errorQuoted(directiveName), loc);
 }
-bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool notContinued, bool namespaceSeen, Scope& scope) {
+bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken());
+		checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
-		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued), "Unexpected macro use", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued) || scope.macroUseAllowed(), "Unexpected macro use", percentToken.loc);
+		// NOTE shouldn't allow expansion body leakages bcs '%' token is never on same line
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
 	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
 }
-bool lookupName(Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, bool notContinued, Scope& scope) {
+bool lookupName(Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
 	if (prefixes.size()) {
 		returnOnFalse(lookupNamespaceAbove(directiveName, namespaceId, locs.front()));
@@ -1136,12 +1143,12 @@ bool lookupName(Token& percentToken, string directiveName, list<string>& prefixe
 		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" errorQuoted(directiveName), locs.front());
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
-	return processUseDirective(directiveName, percentToken, locs.front(), namespaceId, notContinued, namespaceSeen, scope);
+	return processUseDirective(directiveName, percentToken, locs.front(), namespaceId, namespaceSeen, scope);
 }
 bool processUsing(Loc loc, Scope& scope) {
 	int namespaceId = scope.currNamespaceId();
-	string firstName; list<string> prefixes; list<Loc> locs; bool notContinued;
-	returnOnFalse(getDirectivePrefixes(firstName, prefixes, locs, loc, scope, notContinued, "namespace"));
+	string firstName; list<string> prefixes; list<Loc> locs;
+	returnOnFalse(getDirectivePrefixes(firstName, prefixes, locs, loc, scope, "namespace"));
 	// NOTE the first namespace can be used, others down the using chain must be defined inside one another
 	returnOnFalse(lookupNamespaceAbove(firstName, namespaceId, locs.front()));
 	while (prefixes.size()) {
@@ -1182,16 +1189,16 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 #define processDirectiveSituationChecks(type) \
 	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
 	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken); \
-	checkReturnOnFail(notContinued, "Unexpected continued token", scope.currToken()); \
+	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
-		checkReturnOnFail(!scope.isCurrListType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
+		checkReturnOnFail(!scope.insideTlistOfType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
 		checkReturnOnFail(!scope.insideMacro(), type " not allowed inside macro", percentToken.loc); \
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
 	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
-	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc; bool notContinued;
-	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope, notContinued));
+	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
+	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope));
 	if (DefiningDirectivesSet.count(directiveName)) {
 		processDirectiveSituationChecks("Definition");
 		returnOnFalse(processDirectiveDef(directiveName, scope, percentToken, loc));
@@ -1203,7 +1210,7 @@ bool processDirective(Token percentToken, Scope& scope) {
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
 		scope.insertList(argField, percentToken, true);
 	} else {
-		return lookupName(percentToken, directiveName, prefixes, locs, notContinued, scope);
+		return lookupName(percentToken, directiveName, prefixes, locs, scope);
 	}
 	return true;
 }
