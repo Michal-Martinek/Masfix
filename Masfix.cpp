@@ -1043,7 +1043,8 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	Macro& mac = IdToNamespace[namespaceId].macros[macroName]; Token token; Loc loc = percentToken.loc;
 	directiveEatToken(Tlist, "Expansion arglist expected", true);
 	returnOnFalse(processExpansionArglist(token, scope, mac, loc));
-	checkReturnOnFail(!scope.hasNext() || !scope->continued || scope->type == Tseparator, "Unexpected token after macro use", scope.currToken());
+	checkReturnOnFail(!scope.hasNext() || scope->firstOnLine || scope->type == Tseparator ||
+		(!scope->continued && !scope.insideTlistOfType(TIarglist)), "Unexpected token after macro use", scope.currToken());
 
 	Token expanded = Token::fromCtx(ctime ? TIctime : TIexpansion, macroName, percentToken);
 	expanded.tlist = list(mac.body.begin(), mac.body.end());
@@ -1124,6 +1125,7 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(percentToken.firstOnLine || (percentToken.data == "!" && !percentToken.continued) || scope.macroUseAllowed(), "Unexpected macro use", percentToken.loc);
+		// NOTE shouldn't allow expansion body leakages bcs '%' token is never on same line
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
 	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);

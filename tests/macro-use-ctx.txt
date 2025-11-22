@@ -1,12 +1,13 @@
 :returncode 1
 
-:stdout 30
+:stdout 37
 123456
 S123456
 S1234
-S12345678
+S123456789
+S1234
 
-:stderr 3657
+:stderr 4584
 tests\macro-use-ctx.mx:17:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:18:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:21:8 ERROR: Unexpected token after macro use '%'
@@ -30,6 +31,9 @@ tests\macro-use-ctx.mx:87:2 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:89:3 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:100:16 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:102:24 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:112:22 ERROR: Unexpected token after macro use '3'
+tests\macro-use-ctx.mx:113:22 ERROR: Unexpected token after macro use '4'
+tests\macro-use-ctx.mx:118:15 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:19:9 ERROR: Unexpected token '8'
 tests\macro-use-ctx.mx:20:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:24:1 ERROR: Unexpected token '0'
@@ -64,9 +68,21 @@ tests\macro-use-ctx.mx:89:1 ERROR: Unexpected token '()'
 tests\macro-use-ctx.mx:90:1 ERROR: Unexpected token '()'
 tests\macro-use-ctx.mx:91:1 ERROR: Unexpected token '()'
 tests\macro-use-ctx.mx:93:1 ERROR: Unexpected token '()'
+tests\macro-use-ctx.mx:107:5 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:115:6 ERROR: Unexpected token '3'
+tests\macro-use-ctx.mx:117:6 ERROR: Unexpected token '4'
+tests\macro-use-ctx.mx:119:14 ERROR: Simple immediate field expected
+tests\macro-use-ctx.mx:121:9 ERROR: Unexpected token '6'
+tests\macro-use-ctx.mx:122:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:123:8 ERROR: Unexpected token ','
+tests\macro-use-ctx.mx:124:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:72:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\macro-use-ctx.mx:74:5 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
 tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 7 0'
 tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8 0'
+tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8'
+tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 9'
+tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see mova 1'
+tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 0'
 
 

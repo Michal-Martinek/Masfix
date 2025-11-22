@@ -101,3 +101,24 @@ ld !rstCou_n_t()
 %seeArglist1(7 !cout())
 %seeArglist2(%cout(),7 %cout())
 %seeArglist2(%cout(),8 !cout())
+%seeArglist2(%cout(),8
+				%cout())
+%seeArglist2(%cout(),9
+				!cout())
+
+ld !rstCou_n_t()
+
+; tokens after macro use
+%seeArglist1(%cout() 3)
+%seeArglist1(!cout() 4)
+%seeArglist1(%cout()
+					3)
+%seeArglist1(!cout()
+					4)
+%seeArglist1((%cout() 5))
+%seeArglist1((!cout() 5))
+
+%cout() 6
+!cout() 7
+%cout(),
+!cout(),
