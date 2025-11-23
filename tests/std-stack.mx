@@ -3,7 +3,6 @@
 %include "std/memory"
 %using stack
 
-
 %load(%MEMORY_LAYOUT:G_STACK_PTR)
 outur
 %top()
@@ -60,7 +59,46 @@ mov 14
 outum
 %top() ; 4, not eaten
 outum
+outc 10
 
+; over, dup_over, ld_over, reserve, dropN, movptr
+%push(1)
+%push(2)
+%push(3)
+%push(4)
+%push(5)
+
+ld 6 ; over preserving r
+%over(0) ; stack top
+outuh ; sp=25
+outur
+outum ; 5
+
+%dup_over(2) ; push 3
+%ld_over(5) ; 1
+outur
+
+outc 32
+%reserve(3)
+%top()
+outuh ; 29
+outc 32
+
+ld 3
+%drop()
+%dropN(2)
+outur
+; keep result of dup_over(2) ^ (not at stack:top)
+%top()
+ldh
+%storer(%MEMORY_LAYOUT:SEG_TEMP)
+%dropN(4)
+%movptr(%MEMORY_LAYOUT:SEG_TEMP)
+%pushm()
+
+outc 10
+
+%top()
 :pop_all_loop
 	ldh
 	lds 1
