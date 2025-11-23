@@ -23,5 +23,7 @@
 	outc 45
 	outc 10
 }
-ld !print_delim(1)
-%print_delim(0)
+%macro vm_runtime_delim() {
+	ld !print_delim(1)
+	%print_delim(0)
+}
