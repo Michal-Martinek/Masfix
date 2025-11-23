@@ -49,3 +49,34 @@
 	%cond
 	bne do_start_(!iota:get_prev())
 }
+%macro while(cond, body) {
+%def_label(while_start)
+	%cond
+	beq while_end_(!iota:get())
+	%body
+	jmp while_start_(!iota:get_prev())
+%def_label(while_end)
+}
+
+; stop - r
+; curr idx @stack:top
+; r - volatile
+%macro for_full(start, step, body) {
+	%stack:pushr() ; stop
+	%stack:push(%start) ; idx
+	%while {
+		%stack:top()
+		movs 1
+		lltm ; idx < stop
+	,
+		%body
+		%stack:top() ; idx += step
+		stra %step
+	}
+	%stack:drop()
+	%stack:drop()
+}
+
+%macro for(body) {
+	%for_full(0, 1, %body)
+}
