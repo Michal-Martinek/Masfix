@@ -1,0 +1,28 @@
+%include "control"
+
+; TODO should these be ctime only macros?
+
+; perform any binary operation (supply only letters)
+%macro op(opp, a, b) {
+	ld %a
+	ld(%opp) %b
+}
+%macro neg(a) {
+	ld %a
+	ld^ 65535
+	lda 1
+}
+
+%macro max(a, b) {
+	%if_else {
+		ld %a
+		llt %b
+	,
+		ld %b
+	,
+		ld %a
+	}
+}
+%macro abs(a) {
+	ld !max(%a, !neg(%a))
+}

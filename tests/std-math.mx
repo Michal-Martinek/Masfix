@@ -1,0 +1,23 @@
+%include "math"
+
+%macro test(ctime) {
+	outu %ctime
+	outc 32
+}
+
+; abs uses also !max, !neg
+%test(!abs(0))
+%test(!abs(1))
+%test(!abs(420))
+%test(!abs(65535)) ; -1
+%test(!abs(65533)) ; -3
+%test(!abs(32767)) ; int max
+%test(!abs(32769)) ; int min+1
+outc 10
+
+; operation
+%test(!op(a, 4, 3))
+%test(!op(s, 3, 12))
+%test(!op(t, 21, 13))
+%test(!op(>, 21, 3))
+
