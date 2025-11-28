@@ -1,29 +1,43 @@
 %include "memory"
 %using stack
 
-%macro proc(name, body) {
-	jmp proc_(%name)_end
-:proc_(%name)
-	%body
-	%stack:impl:derefSPpop()
-	jmpm
-:proc_(%name)_end
+
+; proc definition: after body expects retval @h
+%macro _proc_impl_reth(name, body) {
+		jmp proc_(%name)_body_end ; skip over proc body
+	:proc_(%name) ; entry
+		%body
+		jmpm
+	:proc_(%name)_body_end
 }
+; proc definition - calling&returning, no args/locals/retval, preserves r
+%macro proc(name, body) {
+	%_proc_impl_reth(%name,
+		%body
+		%stack:drop() ; mov to retaddr
+	)
+}
+; call proc, void func, valued func - returns @stack:top()
 %macro call(name) {
 	%push(2) ; ret addr offset
 	strap
 	jmp proc_(%name)
+	%movptr(%G_STACK_PTR) ; mov retval
 }
 
-%macro callWith1Arg(func, arg) {
+; calling functions with constant arguments - possible retval @h
+%macro callWith1Arg(name, arg) {
 	%push(%arg)
-	%call(%func)
-	%pop()
+	%call(%name)
 }
-%macro callWith2Arg(func, a, b) {
+%macro callWith2Arg(name, a, b) {
 	%push(%a)
 	%push(%b)
-	%call(%func)
-	%pop()
-	%pop()
+	%call(%name)
+}
+%macro callWith3Arg(name, a, b, c) {
+	%push(%a)
+	%push(%b)
+	%push(%c)
+	%call(%name)
 }
