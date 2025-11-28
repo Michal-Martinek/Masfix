@@ -1,3 +1,5 @@
+%include "std/procedures"
+%include "memory"
 %include "control"
 
 ; TODO should these be ctime only macros?
@@ -26,3 +28,25 @@
 %macro abs(a) {
 	ld !max(%a, !neg(%a))
 }
+
+; a, b -> a / b
+%func {divide, 2, 1,
+	; TODO remainder - where to store it?
+	%stack:top() ; local result = 0
+	str 0
+	%while {
+		%func_arg(1) ; a >= b
+		ldm
+		movs 1
+		lmger ; TODO unsigned comparison
+	,
+		%func_local(0) ; result++
+		stra 1
+		%func_arg(1) ; a -= b
+		ldm
+		movs 1
+		strsr
+	}
+	%stack:top() ; return result
+}
+

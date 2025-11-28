@@ -1,0 +1,39 @@
+
+%include "memory"
+%include "math"
+%include "procedures"
+%include "control"
+
+%macro callDiv(numerator, denominator) {
+	%stack:push(%numerator)
+	%stack:push(%denominator)
+	%call(divide)
+	%stack:pop()
+}
+%macro testDiv(numerator, denominator) {
+	outu %numerator
+	outc 47
+	outu %denominator
+	outc 61
+	%callDiv(%numerator, %denominator)
+	outur
+}
+%macro testDivRem(numerator, denominator) {
+	%testDiv(%numerator, %denominator)
+	outc 37
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	ldt %denominator
+	str %numerator
+	strsr
+	outum
+	outc 10
+}
+%testDivRem(0, 1)
+%testDivRem(0, 5)
+%testDivRem(1, 1)
+%testDivRem(1, 30)
+%testDivRem(32169, 2)
+%testDivRem(10, 3)
+%testDivRem(512, 8)
+%testDivRem(512, 1024)
+%testDivRem(89, 13)
