@@ -50,3 +50,25 @@
 	%stack:top() ; return result
 }
 
+; a, b -> a ** b
+%func {power, 2, 1,
+	; local - result
+	%func_local(0) ; result = 1
+	str 1
+	%while {
+		; b > 0
+		%func_arg(1)
+		ldm
+	,
+		; result *= a
+		movs 1 ; a
+		ldm
+		%func_local(0)
+		strtr
+		; b--
+		%func_arg(1)
+		strs 1
+	}
+	%func_local(0) ; return result
+	ldm
+}

@@ -4,22 +4,22 @@
 %include "procedures"
 %include "control"
 
-%macro callDiv(numerator, denominator) {
+%macro callOp(op, numerator, denominator) {
 	%stack:push(%numerator)
 	%stack:push(%denominator)
-	%call(divide)
+	%call(%op)
 	%stack:pop()
 }
-%macro testDiv(numerator, denominator) {
+%macro testOp(op, char, numerator, denominator) {
 	outu %numerator
-	outc 47
+	outc %char
 	outu %denominator
 	outc 61
-	%callDiv(%numerator, %denominator)
+	%callOp(%op, %numerator, %denominator)
 	outur
 }
 %macro testDivRem(numerator, denominator) {
-	%testDiv(%numerator, %denominator)
+	%testOp(divide, 47, %numerator, %denominator)
 	outc 37
 	mov %MEMORY_LAYOUT:SEG_TEMP
 	ldt %denominator
@@ -28,6 +28,11 @@
 	outum
 	outc 10
 }
+%macro testPower(a, b) {
+	%testOp(power, 94, %a, %b)
+	outc 10
+}
+
 %testDivRem(0, 1)
 %testDivRem(0, 5)
 %testDivRem(1, 1)
@@ -37,3 +42,19 @@
 %testDivRem(512, 8)
 %testDivRem(512, 1024)
 %testDivRem(89, 13)
+
+outc 10
+%testPower(1, 1)
+%testPower(1, 0)
+%testPower(0, 1)
+%testPower(0, 0)
+%testPower(10, 1)
+%testPower(10, 0)
+%testPower(2, 2)
+%testPower(2, 10)
+%testPower(3, 8)
+%testPower(10, 4)
+%testPower(213, 2)
+%testPower(3, 9)
+%testPower(7, 5)
+
