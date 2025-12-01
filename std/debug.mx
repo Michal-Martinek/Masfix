@@ -51,6 +51,7 @@
 	outc 10
 	%print_key_val(114, r)
 	%print_key_val(104, h)
+	%print_key_val(109, m)
 	%toggleDebugMode()
 
 	mov 0

@@ -5,6 +5,10 @@
 	%instr
 	outc 32
 }
+%macro print_endl(instr) {
+	%instr
+	outc 10
+}
 %macro print_separator() {
 	outc 44
 	outc 32

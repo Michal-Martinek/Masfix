@@ -96,6 +96,15 @@
 	%func_arg(0)
 	strr
 }
+%macro returnr(funcName) {
+	%save_retval()
+	jmp return_(%funcName)
+}
+%macro return_imm(funcName, imm) {
+	ld %imm
+	%returnr(%funcName)
+}
+
 %macro func_arg(idx) {
 	%movptr(%G_ARGS_PTR)
 	mova %idx

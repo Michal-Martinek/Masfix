@@ -4,6 +4,7 @@
 %include "procedures"
 %include "control"
 %include "io"
+%include "debug"
 
 %macro callOp(op, numerator, denominator) {
 	%stack:push(%numerator)
@@ -70,7 +71,9 @@ outc 10
 	%func_local(%localIdx)
 	strr
 }
-%void_func {test2Powers, 0, 2,
+
+; which power to break -> status
+%func {test2Powers, 1, 2,
 	; locals: maxPwr, currPwr
 	%print_spaced(outc 105) ; collumn headers
 	%print_spaced(
@@ -96,26 +99,87 @@ outc 10
 		%func_local(1)
 		%stack:pushm()
 		%call(divide) ; maxPwr / currPwr
-		
+:second_divide_return ; stack dump purposes
+
 		%func_local(0)
 		ldm
 		%stack:over(1)
 		ld>m ; r = maxPwr >> idx
+		%stack:pushr()
 		outur
 
+		; force error on arg0
 		%if {
+			%func_arg(0)
+			ld&m
+		,
+			%stack:top()
+			stra 1
+		}		
+
+		%if {
+			%stack:pop()
 			%stack:drop()
 			lnem ; maxPwr >> idx != divide(maxPwr, currPwr)
 		,
+			outc 32
 			outc 69 ; emit error
 			outc 64
 			%stack:top()
-			outum ; idx
-			outc 10
-			jmp return_test2Powers ; return when values mismatch
+			%print_endl(outum) ; idx
+			%return_imm(test2Powers, 69) ; return when values mismatch
 		}
 		outc 10
 	}
+	%print_spaced(
+		outc 79 ; OK
+		outc 75
+	)
+	%stack:reserve(5) ; test correct stack alignment on function exit
+	ld 0 ; retval
 }
 
-%call(test2Powers)
+; little bit also func & debug test
+%macro testTest2powers(value) {
+	%stack:push(%value)
+	%call(test2Powers)
+	%print_endl(
+		%stack:pop()
+		outur
+	)
+	outc 10
+}
+
+%void_func {main, 0, 1,
+	%func_local(0)
+	str 66
+	%stack:push(42) ; should stay untouched
+
+	%testTest2powers(0)
+	%testTest2powers(!op(<, 1, 10)) ; break at 4th itr
+:test_return
+
+	%print_endl(
+		%func_local(0)
+		outum
+	)
+	%print_endl(
+		%stack:top()
+		outur
+	)
+	outc 10
+
+	%print_endl(
+		outc 76
+		outc 115
+	)
+	%print_endl(outu module_end)
+	%print_endl(outu test_return)
+	%print_endl(outu second_divide_return)
+
+	%stack:reserve(18) ; see further
+	%dumpStack()
+}
+
+%call(main)
+:module_end
