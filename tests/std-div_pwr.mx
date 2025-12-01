@@ -3,6 +3,7 @@
 %include "math"
 %include "procedures"
 %include "control"
+%include "io"
 
 %macro callOp(op, numerator, denominator) {
 	%stack:push(%numerator)
@@ -57,4 +58,64 @@ outc 10
 %testPower(213, 2)
 %testPower(3, 9)
 %testPower(7, 5)
+outc 10
 
+; b in r
+%macro callPwrStrLocal(a, localIdx) {
+	; outc 65
+	%stack:push(%a)
+	%stack:pushr()
+	%call(power)
+	%stack:pop()
+	%func_local(%localIdx)
+	strr
+}
+%void_func {test2Powers, 0, 2,
+	; locals: maxPwr, currPwr
+	%print_spaced(outc 105) ; collumn headers
+	%print_spaced(
+		outu 2
+		outc 94
+		outc 105
+	)
+	outc 47
+	outc 10
+
+	ld 14
+	%callPwrStrLocal(2, 0) ; maxPwr = 2 ** 14
+	ld 15
+	%for {
+		%stack:top()
+		%print_spaced(outur)
+		
+		%callPwrStrLocal(2, 1) ; currPwr = 2 ** idx
+		%print_spaced(outum)
+
+		%func_local(0)
+		%stack:pushm()
+		%func_local(1)
+		%stack:pushm()
+		%call(divide) ; maxPwr / currPwr
+		
+		%func_local(0)
+		ldm
+		%stack:over(1)
+		ld>m ; r = maxPwr >> idx
+		outur
+
+		%if {
+			%stack:drop()
+			lnem ; maxPwr >> idx != divide(maxPwr, currPwr)
+		,
+			outc 69 ; emit error
+			outc 64
+			%stack:top()
+			outum ; idx
+			outc 10
+			jmp return_test2Powers ; return when values mismatch
+		}
+		outc 10
+	}
+}
+
+%call(test2Powers)
