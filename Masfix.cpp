@@ -2065,6 +2065,7 @@ void initParseCtx(Flags& flags, string mainRelPath) {
 void run(Flags& flags) {
 	int exitCode = 0;
 	if (flags.interpret) {
+		globalVm = VM();
 		interpret();
 	} else {
 		ofstream outFile = openOutputFile(flags.filePath("asm"));
