@@ -799,9 +799,9 @@ public:
 		list<Token>::iterator argStart = --currList().begin(); // points before the starting element, so as not to get invalidated
 		vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
 		while (hasNext()) {
-			loc = currToken().loc;
 			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
+				loc = currToken().loc;
 				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
 				retval &= _addMacroArg(argSpans, ++argStart, loc);
 				argStart = itrs.top();
