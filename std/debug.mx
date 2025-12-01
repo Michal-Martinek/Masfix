@@ -1,0 +1,66 @@
+
+%include "procedures"
+%include "control"
+%include "memory"
+%using MEMORY_LAYOUT
+%include "io"
+
+%define SAVED_STACK_PTR 63488 ; bottom of debug stack
+%store(%SAVED_STACK_PTR, %SEG_DEBUG_STACK)
+
+; toggles between normal stack and debug stack
+%macro toggleDebugMode() {
+	%loadmov(%G_STACK_PTR, %SAVED_STACK_PTR)
+	swap
+	%storer(%G_STACK_PTR)
+}
+
+%macro emitMemdumpAddr() {
+	outc 10
+	outuh
+	outc 58
+}
+
+; from, count -> void (stdout)
+%proc {memdump,
+; NOTE procedure bcs it doesn't modify segments
+	%stack:ld_over(1) ; ld count
+	%for {
+		%stack:top() ; idx
+		movs 4 ; from
+		movm
+		movar ; *(from + idx)
+
+		%if {
+			ldh ; line start
+			ld& 7 ; 8 per line
+			leq 0
+		,
+			%emitMemdumpAddr()
+		}
+
+		; TODO padded outum
+		outc 32
+		outum
+
+	}
+	outc 10
+}
+
+%macro dumpStack() {
+	outc 10
+	%print_key_val(114, r)
+	%print_key_val(104, h)
+	%toggleDebugMode()
+
+	mov 0
+	%emitMemdumpAddr()
+	outc 32
+	%stack:push(1) ; from 1 (*0 shown below)
+	%load(%SAVED_STACK_PTR)
+	outum ; show original SP
+	lda 4 ; show next 4 after stack:top
+	%stack:pushr() ; count
+	%call(memdump)
+	jmp end
+}
