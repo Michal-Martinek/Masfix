@@ -2,18 +2,18 @@
 %using stack
 %using MEMORY_LAYOUT
 
-; proc definition: after body expects retval @h
-%macro _proc_impl_reth(name, body) {
+; proc definition: after body expects retval in reg %where_retaddr
+%macro _proc_impl(name, where_retaddr, body) {
 		jmp proc_(%name)_body_end ; skip over proc body
 	:proc_(%name) ; entry
 		%body
-		jmpm
+		jmp(%where_retaddr)
 	:proc_(%name)_body_end
 }
 ; proc definition - calling&returning, no args/locals/retval
 ; preserves r, expects retaddr @top
 %macro proc(name, body) {
-	%_proc_impl_reth(%name,
+	%_proc_impl(%name, m,
 		%body
 		%stack:drop() ; mov to retaddr
 	)
@@ -28,40 +28,61 @@
 
 ; functions --------------------
 
-; TODO calling inside func - saving locals&args
+
+; saves ARGS, LOCALS segment pointers of caller by pushing in function prologue (above retaddr)
+%macro push_segment_ptrs() {
+	; TODO optimization - save only in non-leaf funcs
+	mov %MEMORY_LAYOUT:G_ARGS_PTR
+	%stack:pushm()
+	mov %MEMORY_LAYOUT:G_LOCALS_PTR
+	%stack:pushm()
+}
+; reset SP to expected length, restore caller's segments, pop retaddr -> r
+%macro rstSP_pop_segment_ptrs() {
+	%load(%MEMORY_LAYOUT:G_LOCALS_PTR)
+	%storer(%MEMORY_LAYOUT:G_STACK_PTR)
+	strs 1 ; SP = locals-1
+	%stack:pop()
+	%storer(%MEMORY_LAYOUT:G_LOCALS_PTR)
+	%stack:pop()
+	%storer(%MEMORY_LAYOUT:G_ARGS_PTR)
+	%stack:pop() ; retaddr
+}
+
 ; TODO auto reserve space for retval when args = 0
 
-; epilogue preserves r, expects stack to stay same size
+; safe when stack grows in func body
+; volatile r on entry/exit
 %macro _func_impl(name, args, drop_args, locals, body) {
-	%_proc_impl_reth(%name,
-		ldh ; &retaddr
-		%storer(%G_LOCALS_PTR) ; LOCALS = &retaddr + 1
+	; function frame: stack top of prev func-| A1..An retaddr seg_args seg_locals L1..Ln
+	%_proc_impl(%name, r,
+		%push_segment_ptrs()
+		ldh ; r = &retaddr + 2 (segments)
+		%storer(%G_LOCALS_PTR) ; LOCALS = top() + 1
 		stra 1
-		mov %G_STACK_PTR ; reserve space for locals
-		stra %locals
+		%stack:reserve(%locals) ; reserve space for locals (above saved segments)
 
-		lds %args
+		lds !op(a, %args, 2)
 		%storer(%G_ARGS_PTR) ; ARGS = &retaddr - #args
 
 		%body
 	:return_(%name) ; function epilogue - jump here to exit func (doesn't save retval!)
-	; TODO set SP = ARGS + (has_retval?) - ignore all pushed values in func
-		%stack:dropN(!op(a, %locals, !op(a, %drop_args, 1))) ; drop #drop_args + #locals + 1 (retaddr)
-		%movptr(%G_LOCALS_PTR)
-		movs 1 ; mov to retaddr
+		%rstSP_pop_segment_ptrs()
+		%stack:dropN(%drop_args) ; drop #drop_args
+		; retaddr in r
 	)
 }
 ; args on stack
 ; args, locals - number of vars to reserve
-; preserves r on return
+; volatile r
 %macro void_func(name, args, locals, body) {
 	%_func_impl(%name, %args, %args, %locals,
 		%body
 	)
 }
-; args on stack, retval on stack
+; caller: push args on stack - auto removed after, retval appears "pushed" instead
+; callee: returns value in r on function end (not when called return!)
 ; args, locals - number of vars to reserve
-; preserves r on return
 ; !! args must be >= 1 (space for retval)
 %macro func(name, args, locals, body) {
 	%_func_impl(%name, %args, !op(s, %args, 1), %locals,
