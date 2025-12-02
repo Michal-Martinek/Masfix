@@ -177,8 +177,7 @@ outc 10
 	%print_endl(outu test_return)
 	%print_endl(outu second_divide_return)
 
-	%stack:reserve(18) ; see further
-	%dumpStack()
+	%dumpStackOverrun(18)
 }
 
 %call(main)

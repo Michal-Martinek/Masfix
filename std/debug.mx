@@ -44,10 +44,10 @@
 		outum
 
 	}
-	outc 10
 }
 
-%macro dumpStack() {
+; original SP -> r
+%macro _dumpStackPrologue() {
 	outc 10
 	%print_key_val(114, r)
 	%print_key_val(104, h)
@@ -57,11 +57,30 @@
 	mov 0
 	%emitMemdumpAddr()
 	outc 32
-	%stack:push(1) ; from 1 (*0 shown below)
 	%load(%SAVED_STACK_PTR)
 	outum ; show original SP
-	lda 4 ; show next 4 after stack:top
+}
+%macro _dumpStack2Top() {
+	%_dumpStackPrologue()
+	%stack:push(1) ; from 1 (mem [0] shown ^)
 	%stack:pushr() ; count
 	%call(memdump)
+}
+
+%macro dumpStack() {
+	%_dumpStack2Top()
+	outc 10
+	jmp end
+}
+%macro dumpStackOverrun(overrun) {
+	%_dumpStack2Top()
+	; show overrun
+	outc 124 ; separator
+	%load(%SAVED_STACK_PTR)
+	lda 1
+	%stack:pushr() ; from original SP
+	%stack:push(%overrun) ; count
+	%call(memdump)
+	outc 10
 	jmp end
 }

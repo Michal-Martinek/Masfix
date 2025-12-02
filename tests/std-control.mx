@@ -10,4 +10,4 @@ ld 10
 	outum
 	ld< 3 ; should be irrelevant
 }
-%dumpStack()
+%dumpStackOverrun(7)
