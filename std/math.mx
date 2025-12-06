@@ -1,0 +1,74 @@
+%include "std/procedures"
+%include "memory"
+%include "control"
+
+; TODO should these be ctime only macros?
+
+; perform any binary operation (supply only letters)
+%macro op(opp, a, b) {
+	ld %a
+	ld(%opp) %b
+}
+%macro neg(a) {
+	ld %a
+	ld^ 65535
+	lda 1
+}
+
+%macro max(a, b) {
+	%if_else {
+		ld %a
+		llt %b
+	,
+		ld %b
+	,
+		ld %a
+	}
+}
+%macro abs(a) {
+	ld !max(%a, !neg(%a))
+}
+
+; a, b -> a / b
+%func {divide, 2, 1,
+	; TODO remainder - where to store it?
+	%stack:top() ; local result = 0
+	str 0
+	%while {
+		%func_arg(1) ; a >= b
+		ldm
+		movs 1
+		lmger ; TODO unsigned comparison
+	,
+		%func_local(0) ; result++
+		stra 1
+		%func_arg(1) ; a -= b
+		ldm
+		movs 1
+		strsr
+	}
+	%stack:top() ; return result
+}
+
+; a, b -> a ** b
+%func {power, 2, 1,
+	; local - result
+	%func_local(0) ; result = 1
+	str 1
+	%while {
+		; b > 0
+		%func_arg(1)
+		ldm
+	,
+		; result *= a
+		movs 1 ; a
+		ldm
+		%func_local(0)
+		strtr
+		; b--
+		%func_arg(1)
+		strs 1
+	}
+	%func_local(0) ; return result
+	ldm
+}

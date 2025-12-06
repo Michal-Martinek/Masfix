@@ -30,7 +30,7 @@ def runCommand(command, stdin: str, timeout=None) -> dict:
 		subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
 		_, _ = process.communicate() # read remaining output
 		print(msg := f'[ERROR] Timed out after {timeout}s')
-		raise ExecutionException(msg)
+		raise ExecutionException(msg) from None
 	except (Exception, KeyboardInterrupt) as e:
 		print(f'[ERROR] {type(e).__name__}')
 		raise ExecutionException(type(e).__name__)

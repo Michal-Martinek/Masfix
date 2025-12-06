@@ -12,9 +12,20 @@
 	mov %addr
 	ldm
 }
+%macro movptr(addr) {
+	mov %addr
+	movm
+}
 %macro loadmov(addr, mov2) {
 	%load(%addr)
 	mov %mov2
+}
+
+; indexes linear field @ptr with idx from r
+%macro index(ptr, item_size) {
+	%movptr(%ptr)
+	ldt %item_size
+	movar
 }
 ; ----------------------------
 %namespace MEMORY_LAYOUT {
@@ -22,23 +33,26 @@
 	%define SEG_GLOBAL 0
 	%define SEG_TEMP 8
 	%define SEG_STACK 16
+	%define SEG_HEAP 2048
+	%define SEG_DEBUG_STACK 63488 ; 2048
 
 ; GLOBALS
 	; points to the last occupied space
 	%define G_STACK_PTR 0
 	%store(%G_STACK_PTR, %SEG_STACK)
 
-	%define G_IOTA 1
+	; start of procedure args
+	%define G_ARGS_PTR 1
+	; start of procedure local vars
+	%define G_LOCALS_PTR 2
+
+	%define G_IOTA 4
 
 }
 %using MEMORY_LAYOUT
 ; interfaces -----------------------
 %namespace stack {
 	%namespace impl {
-		%macro derefSP() {
-			mov %G_STACK_PTR
-			movm
-		}
 		%macro derefSPpush() {
 			mov %G_STACK_PTR
 			stra 1
@@ -53,10 +67,21 @@
 	}
 	%using impl
 
+	; inspecting
 	%macro top() {
-		%derefSP()
+		%movptr(%G_STACK_PTR)
 		ldm
 	}
+	; only primitive not loading the value
+	%macro over(n) {
+		%movptr(%G_STACK_PTR)
+		movs %n
+	}
+	%macro ld_over(n) {
+		%over(%n)
+		ldm
+	}
+	; adding
 	%macro push(imm) {
 		%derefSPpush()
 		str %imm
@@ -65,9 +90,30 @@
 		%derefSPpush()
 		strr
 	}
+	%macro pushm() {
+		ldm
+		%pushr()
+	}
+
+	%macro reserve(N) {
+		mov %G_STACK_PTR
+		stra %N
+	}
+	%macro dup_over(n) {
+		%over(%n)
+		%pushm()
+	}
+	; removing
 	%macro pop() {
 		%derefSPpop()
 		ldm
+	}
+	%macro drop() {
+		%derefSPpop()
+	}
+	%macro dropN(N) {
+		mov %G_STACK_PTR
+		strs %N
 	}
 }
 

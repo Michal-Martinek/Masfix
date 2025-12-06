@@ -1,0 +1,196 @@
+
+%include "memory"
+%include "math"
+%include "procedures"
+%include "control"
+%include "io"
+%include "debug"
+
+:test_start
+
+%macro callOp(op, numerator, denominator) {
+	%stack:push(%numerator)
+	%stack:push(%denominator)
+	%call(%op)
+	%stack:pop()
+}
+%macro testOp(op, char, numerator, denominator) {
+	outu %numerator
+	outc %char
+	outu %denominator
+	outc 61
+	%callOp(%op, %numerator, %denominator)
+	outur
+}
+%macro testDivRem(numerator, denominator) {
+	%testOp(divide, 47, %numerator, %denominator)
+	outc 37
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	ldt %denominator
+	str %numerator
+	strsr
+	outum
+	outc 10
+}
+%macro testPower(a, b) {
+	%testOp(power, 94, %a, %b)
+	outc 10
+}
+
+%testDivRem(0, 1)
+%testDivRem(0, 5)
+%testDivRem(1, 1)
+%testDivRem(1, 30)
+%testDivRem(32169, 2)
+%testDivRem(10, 3)
+%testDivRem(512, 8)
+%testDivRem(512, 1024)
+%testDivRem(89, 13)
+
+outc 10
+%testPower(1, 1)
+%testPower(1, 0)
+%testPower(0, 1)
+%testPower(0, 0)
+%testPower(10, 1)
+%testPower(10, 0)
+%testPower(2, 2)
+%testPower(2, 10)
+%testPower(3, 8)
+%testPower(10, 4)
+%testPower(213, 2)
+%testPower(3, 9)
+%testPower(7, 5)
+outc 10
+
+; b in r
+%macro callPwrStrLocal(a, localIdx) {
+	; outc 65
+	%stack:push(%a)
+	%stack:pushr()
+	%call(power)
+	%stack:pop()
+	%func_local(%localIdx)
+	strr
+}
+
+; which power to break -> status
+%func {test2Powers, 1, 2,
+	; locals: maxPwr, currPwr
+	%print_spaced(outc 105) ; collumn headers
+	%print_spaced(
+		outu 2
+		outc 94
+		outc 105
+	)
+	outc 47
+	outc 10
+
+	ld 14
+	%callPwrStrLocal(2, 0) ; maxPwr = 2 ** 14
+	ld 15
+	%for {
+		%stack:top()
+		%print_spaced(outur)
+		
+		%callPwrStrLocal(2, 1) ; currPwr = 2 ** idx
+		%print_spaced(outum)
+
+		%func_local(0)
+		%stack:pushm()
+		%func_local(1)
+		%stack:pushm()
+		%call(divide) ; maxPwr / currPwr
+:second_divide_return ; stack dump purposes
+
+		%func_local(0)
+		ldm
+		%stack:over(1)
+		ld>m ; r = maxPwr >> idx
+		%stack:pushr()
+		outur
+
+		; force error on arg0
+		%if {
+			%func_arg(0)
+			ld&m
+		,
+			%stack:top()
+			stra 1
+		}		
+
+		%if {
+			%stack:pop()
+			%stack:drop()
+			lnem ; maxPwr >> idx != divide(maxPwr, currPwr)
+		,
+			outc 32
+			outc 69 ; emit error
+			outc 64
+			%stack:top()
+			%print_endl(outum) ; idx
+			%return_imm(test2Powers, 69) ; return when values mismatch
+		}
+		outc 10
+	}
+	%print_spaced(
+		outc 79 ; OK
+		outc 75
+	)
+	%stack:reserve(5) ; test correct stack alignment on function exit
+	ld 0 ; retval
+}
+
+; little bit also func & debug test
+%macro testTest2powers(value) {
+	%stack:push(%value)
+	%call(test2Powers)
+	%print_endl(
+		%stack:pop()
+		outur
+	)
+	outc 10
+}
+
+%macro showLabelOffset(label, retaddrLocation) {
+	ld %label
+	lds test_start
+	outur
+	mov %retaddrLocation
+	strs test_start
+	outc 10
+}
+
+%void_func {main, 0, 1,
+	%func_local(0)
+	str 66
+	%stack:push(42) ; should stay untouched
+
+	%testTest2powers(0)
+	%testTest2powers(!op(<, 1, 10)) ; break at 4th itr
+:test_return
+
+	%print_endl(
+		%func_local(0)
+		outum
+	)
+	%print_endl(
+		%stack:top()
+		outur
+	)
+	outc 10
+
+	%print_endl(
+		outc 76
+		outc 115
+	)
+	%showLabelOffset(module_end, 17)
+	%showLabelOffset(test_return, 23)
+	%showLabelOffset(second_divide_return, 32)
+
+	%stack:top()
+	%dumpStackOverrun(18)
+}
+
+%call(main)
+:module_end

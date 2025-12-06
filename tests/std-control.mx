@@ -1,0 +1,13 @@
+
+%include "memory"
+%include "control"
+%include "debug"
+
+; for loop
+ld 10
+%for {
+	%stack:top()
+	outum
+	ld< 3 ; should be irrelevant
+}
+%dumpStackOverrun(7)

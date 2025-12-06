@@ -1,0 +1,86 @@
+
+%include "procedures"
+%include "control"
+%include "memory"
+%using MEMORY_LAYOUT
+%include "io"
+
+%define SAVED_STACK_PTR 63488 ; bottom of debug stack
+%store(%SAVED_STACK_PTR, %SEG_DEBUG_STACK)
+
+; toggles between normal stack and debug stack
+%macro toggleDebugMode() {
+	%loadmov(%G_STACK_PTR, %SAVED_STACK_PTR)
+	swap
+	%storer(%G_STACK_PTR)
+}
+
+%macro emitMemdumpAddr() {
+	outc 10
+	outuh
+	outc 58
+}
+
+; from, count -> void (stdout)
+%proc {memdump,
+; NOTE procedure bcs it doesn't modify segments
+	%stack:ld_over(1) ; ld count
+	%for {
+		%stack:top() ; idx
+		movs 4 ; from
+		movm
+		movar ; *(from + idx)
+
+		%if {
+			ldh ; line start
+			ld& 7 ; 8 per line
+			leq 0
+		,
+			%emitMemdumpAddr()
+		}
+
+		; TODO padded outum
+		outc 32
+		outum
+
+	}
+}
+
+; original SP -> r
+%macro _dumpStackPrologue() {
+	outc 10
+	%print_key_val(114, r)
+	%print_key_val(104, h)
+	%print_key_val(109, m)
+	%toggleDebugMode()
+
+	mov 0
+	%emitMemdumpAddr()
+	outc 32
+	%load(%SAVED_STACK_PTR)
+	outum ; show original SP
+}
+%macro _dumpStack2Top() {
+	%_dumpStackPrologue()
+	%stack:push(1) ; from 1 (mem [0] shown ^)
+	%stack:pushr() ; count
+	%call(memdump)
+}
+
+%macro dumpStack() {
+	%_dumpStack2Top()
+	outc 10
+	jmp end
+}
+%macro dumpStackOverrun(overrun) {
+	%_dumpStack2Top()
+	; show overrun
+	outc 124 ; separator
+	%load(%SAVED_STACK_PTR)
+	lda 1
+	%stack:pushr() ; from original SP
+	%stack:push(%overrun) ; count
+	%call(memdump)
+	outc 10
+	jmp end
+}

@@ -1,12 +1,39 @@
 %include "control"
+%include "memory"
 
-%macro print(wannabe_string) {
-	outc %wannabe_string
-}
-%macro print_spaced(instr, end) {
+%macro print_spaced(instr) {
 	%instr
-	outc %end
+	outc 32
 }
+%macro print_endl(instr) {
+	%instr
+	outc 10
+}
+%macro print_separator() {
+	outc 44
+	outc 32
+}
+%macro print_key_val(keyChar, val) {
+	outc %keyChar
+	outc 61
+	outu(%val)
+	%print_separator()
+}
+; output signed r (stdout)
+%macro outir() {
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	strr
+	%if {
+		ld> 15 ; negative?
+	,
+		outc 45
+		ld 0
+		ldsm
+		strr
+	}
+	outum
+}
+
 
 ; VM / runtime delim
 %macro print_delim(vm) {
@@ -23,5 +50,7 @@
 	outc 45
 	outc 10
 }
-ld !print_delim(1)
-%print_delim(0)
+%macro vm_runtime_delim() {
+	ld !print_delim(1)
+	%print_delim(0)
+}

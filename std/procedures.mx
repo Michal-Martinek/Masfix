@@ -1,29 +1,133 @@
 %include "memory"
 %using stack
+%using MEMORY_LAYOUT
 
-%macro proc(name, body) {
-	jmp proc_(%name)_end
-:proc_(%name)
-	%body
-	%stack:impl:derefSPpop()
-	jmpm
-:proc_(%name)_end
+; proc definition: after body expects retval in reg %where_retaddr
+%macro _proc_impl(name, where_retaddr, body) {
+		jmp proc_(%name)_body_end ; skip over proc body
+	:proc_(%name) ; entry
+		%body
+		jmp(%where_retaddr)
+	:proc_(%name)_body_end
 }
+; proc definition - calling&returning, no args/locals/retval
+; preserves r, expects retaddr @top
+%macro proc(name, body) {
+	%_proc_impl(%name, m,
+		%body
+		%stack:drop() ; mov to retaddr
+	)
+}
+; call proc / func
 %macro call(name) {
 	%push(2) ; ret addr offset
 	strap
 	jmp proc_(%name)
 }
 
-%macro callWith1Arg(func, arg) {
-	%push(%arg)
-	%call(%func)
-	%pop()
+; functions --------------------
+
+
+; saves ARGS, LOCALS segment pointers of caller by pushing in function prologue (above retaddr)
+%macro push_segment_ptrs() {
+	; TODO optimization - save only in non-leaf funcs
+	mov %MEMORY_LAYOUT:G_ARGS_PTR
+	%stack:pushm()
+	mov %MEMORY_LAYOUT:G_LOCALS_PTR
+	%stack:pushm()
 }
-%macro callWith2Arg(func, a, b) {
+; reset SP to expected length, restore caller's segments, pop retaddr -> r
+%macro rstSP_pop_segment_ptrs() {
+	%load(%MEMORY_LAYOUT:G_LOCALS_PTR)
+	%storer(%MEMORY_LAYOUT:G_STACK_PTR)
+	strs 1 ; SP = locals-1
+	%stack:pop()
+	%storer(%MEMORY_LAYOUT:G_LOCALS_PTR)
+	%stack:pop()
+	%storer(%MEMORY_LAYOUT:G_ARGS_PTR)
+	%stack:pop() ; retaddr
+}
+
+; TODO auto reserve space for retval when args = 0
+
+; safe when stack grows in func body
+; volatile r on entry/exit
+%macro _func_impl(name, args, drop_args, locals, body) {
+	; function frame: stack top of prev func-| A1..An retaddr seg_args seg_locals L1..Ln
+	%_proc_impl(%name, r,
+		%push_segment_ptrs()
+		ldh ; r = &retaddr + 2 (segments)
+		%storer(%G_LOCALS_PTR) ; LOCALS = top() + 1
+		stra 1
+		%stack:reserve(%locals) ; reserve space for locals (above saved segments)
+
+		lds !op(a, %args, 2)
+		%storer(%G_ARGS_PTR) ; ARGS = &retaddr - #args
+
+		%body
+	:return_(%name) ; function epilogue - jump here to exit func (doesn't save retval!)
+		%rstSP_pop_segment_ptrs()
+		%stack:dropN(%drop_args) ; drop #drop_args
+		; retaddr in r
+	)
+}
+; args on stack
+; args, locals - number of vars to reserve
+; volatile r
+%macro void_func(name, args, locals, body) {
+	%_func_impl(%name, %args, %args, %locals,
+		%body
+	)
+}
+; caller: push args on stack - auto removed after, retval appears "pushed" instead
+; callee: returns value in r on function end (not when called return!)
+; args, locals - number of vars to reserve
+; !! args must be >= 1 (space for retval)
+%macro func(name, args, locals, body) {
+	%_func_impl(%name, %args, !op(s, %args, 1), %locals,
+		%body
+		%save_retval() ; return r
+	)
+}
+
+; saves retval from r
+%macro save_retval() {
+	%func_arg(0)
+	strr
+}
+%macro returnr(funcName) {
+	%save_retval()
+	jmp return_(%funcName)
+}
+%macro return_imm(funcName, imm) {
+	ld %imm
+	%returnr(%funcName)
+}
+
+%macro func_arg(idx) {
+	%movptr(%G_ARGS_PTR)
+	mova %idx
+}
+%macro func_local(idx) {
+	%movptr(%G_LOCALS_PTR)
+	mova %idx
+}
+
+; calling functions with constant arguments
+%macro callWith1Arg(name, arg) {
+	%push(%arg)
+	%call(%name)
+}
+%macro callWith2Arg(name, a, b) {
 	%push(%a)
 	%push(%b)
-	%call(%func)
-	%pop()
-	%pop()
+	%call(%name)
 }
+%macro callWith3Arg(name, a, b, c) {
+	%push(%a)
+	%push(%b)
+	%push(%c)
+	%call(%name)
+}
+
+%include "math"

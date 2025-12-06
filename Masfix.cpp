@@ -799,9 +799,9 @@ public:
 		list<Token>::iterator argStart = --currList().begin(); // points before the starting element, so as not to get invalidated
 		vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
 		while (hasNext()) {
-			loc = currToken().loc;
 			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
+				loc = currToken().loc;
 				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
 				retval &= _addMacroArg(argSpans, ++argStart, loc);
 				argStart = itrs.top();
@@ -2065,6 +2065,7 @@ void initParseCtx(Flags& flags, string mainRelPath) {
 void run(Flags& flags) {
 	int exitCode = 0;
 	if (flags.interpret) {
+		globalVm = VM();
 		interpret();
 	} else {
 		ofstream outFile = openOutputFile(flags.filePath("asm"));

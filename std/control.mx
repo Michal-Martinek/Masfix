@@ -10,14 +10,22 @@
 		%get()
 		lda %off
 	}
-	%macro inc() {
+	%macro get_prev() {
+		%get_offset(65535)
+	}
+	%macro get_next() {
+		%get_offset(1)
+	}
+
+	%macro increment() {
 		%load(%G_IOTA)
 		stra 1
 	}
 	%macro def_label(name) {
-		: (%name)_(!inc())
+		: (%name)_(!increment())
 	}
 }
+%using iota
 
 ; NOTE cond - loads boolean condition to r
 %macro if(cond, body) {
@@ -30,7 +38,7 @@
 	%cond
 	beq else_(!iota:get())
 		%body
-		jmp else_end_(!iota:get_offset(1))
+		jmp else_end_(!iota:get_next())
 	%def_label(else)
 		%else
 	%def_label(else_end)
@@ -39,5 +47,36 @@
 	%def_label(do_start)
 	%body
 	%cond
-	bne do_start_(!iota:get())
+	bne do_start_(!iota:get_prev())
+}
+%macro while(cond, body) {
+%def_label(while_start)
+	%cond
+	beq while_end_(!iota:get())
+	%body
+	jmp while_start_(!iota:get_prev())
+%def_label(while_end)
+}
+
+; stop - r
+; curr idx @stack:top
+; r - volatile
+%macro for_full(start, step, body) {
+	%stack:pushr() ; stop
+	%stack:push(%start) ; idx
+	%while {
+		%stack:top()
+		movs 1
+		lltm ; idx < stop
+	,
+		%body
+		%stack:top() ; idx += step
+		stra %step
+	}
+	%stack:drop()
+	%stack:drop()
+}
+
+%macro for(body) {
+	%for_full(0, 1, %body)
 }
