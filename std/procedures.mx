@@ -18,12 +18,11 @@
 		%stack:drop() ; mov to retaddr
 	)
 }
-; call proc, void func, valued func - returns @stack:top()
+; call proc / func
 %macro call(name) {
 	%push(2) ; ret addr offset
 	strap
 	jmp proc_(%name)
-	%movptr(%G_STACK_PTR) ; mov retval
 }
 
 ; functions --------------------
@@ -114,7 +113,7 @@
 	mova %idx
 }
 
-; calling functions with constant arguments - possible retval @h
+; calling functions with constant arguments
 %macro callWith1Arg(name, arg) {
 	%push(%arg)
 	%call(%name)
