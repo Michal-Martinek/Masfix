@@ -6,6 +6,8 @@
 %include "io"
 %include "debug"
 
+:test_start
+
 %macro callOp(op, numerator, denominator) {
 	%stack:push(%numerator)
 	%stack:push(%denominator)
@@ -150,6 +152,15 @@ outc 10
 	outc 10
 }
 
+%macro showLabelOffset(label, retaddrLocation) {
+	ld %label
+	lds test_start
+	outur
+	mov %retaddrLocation
+	strs test_start
+	outc 10
+}
+
 %void_func {main, 0, 1,
 	%func_local(0)
 	str 66
@@ -173,10 +184,11 @@ outc 10
 		outc 76
 		outc 115
 	)
-	%print_endl(outu module_end)
-	%print_endl(outu test_return)
-	%print_endl(outu second_divide_return)
+	%showLabelOffset(module_end, 17)
+	%showLabelOffset(test_return, 23)
+	%showLabelOffset(second_divide_return, 32)
 
+	%stack:top()
 	%dumpStackOverrun(18)
 }
 
