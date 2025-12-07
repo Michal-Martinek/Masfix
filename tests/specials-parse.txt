@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1328
+:stderr 1504
 tests\specials-parse.mx:2:1 ERROR: Missing condition 'b'
 tests\specials-parse.mx:3:1 ERROR: Missing condition 'l'
 tests\specials-parse.mx:4:1 ERROR: Missing condition 'bd'
@@ -20,5 +20,7 @@ tests\specials-parse.mx:23:1 ERROR: This instruction should have no arguments 's
 tests\specials-parse.mx:24:1 ERROR: This instruction should have no arguments 'swap 5'
 tests\specials-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'swapa 5'
 tests\specials-parse.mx:26:1 ERROR: This instruction should have no arguments 'swapp 5'
+tests\specials-parse.mx:27:1 ERROR: This instruction should have no arguments 'swapra'
+tests\specials-parse.mx:28:1 ERROR: This instruction should have no arguments 'swapra 8'
 
 

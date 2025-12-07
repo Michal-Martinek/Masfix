@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1341
+:stderr 1754
 tests\input-parse.mx:8:1 ERROR: Input destination can be only r/m 'inch'
 tests\input-parse.mx:12:1 ERROR: Input destination can be only r/m 'inup'
 tests\input-parse.mx:14:1 ERROR: This instruction should have no arguments 'inlr'
@@ -14,9 +14,14 @@ tests\input-parse.mx:23:1 ERROR: This instruction cannot have a modifier 'inc|'
 tests\input-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'inla'
 tests\input-parse.mx:26:1 ERROR: This instruction cannot have a modifier 'inl&'
 tests\input-parse.mx:27:1 ERROR: This instruction cannot have a modifier 'inlsm'
-tests\input-parse.mx:30:1 ERROR: Unknown suffix 'ipcl'
-tests\input-parse.mx:33:1 ERROR: Input destination can be only r/m 'ipch'
-tests\input-parse.mx:34:1 ERROR: This instruction cannot have a modifier 'ipca 1'
-tests\input-parse.mx:35:1 ERROR: This instruction cannot have a modifier 'ipc<'
+tests\input-parse.mx:28:1 ERROR: This instruction should have no arguments 'inlrt 9'
+tests\input-parse.mx:31:1 ERROR: Unknown suffix 'ipcl'
+tests\input-parse.mx:34:1 ERROR: Input destination can be only r/m 'ipch'
+tests\input-parse.mx:35:1 ERROR: This instruction cannot have a modifier 'ipca 1'
+tests\input-parse.mx:36:1 ERROR: This instruction cannot have a modifier 'ipc<'
+tests\input-parse.mx:38:1 ERROR: Input destination can be only r/m 'inuh'
+tests\input-parse.mx:39:1 ERROR: This instruction cannot have any operation 'inuh|'
+tests\input-parse.mx:40:1 ERROR: This instruction cannot have any operation 'inuh| 7'
+tests\input-parse.mx:41:1 ERROR: This instruction cannot have an immediate 'inuh 7'
 
 

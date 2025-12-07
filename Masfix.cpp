@@ -1414,6 +1414,7 @@ bool checkSuffixCombination(Instr& instr) {
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
 		checkReturnOnFail(!instr.hasImm() && !instr.hasReg() && !instr.hasOp(), "This instruction should have no arguments", instr);
 	} else if (instr.instr == Iinc || instr.instr == Iinu || instr.instr == Iipc) {
+		checkReturnOnFail(!instr.hasOp(), "This instruction cannot have any operation", instr);
 		checkReturnOnFail(!instr.hasImm(), "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
