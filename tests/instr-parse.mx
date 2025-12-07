@@ -46,3 +46,22 @@ ld.m> 8
 ldeq
 ldeqp
 ldeq 9
+
+ldrge
+ldtge
+ldtmge
+
+; too much
+jmp
+jmpp
+jmppp 
+jmpppp
+jmppppp
+jmppppp 8
+
+strap
+strra
+strra 9
+strrap
+strrap 10
+

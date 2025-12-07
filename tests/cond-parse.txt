@@ -1,12 +1,12 @@
 :returncode 1
 
-:stderr 2432
+:stderr 2407
 tests\cond-parse.mx:17:1 ERROR: Missing condition 'l'
 tests\cond-parse.mx:18:1 ERROR: Missing condition 'la 5'
 tests\cond-parse.mx:19:1 ERROR: Missing condition 'lr'
 tests\cond-parse.mx:20:1 ERROR: Missing condition 'l eq'
 tests\cond-parse.mx:21:1 ERROR: Unexpected condition 'ldgt'
-tests\cond-parse.mx:22:1 ERROR: Max two letter suffixes are supported for now 'ldale'
+tests\cond-parse.mx:22:1 ERROR: Unexpected condition 'ldale'
 tests\cond-parse.mx:23:1 ERROR: Missing condition 'lt'
 tests\cond-parse.mx:25:1 ERROR: Target value expected 'ble'
 tests\cond-parse.mx:26:1 ERROR: Unknown suffix 'bleq'

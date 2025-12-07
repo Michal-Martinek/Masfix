@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8823
+:stderr 8792
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -124,7 +124,7 @@ tests\directive-definition.mx:145:2 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:194:1 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:6:1 ERROR: Unknown instruction 'dir'
 tests\directive-definition.mx:95:1 ERROR: Unknown instruction 'name'
-tests\directive-definition.mx:165:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
+tests\directive-definition.mx:165:1 ERROR: Unknown suffix 'ldbad'
 tests\directive-definition.mx:174:2 ERROR: Unknown condition 'somting'
 
 

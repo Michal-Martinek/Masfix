@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2262
+:stderr 2868
 tests\instr-parse.mx:2:1 ERROR: Unknown instruction 'fuhr'
 tests\instr-parse.mx:3:1 ERROR: Missing condition 'lu'
 tests\instr-parse.mx:4:2 ERROR: Missing condition 'li 85'
@@ -30,10 +30,20 @@ tests\instr-parse.mx:36:1 ERROR: Excessive immediate 'ldr 9'
 tests\instr-parse.mx:37:1 ERROR: Target value expected 'ld&'
 tests\instr-parse.mx:40:1 ERROR: Excessive immediate 'ld|r 8'
 tests\instr-parse.mx:41:1 ERROR: Missing immediate 'ldm>'
-tests\instr-parse.mx:43:1 ERROR: Max two letter suffixes are supported for now 'ld.m>'
-tests\instr-parse.mx:44:1 ERROR: Max two letter suffixes are supported for now 'ld.m> 8'
+tests\instr-parse.mx:43:1 ERROR: Missing immediate 'ld.m>'
 tests\instr-parse.mx:46:1 ERROR: Unexpected condition 'ldeq'
-tests\instr-parse.mx:47:1 ERROR: Max two letter suffixes are supported for now 'ldeqp'
+tests\instr-parse.mx:47:1 ERROR: Unexpected condition 'ldeqp'
 tests\instr-parse.mx:48:1 ERROR: Unexpected condition 'ldeq 9'
+tests\instr-parse.mx:50:1 ERROR: Unexpected condition 'ldrge'
+tests\instr-parse.mx:51:1 ERROR: Unexpected condition 'ldtge'
+tests\instr-parse.mx:52:1 ERROR: Max three letter suffix allowed 'ldtmge'
+tests\instr-parse.mx:55:1 ERROR: Target value expected 'jmp'
+tests\instr-parse.mx:57:1 ERROR: Unexpected register suffix 'jmppp'
+tests\instr-parse.mx:58:1 ERROR: Unexpected register suffix 'jmpppp'
+tests\instr-parse.mx:59:1 ERROR: Max three letter suffix allowed 'jmppppp'
+tests\instr-parse.mx:60:1 ERROR: Max three letter suffix allowed 'jmppppp 8'
+tests\instr-parse.mx:63:1 ERROR: Missing immediate 'strra'
+tests\instr-parse.mx:65:1 ERROR: Unexpected register suffix 'strrap'
+tests\instr-parse.mx:66:1 ERROR: Unexpected register suffix 'strrap 10'
 
 

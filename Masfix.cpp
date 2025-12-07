@@ -1347,7 +1347,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 		instr.suffixes.condReg = Rr; // default
 		returnOnFalse(parseCond(instr, s));
 	}
-	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
+	checkReturnOnFail(s.size() <= 3, "Max three letter suffix allowed", instr);
 	for (int i = 0; i < s.size(); ++i) {
 		char c = s.at(i);
 		if (CharToOp.count(c)) {

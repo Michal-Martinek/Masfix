@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1353
+:stderr 1328
 tests\specials-parse.mx:2:1 ERROR: Missing condition 'b'
 tests\specials-parse.mx:3:1 ERROR: Missing condition 'l'
 tests\specials-parse.mx:4:1 ERROR: Missing condition 'bd'
@@ -8,7 +8,7 @@ tests\specials-parse.mx:5:1 ERROR: Unknown condition 'bde'
 tests\specials-parse.mx:6:1 ERROR: Unknown suffix 'beqz'
 tests\specials-parse.mx:8:1 ERROR: Unexpected condition 'ldeq'
 tests\specials-parse.mx:9:1 ERROR: Unexpected condition 'jmpne'
-tests\specials-parse.mx:10:1 ERROR: Max two letter suffixes are supported for now 'movner'
+tests\specials-parse.mx:10:1 ERROR: Unexpected condition 'movner'
 tests\specials-parse.mx:12:1 ERROR: Target value expected 'beq'
 tests\specials-parse.mx:13:1 ERROR: Target value expected 'bne'
 tests\specials-parse.mx:16:1 ERROR: This instruction cannot have a modifier 'beqar'
