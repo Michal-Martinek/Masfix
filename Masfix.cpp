@@ -523,6 +523,12 @@ bool raiseError(string message, Instr instr, bool strict=false) {
 	addError(err, strict);
 	return false;
 }
+bool raiseWarning(string message, Instr instr) {
+	returnOnErrSupress();
+	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, false);
+	return false;
+}
 bool raiseError(string message, Loc loc, bool strict=false) {
 	returnOnErrSupress();
 	string err = loc.toStr() + " ERROR: " + message + "\n";
@@ -1407,6 +1413,10 @@ bool checkValidity(Instr& instr) {
 	}
 	if (InstrToModReg.count(instr.instr) == 0) {
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
+	} else {
+		if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
+			raiseWarning("No-OP instruction", instr);
+		}
 	}
 	RegNames condReg = instr.suffixes.condReg; CondNames cond = instr.suffixes.cond;
 	if (instr.instr == Ib || instr.instr == Il || instr.instr == Is) {
