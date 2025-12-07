@@ -1,8 +1,8 @@
 :returncode 1
 
-:stderr 1583
+:stderr 1561
 tests\imm-parse.mx:2:1 ERROR: Unknown suffix 'ld7'
-tests\imm-parse.mx:4:1 ERROR: Instrs must have only imm, or 1 reg for now 'stra'
+tests\imm-parse.mx:4:1 ERROR: Target value expected 'stra'
 tests\imm-parse.mx:6:1 ERROR: Only simple immediates for now 'str 5 mov'
 tests\imm-parse.mx:7:1 ERROR: Unknown suffix 'ld6 mov'
 tests\imm-parse.mx:8:1 ERROR: Unknown suffix 'ld7 str 5'

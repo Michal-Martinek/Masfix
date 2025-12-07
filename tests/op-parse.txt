@@ -1,12 +1,12 @@
 :returncode 1
 
 :stderr 1459
-tests\op-parse.mx:2:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|'
-tests\op-parse.mx:4:1 ERROR: Instrs must have only imm, or 1 reg for now 'str^'
+tests\op-parse.mx:2:1 ERROR: Target value expected 'str|'
+tests\op-parse.mx:4:1 ERROR: Target value expected 'str^'
 tests\op-parse.mx:6:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|r 5'
 tests\op-parse.mx:7:1 ERROR: Missing register for second operation 'str^&'
-tests\op-parse.mx:8:1 ERROR: Instrs must have only imm, or 1 reg for now 'strt'
-tests\op-parse.mx:10:1 ERROR: unimplemented 'strrt'
+tests\op-parse.mx:8:1 ERROR: Target value expected 'strt'
+tests\op-parse.mx:10:1 ERROR: Missing immediate 'strrt'
 tests\op-parse.mx:11:1 ERROR: Invalid instruction immediate 'str t'
 tests\op-parse.mx:12:1 ERROR: Unknown suffix 'str$ 5'
 tests\op-parse.mx:14:1 ERROR: Missing condition 'b|'

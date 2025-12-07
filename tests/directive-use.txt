@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 7153
+:stderr 7061
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -64,11 +64,11 @@ tests\directive-use.mx:183:8 ERROR: Unexpected token '420'
 tests\directive-use.mx:13:1 ERROR: Invalid instruction immediate 'mov defined3'
 tests\directive-use.mx:17:1 ERROR: Only simple immediates for now 'ld 8 3'
 tests\directive-use.mx:18:1 ERROR: Only simple immediates for now 'ld 1 9'
-tests\directive-use.mx:19:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
-tests\directive-use.mx:21:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
-tests\directive-use.mx:36:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
+tests\directive-use.mx:19:1 ERROR: Target value expected 'ld'
+tests\directive-use.mx:21:1 ERROR: Target value expected 'ld'
+tests\directive-use.mx:36:1 ERROR: Target value expected 'mov'
 tests\directive-use.mx:7:21 ERROR: Invalid instruction immediate 'ld insides'
-tests\directive-use.mx:38:1 ERROR: Instrs must have only imm, or 1 reg for now 'str'
+tests\directive-use.mx:38:1 ERROR: Target value expected 'str'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu _'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu labelInside1'
 tests\directive-use.mx:93:2 ERROR: Only simple immediates for now 'outu _ 5'

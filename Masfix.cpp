@@ -1418,8 +1418,13 @@ bool checkSuffixCombination(Instr& instr) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else {
-		checkReturnOnFail(instr.hasImm() ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
-		checkReturnOnFail(!instr.hasOp(), "unimplemented", instr);
+		// TODO if insta has condition
+		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
+		if (instr.hasOp()) {
+			checkReturnOnFail(instr.hasReg() && instr.hasImm(), "Missing immediate", instr)
+		} else {
+			checkReturnOnFail(instr.hasReg() ^ instr.hasImm(), "Excessive immediate", instr);
+		}
 	}
 	return true;
 }

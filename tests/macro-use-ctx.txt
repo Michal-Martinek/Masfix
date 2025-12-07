@@ -7,7 +7,7 @@ S1234
 S123456789
 S1234
 
-:stderr 4584
+:stderr 4540
 tests\macro-use-ctx.mx:17:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:18:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:21:8 ERROR: Unexpected token after macro use '%'
@@ -76,8 +76,8 @@ tests\macro-use-ctx.mx:121:9 ERROR: Unexpected token '6'
 tests\macro-use-ctx.mx:122:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:123:8 ERROR: Unexpected token ','
 tests\macro-use-ctx.mx:124:1 ERROR: Unexpected token '0'
-tests\macro-use-ctx.mx:72:1 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
-tests\macro-use-ctx.mx:74:5 ERROR: Instrs must have only imm, or 1 reg for now 'ld'
+tests\macro-use-ctx.mx:72:1 ERROR: Target value expected 'ld'
+tests\macro-use-ctx.mx:74:5 ERROR: Target value expected 'ld'
 tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 7 0'
 tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8 0'
 tests\macro-use-ctx.mx:98:28 ERROR: Unknown condition 'see 8'
