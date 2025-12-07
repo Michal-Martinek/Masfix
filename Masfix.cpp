@@ -373,17 +373,19 @@ struct Module {
 };
 
 struct Suffix {
-	// dest ?<operation>= <reg>/<imm>
+	// dest <modifier>? = <reg> <op> <imm>
 	RegNames condReg;
 	CondNames cond;
 	OpNames modifier;
 	RegNames reg;
+	OpNames op;
 
 	Suffix() {
 		condReg = Rno;
 		cond = Cno;
 		modifier = OPno;
 		reg = Rno;
+		op = OPno;
 	}
 };
 struct Instr {
@@ -404,6 +406,8 @@ struct Instr {
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
+	bool hasOp()  { return suffixes.op != OPno; }
+
 	string toStr() {
 		string out = opcodeStr;
 		for (string s : immFields) {
@@ -1334,27 +1338,35 @@ bool parseCond(Instr& instr, string& s) {
 	instr.suffixes.cond = StrToCond[cond];
 	return true;
 }
+#define assignSuffix(field, empty, value, error) \
+	checkReturnOnFail(field == empty, error, instr); \
+	field = value;
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
-	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7 && sizeof(Suffix) == 4 * 5, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
 		returnOnFalse(parseCond(instr, s));
 	}
 	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
-	if (s.size() == 1) {
-		char c = s.at(0);
-		if (CharToReg.count(c) == 1) {
-			instr.suffixes.reg = CharToReg[c];
-		} else if (CharToOp.count(c) == 1) {
-			instr.suffixes.modifier = CharToOp[c];
+	for (int i = 0; i < s.size(); ++i) {
+		char c = s.at(i);
+		if (CharToOp.count(c)) {
+			if (i == 0) {
+				instr.suffixes.modifier = CharToOp[c];
+			} else {
+				if (instr.hasMod()) {
+					checkReturnOnFail(instr.hasReg(), "Missing register for second operation", instr);
+				} else {
+					checkReturnOnFail(instr.hasReg(), "Missing register for operation", instr);
+				}
+				assignSuffix(instr.suffixes.op, OPno, CharToOp[c], "Unexpected operation suffix");
+			}
+		} else if (CharToReg.count(c)) {
+			assignSuffix(instr.suffixes.reg, Rno, CharToReg[c], "Unexpected register suffix");
 		} else {
-			checkReturnOnFail(false, "Unknown suffix", instr);
+			checkReturnOnFail(StrToCond.count(s.substr(i, 2)) == 0, "Unexpected condition", instr);
+			return check(false, "Unknown suffix", instr);
 		}
-	} else if (s.size() == 2) {
-		checkReturnOnFail(CharToOp.count(s.at(0)) == 1, "The first suffix must be an operation", instr);
-		checkReturnOnFail(CharToReg.count(s.at(1)) == 1, "The second suffix must be a register", instr);
-		instr.suffixes.modifier = CharToOp[s.at(0)];
-		instr.suffixes.reg = CharToReg[s.at(1)];
 	}
 	return true;
 }
@@ -1397,12 +1409,9 @@ bool parseInstrFields(Instr& instr) {
 	}
 	return true;
 }
-// checks if the instr has correct combination of suffixes and immediates
-bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
-	if (instr.instr == InstructionCount) unreachable();
+bool checkSuffixCombination(Instr& instr) {
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
-		checkReturnOnFail(!instr.hasImm() && !instr.hasReg(), "This instruction should have no arguments", instr);
+		checkReturnOnFail(!instr.hasImm() && !instr.hasReg() && !instr.hasOp(), "This instruction should have no arguments", instr);
 	} else if (instr.instr == Iinc || instr.instr == Iinu || instr.instr == Iipc) {
 		checkReturnOnFail(!instr.hasImm(), "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
@@ -1410,8 +1419,16 @@ bool checkValidity(Instr& instr) {
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else {
 		checkReturnOnFail(instr.hasImm() ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+		checkReturnOnFail(!instr.hasOp(), "unimplemented", instr);
 	}
-	if (InstrToModReg.count(instr.instr) == 0) {
+	return true;
+}
+// checks if the instr has correct combination of suffixes and immediates
+bool checkValidity(Instr& instr) {
+	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	assert(instr.instr != InstructionCount);
+	returnOnFalse(checkSuffixCombination(instr));
+	if (InstrToModReg.count(instr.instr) == 0) { // TODO modifier above other suffixes
 		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
 	} else {
 		if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {

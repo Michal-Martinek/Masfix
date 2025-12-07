@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1742
+:stderr 1744
 tests\instr-parse.mx:2:1 ERROR: Unknown instruction 'fuhr'
 tests\instr-parse.mx:3:1 ERROR: Missing condition 'lu'
 tests\instr-parse.mx:4:2 ERROR: Missing condition 'li 85'
@@ -18,8 +18,8 @@ tests\instr-parse.mx:18:1 ERROR: This instruction cannot have a modifier 'outuar
 tests\instr-parse.mx:19:1 ERROR: This instruction cannot have a modifier 'outcsm'
 tests\instr-parse.mx:20:1 ERROR: Instrs must have only imm, or 1 reg for now 'outcsm 5'
 tests\instr-parse.mx:22:1 ERROR: Instrs must have only imm, or 1 reg for now 'strr 8'
-tests\instr-parse.mx:24:1 ERROR: The second suffix must be a register 'strsa'
-tests\instr-parse.mx:26:1 ERROR: The second suffix must be a register 'straa'
+tests\instr-parse.mx:24:1 ERROR: Missing register for second operation 'strsa'
+tests\instr-parse.mx:26:1 ERROR: Missing register for second operation 'straa'
 tests\instr-parse.mx:27:1 ERROR: Instrs must have only imm, or 1 reg for now 'strar 5'
 tests\instr-parse.mx:28:1 ERROR: Invalid instruction immediate 'strar a'
 tests\instr-parse.mx:29:1 ERROR: Instrs must have only imm, or 1 reg for now 'strar 10'

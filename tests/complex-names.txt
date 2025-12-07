@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2773
+:stderr 2774
 tests\complex-names.mx:41:4 ERROR: Directive must not continue
 tests\complex-names.mx:42:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Expected label field
@@ -36,7 +36,7 @@ tests\complex-names.mx:41:1 ERROR: Instrs must have only imm, or 1 reg for now '
 tests\complex-names.mx:46:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
 tests\complex-names.mx:49:1 ERROR: Instrs must have only imm, or 1 reg for now 'mov'
 tests\complex-names.mx:51:1 ERROR: Unknown instruction 'jm p 4'
-tests\complex-names.mx:54:1 ERROR: The second suffix must be a register 'strts'
+tests\complex-names.mx:54:1 ERROR: Missing register for second operation 'strts'
 tests\complex-names.mx:55:1 ERROR: Instrs must have only imm, or 1 reg for now 'smge'
 tests\complex-names.mx:56:1 ERROR: Instrs must have only imm, or 1 reg for now 'bmeqm 15'
 tests\complex-names.mx:61:1 ERROR: Unknown instruction 'dll'
