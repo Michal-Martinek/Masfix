@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2076
+:stderr 2009
 tests\label-def.mx:6:2 ERROR: Missing label name
 tests\label-def.mx:8:1 ERROR: Missing label name
 tests\label-def.mx:9:2 ERROR: Missing label name
@@ -28,7 +28,6 @@ tests\label-def.mx:56:1 ERROR: Invalid label name 'ld>r'
 tests\label-def.mx:58:1 ERROR: Name shadows an instruction 'mov'
 tests\label-def.mx:59:1 ERROR: Name shadows an instruction 'ldam'
 tests\label-def.mx:62:1 ERROR: Name shadows an instruction 'swap'
-tests\label-def.mx:63:1 ERROR: Name shadows an instruction 'swapa'
 tests\label-def.mx:69:2 ERROR: Missing label name
 tests\label-def.mx:14:4 ERROR: Unknown condition 'lab2'
 tests\label-def.mx:27:5 ERROR: Missing condition 'b'

@@ -1,25 +1,25 @@
 :returncode 1
 
-:stderr 1459
+:stderr 1367
 tests\op-parse.mx:2:1 ERROR: Target value expected 'str|'
 tests\op-parse.mx:4:1 ERROR: Target value expected 'str^'
-tests\op-parse.mx:6:1 ERROR: Instrs must have only imm, or 1 reg for now 'str|r 5'
+tests\op-parse.mx:6:1 ERROR: Excessive immediate 'str|r 5'
 tests\op-parse.mx:7:1 ERROR: Missing register for second operation 'str^&'
 tests\op-parse.mx:8:1 ERROR: Target value expected 'strt'
 tests\op-parse.mx:10:1 ERROR: Missing immediate 'strrt'
 tests\op-parse.mx:11:1 ERROR: Invalid instruction immediate 'str t'
 tests\op-parse.mx:12:1 ERROR: Unknown suffix 'str$ 5'
 tests\op-parse.mx:14:1 ERROR: Missing condition 'b|'
-tests\op-parse.mx:15:1 ERROR: Instrs must have only imm, or 1 reg for now 'beq|'
+tests\op-parse.mx:15:1 ERROR: This instruction cannot have a modifier 'beq|'
 tests\op-parse.mx:16:1 ERROR: This instruction cannot have a modifier 'bne& 5'
 tests\op-parse.mx:18:1 ERROR: This instruction cannot have a modifier 'bgtt 6'
-tests\op-parse.mx:20:1 ERROR: Instrs must have only imm, or 1 reg for now 'blt^'
+tests\op-parse.mx:20:1 ERROR: This instruction cannot have a modifier 'blt^'
 tests\op-parse.mx:21:1 ERROR: This instruction cannot have a modifier 'ble^p'
-tests\op-parse.mx:22:1 ERROR: Instrs must have only imm, or 1 reg for now 'bne|r 5'
-tests\op-parse.mx:23:1 ERROR: Missing register for second operation 'lgt^&'
+tests\op-parse.mx:22:1 ERROR: This instruction cannot have a modifier 'bne|r 5'
+tests\op-parse.mx:23:1 ERROR: This instruction cannot have a modifier 'lgt^&'
 tests\op-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'bgeth'
 tests\op-parse.mx:26:1 ERROR: This instruction cannot have a modifier 'slttr'
-tests\op-parse.mx:27:1 ERROR: unimplemented 'sgert'
+tests\op-parse.mx:27:1 ERROR: Missing immediate 'sgert'
 tests\op-parse.mx:28:1 ERROR: Invalid instruction immediate 'sge t'
 
 

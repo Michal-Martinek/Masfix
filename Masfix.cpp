@@ -1352,6 +1352,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 		char c = s.at(i);
 		if (CharToOp.count(c)) {
 			if (i == 0) {
+				checkReturnOnFail(InstrToModReg.count(instr.instr), "This instruction cannot have a modifier", instr);
 				instr.suffixes.modifier = CharToOp[c];
 			} else {
 				if (instr.hasMod()) {
@@ -1418,7 +1419,6 @@ bool checkSuffixCombination(Instr& instr) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else {
-		// TODO if insta has condition
 		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
 		if (instr.hasOp()) {
 			checkReturnOnFail(instr.hasReg() && instr.hasImm(), "Missing immediate", instr)
@@ -1433,12 +1433,8 @@ bool checkValidity(Instr& instr) {
 	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr != InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
-	if (InstrToModReg.count(instr.instr) == 0) { // TODO modifier above other suffixes
-		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
-	} else {
-		if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
-			raiseWarning("No-OP instruction", instr);
-		}
+	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
+		raiseWarning("No-OP instruction", instr);
 	}
 	RegNames condReg = instr.suffixes.condReg; CondNames cond = instr.suffixes.cond;
 	if (instr.instr == Ib || instr.instr == Il || instr.instr == Is) {

@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 7061
+:stderr 7065
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'

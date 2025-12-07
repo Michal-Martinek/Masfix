@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1744
+:stderr 1514
 tests\instr-parse.mx:2:1 ERROR: Unknown instruction 'fuhr'
 tests\instr-parse.mx:3:1 ERROR: Missing condition 'lu'
 tests\instr-parse.mx:4:2 ERROR: Missing condition 'li 85'
@@ -16,7 +16,7 @@ tests\instr-parse.mx:15:1 ERROR: Target value expected 'outc'
 tests\instr-parse.mx:17:1 ERROR: Unknown instruction 'outa 5'
 tests\instr-parse.mx:18:1 ERROR: This instruction cannot have a modifier 'outuar'
 tests\instr-parse.mx:19:1 ERROR: This instruction cannot have a modifier 'outcsm'
-tests\instr-parse.mx:20:1 ERROR: Instrs must have only imm, or 1 reg for now 'outcsm 5'
+tests\instr-parse.mx:20:1 ERROR: This instruction cannot have a modifier 'outcsm 5'
 tests\instr-parse.mx:22:1 ERROR: Excessive immediate 'strr 8'
 tests\instr-parse.mx:24:1 ERROR: Missing register for second operation 'strsa'
 tests\instr-parse.mx:26:1 ERROR: Missing register for second operation 'straa'

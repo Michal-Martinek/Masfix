@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1399
+:stderr 1353
 tests\specials-parse.mx:2:1 ERROR: Missing condition 'b'
 tests\specials-parse.mx:3:1 ERROR: Missing condition 'l'
 tests\specials-parse.mx:4:1 ERROR: Missing condition 'bd'
@@ -9,8 +9,8 @@ tests\specials-parse.mx:6:1 ERROR: Unknown suffix 'beqz'
 tests\specials-parse.mx:8:1 ERROR: Unexpected condition 'ldeq'
 tests\specials-parse.mx:9:1 ERROR: Unexpected condition 'jmpne'
 tests\specials-parse.mx:10:1 ERROR: Max two letter suffixes are supported for now 'movner'
-tests\specials-parse.mx:12:1 ERROR: Instrs must have only imm, or 1 reg for now 'beq'
-tests\specials-parse.mx:13:1 ERROR: Instrs must have only imm, or 1 reg for now 'bne'
+tests\specials-parse.mx:12:1 ERROR: Target value expected 'beq'
+tests\specials-parse.mx:13:1 ERROR: Target value expected 'bne'
 tests\specials-parse.mx:16:1 ERROR: This instruction cannot have a modifier 'beqar'
 tests\specials-parse.mx:17:1 ERROR: This instruction cannot have a modifier 'bnea 5'
 tests\specials-parse.mx:18:1 ERROR: Missing condition 'ba'
@@ -18,7 +18,7 @@ tests\specials-parse.mx:21:1 ERROR: Unknown condition 'swa'
 tests\specials-parse.mx:22:1 ERROR: This instruction cannot have a modifier 'swapa'
 tests\specials-parse.mx:23:1 ERROR: This instruction should have no arguments 'swapr'
 tests\specials-parse.mx:24:1 ERROR: This instruction should have no arguments 'swap 5'
-tests\specials-parse.mx:25:1 ERROR: This instruction should have no arguments 'swapa 5'
+tests\specials-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'swapa 5'
 tests\specials-parse.mx:26:1 ERROR: This instruction should have no arguments 'swapp 5'
 
 
