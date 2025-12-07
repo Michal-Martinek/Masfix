@@ -154,3 +154,15 @@ ldam
 ld> 2
 outur
 outc 10
+
+; 3 letter instrs
+mov 773
+ld 4080
+str 9949
+ldsht 5 ; 215
+outur
+
+outc 32
+str&m> 10 ; m && 9
+outum
+outc 10

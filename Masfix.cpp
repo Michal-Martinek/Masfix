@@ -1702,16 +1702,20 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 }
 void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
-	// intermediate values - first - rbx, second - rcx
+	// operands - first - rbx, second - rcx (also result of operation)
 	// addr of cells[0] - r13
 	// responsibilities for clamping and register preserving:
 	// each operation, register fetch or instr body must touch only appropriate architecture registers, others must be left unchanged
 	// also, they need to make sure all changed architecture regs, intermediate value registers and the memory /
 	//		is clamped to the right bitsize and contains a valid value
+	if (instr.hasReg()) {
+		genRegisterFetch(outFile, instr.suffixes.reg, instrNum, !instr.hasOp());
+	}
 	if (instr.hasImm()) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
-	} else if (instr.hasReg()) {
-		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
+	}
+	if (instr.hasOp()) {
+		genOperation(outFile, instr.suffixes.op);
 	}
 	if (instr.hasMod()) {
 		genRegisterFetch(outFile, InstrToModReg[instr.instr], instrNum, false);
