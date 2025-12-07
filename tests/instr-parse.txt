@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1514
+:stderr 2262
 tests\instr-parse.mx:2:1 ERROR: Unknown instruction 'fuhr'
 tests\instr-parse.mx:3:1 ERROR: Missing condition 'lu'
 tests\instr-parse.mx:4:2 ERROR: Missing condition 'li 85'
@@ -24,5 +24,16 @@ tests\instr-parse.mx:27:1 ERROR: Excessive immediate 'strar 5'
 tests\instr-parse.mx:28:1 ERROR: Invalid instruction immediate 'strar a'
 tests\instr-parse.mx:29:1 ERROR: Excessive immediate 'strar 10'
 tests\instr-parse.mx:31:1 ERROR: Target value expected 'mov'
+tests\instr-parse.mx:33:1 ERROR: Target value expected 'ld'
+tests\instr-parse.mx:35:1 WARNING: No-OP instruction 'ldr'
+tests\instr-parse.mx:36:1 ERROR: Excessive immediate 'ldr 9'
+tests\instr-parse.mx:37:1 ERROR: Target value expected 'ld&'
+tests\instr-parse.mx:40:1 ERROR: Excessive immediate 'ld|r 8'
+tests\instr-parse.mx:41:1 ERROR: Missing immediate 'ldm>'
+tests\instr-parse.mx:43:1 ERROR: Max two letter suffixes are supported for now 'ld.m>'
+tests\instr-parse.mx:44:1 ERROR: Max two letter suffixes are supported for now 'ld.m> 8'
+tests\instr-parse.mx:46:1 ERROR: Unexpected condition 'ldeq'
+tests\instr-parse.mx:47:1 ERROR: Max two letter suffixes are supported for now 'ldeqp'
+tests\instr-parse.mx:48:1 ERROR: Unexpected condition 'ldeq 9'
 
 
