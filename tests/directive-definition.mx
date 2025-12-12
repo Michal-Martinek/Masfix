@@ -117,7 +117,7 @@ name
 	%b
 %define hash #
 
-%define lab :here_label
+%define lab1 :here_label
 %define lab2 here_macro_def
 
 %define used_var %def1
@@ -200,12 +200,12 @@ ldbad
 	%namespace ok{}
 	%namespace next_line
 	{}
-	%namespace lab :label
+	%namespace labl :label
 	%namespace dir %body
 	%namespace sep,
 	%namespace sep :
 	%namespace num 8
-	%namespace sepd {:lab}
+	%namespace sepd {:label}
 }
 
 ; trailing define

@@ -116,10 +116,15 @@ enum CondNames {
 	Cgt,
 	Cge,
 
+	Cab,
+	Cae,
+	Cbl,
+	Cbe,
+
 	Cno,
 	ConditionCount
 };
-static_assert(ConditionCount == 7, "Exhaustive StrToCond definition");
+static_assert(ConditionCount == 11, "Exhaustive StrToCond definition");
 map<string, CondNames> StrToCond = {
 {"eq", Ceq},
 {"ne", Cne},
@@ -127,6 +132,11 @@ map<string, CondNames> StrToCond = {
 {"le", Cle},
 {"gt", Cgt},
 {"ge", Cge},
+
+{"ab", Cab},
+{"ae", Cae},
+{"bl", Cbl},
+{"be", Cbe},
 };
 enum InstrNames {
 	Imov,
@@ -1342,7 +1352,7 @@ bool parseCond(Instr& instr, string& s) {
 	checkReturnOnFail(field == empty, error, instr); \
 	field = value;
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
-	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7 && sizeof(Suffix) == 4 * 5, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
 		returnOnFalse(parseCond(instr, s));
@@ -1485,16 +1495,21 @@ unsigned short interpOperation(VM& vm, OpNames op, unsigned short left, unsigned
 	else unreachable();
 }
 bool interpCond(VM& vm, Instr& instr, signed short target) {
-	static_assert(ConditionCount == 7, "Exhaustive interpCond definition");
-	short reg = (signed short) interpGetReg(vm, instr.suffixes.condReg);
+	static_assert(ConditionCount == 11, "Exhaustive interpCond definition");
+	signed short ireg = interpGetReg(vm, instr.suffixes.condReg);
+	unsigned short ureg = interpGetReg(vm, instr.suffixes.condReg);
 	if (instr.instr == Ib) target = 0;
 
-	if (instr.suffixes.cond == Ceq) return reg == target;
-	if (instr.suffixes.cond == Cne) return reg != target;
-	if (instr.suffixes.cond == Clt) return reg <  target;
-	if (instr.suffixes.cond == Cle) return reg <= target;
-	if (instr.suffixes.cond == Cgt) return reg >  target;
-	if (instr.suffixes.cond == Cge) return reg >= target;
+	if (instr.suffixes.cond == Ceq) return ireg == target;
+	if (instr.suffixes.cond == Cne) return ireg != target;
+	if (instr.suffixes.cond == Clt) return ireg <  target;
+	if (instr.suffixes.cond == Cle) return ireg <= target;
+	if (instr.suffixes.cond == Cgt) return ireg >  target;
+	if (instr.suffixes.cond == Cge) return ireg >= target;
+	if (instr.suffixes.cond == Cab) return ureg >  (unsigned short)target;
+	if (instr.suffixes.cond == Cae) return ureg >= (unsigned short)target;
+	if (instr.suffixes.cond == Cbl) return ureg <  (unsigned short)target;
+	if (instr.suffixes.cond == Cbe) return ureg <= (unsigned short)target;
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
@@ -1541,8 +1556,13 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	else unreachable();
 }
 void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
+	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
 	unsigned short left, right;
 	if (instr.hasImm()) right = instr.immediate;
+	if (instr.hasOp()) {
+		left = interpGetReg(vm, instr.suffixes.reg);
+		right = interpOperation(vm, instr.suffixes.op, left, right);
+	}
 	else if (instr.hasReg()) right = interpGetReg(vm, instr.suffixes.reg);
 
 	if (instr.hasMod()) {
@@ -1613,7 +1633,7 @@ void genOperation(ofstream& outFile, OpNames op) {
 		unreachable();
 	}
 }
-static_assert(ConditionCount == 7, "Exhaustive _jmpInstr definition");
+static_assert(ConditionCount == 11, "Exhaustive _jmpInstr definition");
 map<CondNames, string> _jmpInstr {
 	{Ceq, "jne"},
 	{Cne, "je"},
@@ -1621,18 +1641,28 @@ map<CondNames, string> _jmpInstr {
 	{Cle, "jg"},
 	{Cgt, "jle"},
 	{Cge, "js"},
+
+	{Cab, "jbe"},
+	{Cae, "jb"},
+	{Cbl, "jae"},
+	{Cbe, "ja"},
 };
-static_assert(ConditionCount == 7, "Exhaustive _condLoadInstr definition");
+static_assert(ConditionCount == 11, "Exhaustive _condLoadInstr definition");
 map<CondNames, string> _condLoadInstr {
 	{Ceq, "sete"},
 	{Cne, "setne"},
-	{Clt, "sets"},
+	{Clt, "setl"},
 	{Cle, "setle"},
 	{Cgt, "setg"},
-	{Cge, "setns"},
+	{Cge, "setge"},
+
+	{Cab, "seta"},
+	{Cae, "setae"},
+	{Cbl, "setb"},
+	{Cbe, "setbe"},
 };
 void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames cond, int instrNum) {
-	static_assert(ConditionCount == 7, "Exhaustive genCond definition");
+	static_assert(ConditionCount == 11, "Exhaustive genCond definition");
 	genRegisterFetch(outFile, condReg, -1, false);
 	if (instr == Ib) {
 		outFile << "	cmp bx, 0\n"

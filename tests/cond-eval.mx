@@ -1,6 +1,7 @@
 ; tests all conditions and branches
 %include "memory"
 %include "control"
+%include "io"
 
 ; print condition headers
 outc 101
@@ -20,27 +21,55 @@ outc 116
 outc 124
 outc 103
 outc 101
+outc 124
+outc 97
+outc 98
+outc 124
+outc 97
+outc 101
+outc 124
+outc 98
+outc 108
+outc 124
+outc 98
+outc 101
+outc 10
 outc 10
 
 ; memory
-%define currTested 8
-%define stage1done 10
-%define strTemp 11
+%define currTested 10
+%define curr_rhs 11
+%define stage1done 12
+%define strTemp 13
 
 %store(%currTested, 0)
 %store(%stage1done, 0)
 
 
 %macro testCond(cond, rhs, end) {
-	%load(%currTested)
-	ld 65535
-	lm(%cond) 0 ;%rhs
+	%if_else { ld %rhs,
+		%load(%curr_rhs)
+		mov %currTested
+		lm(%cond)r
+	,
+		mov %currTested
+		ld 65535 ; trash -> output
+		lm(%cond) 0
+	}
 	%stack:pushr()
 
-	%load(%currTested)
-	mov %strTemp
-	str 65535
-	s(%cond) 0 ;%rhs
+	%if_else { ld %rhs,
+		%load(%curr_rhs)
+		%storer(%strTemp)
+		%load(%currTested)
+		mov %strTemp
+		sr(%cond)m
+	,
+		%store(%strTemp, 65535)
+		%load(%currTested)
+		mov %strTemp
+		s(%cond) 0
+	}
 	%stack:pushm()
 
 	%stack:push(branch_ret_(%cond)(%rhs))
@@ -59,11 +88,38 @@ outc 10
 	}
 }
 
-mov %currTested
-outum
-outc 10
+:set_start
+%stack:push(1)
+; set rhs
+%define rhs_offset 2
+%load(%currTested)
+lda %rhs_offset
+%storer(%curr_rhs)
+jmp loop_header
 
 :loop
+%stack:push(0)
+
+:loop_header
+%if { %stack:pop(),
+	mov %currTested
+	outum
+	outc 58
+	outc 9
+	outc 9
+	outc 114
+	outc 104
+	outc 115
+	outc 58
+	outc 32
+	outu 0
+	outc 32
+	outc 47
+	outc 32
+	%load(%curr_rhs)
+	%outir()
+	outc 10
+}
 
 ; tests
 %testCond(eq, 0, 0)
@@ -77,8 +133,16 @@ outc 10
 %testCond(gt, 0, 0)
 %testCond(gt, 1, 124)
 %testCond(ge, 0, 0)
-%testCond(ge, 1, 10)
-
+%testCond(ge, 1, 124)
+%testCond(ab, 0, 0)
+%testCond(ab, 1, 124)
+%testCond(ae, 0, 0)
+%testCond(ae, 1, 124)
+%testCond(bl, 0, 0)
+%testCond(bl, 1, 124)
+%testCond(be, 0, 0)
+%testCond(be, 1, 10)
+; NOTE bug when comparing int min (1000..) lt 1 -> 0
 
 ; increments
 mov %currTested
@@ -89,12 +153,9 @@ lds 6
 bne stage1_end
 outc 10
 str 32765
-outum
-outc 10
 
 %store(%stage1done, 1)
-mov %currTested
-jmp loop
+jmp set_start
 
 :stage1_end
 ldm
@@ -102,9 +163,7 @@ lds 32771
 bne stage2_end
 outc 10
 str 65533
-outum
-outc 10
-jmp loop
+jmp set_start
 
 :stage2_end
 lmeq 3 ; end if (curr == 2) && stage1_done
@@ -139,5 +198,6 @@ jmp branch_ret
 	outc 69
 
 :branch_ret
-mova 1
+%stack:over(0)
+mova 3
 jmpm

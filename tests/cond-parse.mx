@@ -6,13 +6,13 @@ lle 5
 lgt 5
 lge 5
 
-:lab
-beq lab
-bne lab
-blt lab
-ble lab
-bgt lab
-bge lab
+:label
+beq label
+bne label
+blt label
+ble label
+bgt label
+bge label
 
 l
 la 5
@@ -34,9 +34,9 @@ lmle 5
 lmgt 5
 lmge 5
 
-bmeq lab
-bmgt lab
-bmge lab
+bmeq label
+bmgt label
+bmge label
 
 lpeq
 bhge
