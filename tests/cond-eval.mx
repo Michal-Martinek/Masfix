@@ -1,4 +1,6 @@
 ; tests all conditions and branches
+%include "memory"
+%include "control"
 
 ; print condition headers
 outc 101
@@ -21,86 +23,65 @@ outc 101
 outc 10
 
 ; memory
-mov 0 ; curr tested
-str 0
-mov 1 ; bool - stage 1 done
-str 0
-mov 0
-	; 2 - branch test ret addr
-	; 3 - test for s<cond> instr
+%define currTested 8
+%define stage1done 10
+%define strTemp 11
 
+%store(%currTested, 0)
+%store(%stage1done, 0)
+
+
+%macro testCond(cond, rhs, end) {
+	%load(%currTested)
+	ld 65535
+	lm(%cond) 0 ;%rhs
+	%stack:pushr()
+
+	%load(%currTested)
+	mov %strTemp
+	str 65535
+	s(%cond) 0 ;%rhs
+	%stack:pushm()
+
+	%stack:push(branch_ret_(%cond)(%rhs))
+	%if_else { ld %rhs,
+		%stack:over(1) ; if nonzero rhs - cannot test branch: emulate answer from s ^
+		ldm
+		jmp branch_end
+	,
+		%load(%currTested)
+		bm(%cond) branch_true
+		jmp branch_false
+	}
+:branch_ret_(%cond)(%rhs)
+	%if { ld %end,
+		outc %end
+	}
+}
+
+mov %currTested
 outum
 outc 10
 
 :loop
 
 ; tests
-; TODO use macros, test properly all Il, Ib, Is; against not only 0
-mov 2
-strp
-mov 0
-ld 65535
-lmeq 0
-outur
-bmeq branch_true
-jmp branch_false
-outc 124
+%testCond(eq, 0, 0)
+%testCond(eq, 1, 124)
+%testCond(ne, 0, 0)
+%testCond(ne, 1, 124)
+%testCond(lt, 0, 0)
+%testCond(lt, 1, 124)
+%testCond(le, 0, 0)
+%testCond(le, 1, 124)
+%testCond(gt, 0, 0)
+%testCond(gt, 1, 124)
+%testCond(ge, 0, 0)
+%testCond(ge, 1, 10)
 
-mov 0
-ldm
-mov 2
-strp
-mov 3
-str 65535
-sne 0
-outum
-bne branch_true
-jmp branch_false
-outc 124
-
-mov 2
-strp
-mov 0
-ld 65535
-lmlt 0
-outur
-bmlt branch_true
-jmp branch_false
-outc 124
-
-mov 2
-strp
-mov 0
-ld 65535
-lmle 0
-outur
-bmle branch_true
-jmp branch_false
-outc 124
-
-mov 0
-ldm
-mov 2
-strp
-mov 3
-str 65535
-sgt 0
-outum
-bgt branch_true
-jmp branch_false
-outc 124
-
-mov 2
-strp
-mov 0
-ld 65535
-lmge 0
-outur
-bmge branch_true
-jmp branch_false
-outc 10
 
 ; increments
+mov %currTested
 stra 1
 
 ldm
@@ -111,9 +92,8 @@ str 32765
 outum
 outc 10
 
-mov 1 ; stage 1 done
-str 1
-mov 0
+%store(%stage1done, 1)
+mov %currTested
 jmp loop
 
 :stage1_end
@@ -128,23 +108,36 @@ jmp loop
 
 :stage2_end
 lmeq 3 ; end if (curr == 2) && stage1_done
-mov 1
+mov %stage1done
 ld&m
-mov 0
 beq loop
 jmp end
 
 ; branch outcomes
 :branch_true
-outu 1
-jmp branch_ret
+ld 1
+jmp branch_end
 
 :branch_false
-outu 0
+ld 0
+
+%macro compare() {
+	ldsm
+	bne error
+	ldm
+}
+:branch_end
+%stack:dropN(2)
+%stack:drop()
+%compare()
+mova 1
+%compare()
+outur
+jmp branch_ret
+
+:error
+	outc 69
 
 :branch_ret
-mov 2
-ldm
-mov 0
-lda 7 ; jump to outc '|' out there
-jmpr
+mova 1
+jmpm
