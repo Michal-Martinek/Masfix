@@ -116,10 +116,15 @@ enum CondNames {
 	Cgt,
 	Cge,
 
+	Cab,
+	Cae,
+	Cbl,
+	Cbe,
+
 	Cno,
 	ConditionCount
 };
-static_assert(ConditionCount == 7, "Exhaustive StrToCond definition");
+static_assert(ConditionCount == 11, "Exhaustive StrToCond definition");
 map<string, CondNames> StrToCond = {
 {"eq", Ceq},
 {"ne", Cne},
@@ -127,6 +132,11 @@ map<string, CondNames> StrToCond = {
 {"le", Cle},
 {"gt", Cgt},
 {"ge", Cge},
+
+{"ab", Cab},
+{"ae", Cae},
+{"bl", Cbl},
+{"be", Cbe},
 };
 enum InstrNames {
 	Imov,
@@ -373,17 +383,19 @@ struct Module {
 };
 
 struct Suffix {
-	// dest ?<operation>= <reg>/<imm>
+	// dest <modifier>? = <reg> <op> <imm>
 	RegNames condReg;
 	CondNames cond;
 	OpNames modifier;
 	RegNames reg;
+	OpNames op;
 
 	Suffix() {
 		condReg = Rno;
 		cond = Cno;
 		modifier = OPno;
 		reg = Rno;
+		op = OPno;
 	}
 };
 struct Instr {
@@ -404,6 +416,8 @@ struct Instr {
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
+	bool hasOp()  { return suffixes.op != OPno; }
+
 	string toStr() {
 		string out = opcodeStr;
 		for (string s : immFields) {
@@ -521,6 +535,12 @@ bool raiseError(string message, Instr instr, bool strict=false) {
 	returnOnErrSupress();
 	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
 	addError(err, strict);
+	return false;
+}
+bool raiseWarning(string message, Instr instr) {
+	returnOnErrSupress();
+	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) "\n";
+	addError(err, false);
 	return false;
 }
 bool raiseError(string message, Loc loc, bool strict=false) {
@@ -1328,27 +1348,36 @@ bool parseCond(Instr& instr, string& s) {
 	instr.suffixes.cond = StrToCond[cond];
 	return true;
 }
+#define assignSuffix(field, empty, value, error) \
+	checkReturnOnFail(field == empty, error, instr); \
+	field = value;
 bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
-	static_assert(RegisterCount == 5 && OperationCount == 10 && ConditionCount == 7, "Exhaustive parseSuffixes definition");
+	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive parseSuffixes definition");
 	if (condExpected) {
 		instr.suffixes.condReg = Rr; // default
 		returnOnFalse(parseCond(instr, s));
 	}
-	checkReturnOnFail(s.size() <= 2, "Max two letter suffixes are supported for now", instr);
-	if (s.size() == 1) {
-		char c = s.at(0);
-		if (CharToReg.count(c) == 1) {
-			instr.suffixes.reg = CharToReg[c];
-		} else if (CharToOp.count(c) == 1) {
-			instr.suffixes.modifier = CharToOp[c];
+	checkReturnOnFail(s.size() <= 3, "Max three letter suffix allowed", instr);
+	for (int i = 0; i < s.size(); ++i) {
+		char c = s.at(i);
+		if (CharToOp.count(c)) {
+			if (i == 0) {
+				checkReturnOnFail(InstrToModReg.count(instr.instr), "This instruction cannot have a modifier", instr);
+				instr.suffixes.modifier = CharToOp[c];
+			} else {
+				if (instr.hasMod()) {
+					checkReturnOnFail(instr.hasReg(), "Missing register for second operation", instr);
+				} else {
+					checkReturnOnFail(instr.hasReg(), "Missing register for operation", instr);
+				}
+				assignSuffix(instr.suffixes.op, OPno, CharToOp[c], "Unexpected operation suffix");
+			}
+		} else if (CharToReg.count(c)) {
+			assignSuffix(instr.suffixes.reg, Rno, CharToReg[c], "Unexpected register suffix");
 		} else {
-			checkReturnOnFail(false, "Unknown suffix", instr);
+			checkReturnOnFail(StrToCond.count(s.substr(i, 2)) == 0, "Unexpected condition", instr);
+			return check(false, "Unknown suffix", instr);
 		}
-	} else if (s.size() == 2) {
-		checkReturnOnFail(CharToOp.count(s.at(0)) == 1, "The first suffix must be an operation", instr);
-		checkReturnOnFail(CharToReg.count(s.at(1)) == 1, "The second suffix must be a register", instr);
-		instr.suffixes.modifier = CharToOp[s.at(0)];
-		instr.suffixes.reg = CharToReg[s.at(1)];
 	}
 	return true;
 }
@@ -1391,22 +1420,32 @@ bool parseInstrFields(Instr& instr) {
 	}
 	return true;
 }
-// checks if the instr has correct combination of suffixes and immediates
-bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 4, "Exhaustive checkValidity definition");
-	if (instr.instr == InstructionCount) unreachable();
+bool checkSuffixCombination(Instr& instr) {
 	if (instr.instr == Iswap || instr.instr == Iinl) { // check specials
-		checkReturnOnFail(!instr.hasImm() && !instr.hasReg(), "This instruction should have no arguments", instr);
+		checkReturnOnFail(!instr.hasImm() && !instr.hasReg() && !instr.hasOp(), "This instruction should have no arguments", instr);
 	} else if (instr.instr == Iinc || instr.instr == Iinu || instr.instr == Iipc) {
+		checkReturnOnFail(!instr.hasOp(), "This instruction cannot have any operation", instr);
 		checkReturnOnFail(!instr.hasImm(), "This instruction cannot have an immediate", instr);
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else {
-		checkReturnOnFail(instr.hasImm() ^ instr.hasReg(), "Instrs must have only imm, or 1 reg for now", instr);
+		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
+		if (instr.hasOp()) {
+			checkReturnOnFail(instr.hasReg() && instr.hasImm(), "Missing immediate", instr)
+		} else {
+			checkReturnOnFail(instr.hasReg() ^ instr.hasImm(), "Excessive immediate", instr);
+		}
 	}
-	if (InstrToModReg.count(instr.instr) == 0) {
-		checkReturnOnFail(!instr.hasMod(), "This instruction cannot have a modifier", instr);
+	return true;
+}
+// checks if the instr has correct combination of suffixes and immediates
+bool checkValidity(Instr& instr) {
+	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	assert(instr.instr != InstructionCount);
+	returnOnFalse(checkSuffixCombination(instr));
+	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
+		raiseWarning("No-OP instruction", instr);
 	}
 	RegNames condReg = instr.suffixes.condReg; CondNames cond = instr.suffixes.cond;
 	if (instr.instr == Ib || instr.instr == Il || instr.instr == Is) {
@@ -1456,16 +1495,21 @@ unsigned short interpOperation(VM& vm, OpNames op, unsigned short left, unsigned
 	else unreachable();
 }
 bool interpCond(VM& vm, Instr& instr, signed short target) {
-	static_assert(ConditionCount == 7, "Exhaustive interpCond definition");
-	short reg = (signed short) interpGetReg(vm, instr.suffixes.condReg);
+	static_assert(ConditionCount == 11, "Exhaustive interpCond definition");
+	signed short ireg = interpGetReg(vm, instr.suffixes.condReg);
+	unsigned short ureg = interpGetReg(vm, instr.suffixes.condReg);
 	if (instr.instr == Ib) target = 0;
 
-	if (instr.suffixes.cond == Ceq) return reg == target;
-	if (instr.suffixes.cond == Cne) return reg != target;
-	if (instr.suffixes.cond == Clt) return reg <  target;
-	if (instr.suffixes.cond == Cle) return reg <= target;
-	if (instr.suffixes.cond == Cgt) return reg >  target;
-	if (instr.suffixes.cond == Cge) return reg >= target;
+	if (instr.suffixes.cond == Ceq) return ireg == target;
+	if (instr.suffixes.cond == Cne) return ireg != target;
+	if (instr.suffixes.cond == Clt) return ireg <  target;
+	if (instr.suffixes.cond == Cle) return ireg <= target;
+	if (instr.suffixes.cond == Cgt) return ireg >  target;
+	if (instr.suffixes.cond == Cge) return ireg >= target;
+	if (instr.suffixes.cond == Cab) return ureg >  (unsigned short)target;
+	if (instr.suffixes.cond == Cae) return ureg >= (unsigned short)target;
+	if (instr.suffixes.cond == Cbl) return ureg <  (unsigned short)target;
+	if (instr.suffixes.cond == Cbe) return ureg <= (unsigned short)target;
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
@@ -1512,8 +1556,13 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	else unreachable();
 }
 void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
+	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
 	unsigned short left, right;
 	if (instr.hasImm()) right = instr.immediate;
+	if (instr.hasOp()) {
+		left = interpGetReg(vm, instr.suffixes.reg);
+		right = interpOperation(vm, instr.suffixes.op, left, right);
+	}
 	else if (instr.hasReg()) right = interpGetReg(vm, instr.suffixes.reg);
 
 	if (instr.hasMod()) {
@@ -1584,7 +1633,7 @@ void genOperation(ofstream& outFile, OpNames op) {
 		unreachable();
 	}
 }
-static_assert(ConditionCount == 7, "Exhaustive _jmpInstr definition");
+static_assert(ConditionCount == 11, "Exhaustive _jmpInstr definition");
 map<CondNames, string> _jmpInstr {
 	{Ceq, "jne"},
 	{Cne, "je"},
@@ -1592,18 +1641,28 @@ map<CondNames, string> _jmpInstr {
 	{Cle, "jg"},
 	{Cgt, "jle"},
 	{Cge, "js"},
+
+	{Cab, "jbe"},
+	{Cae, "jb"},
+	{Cbl, "jae"},
+	{Cbe, "ja"},
 };
-static_assert(ConditionCount == 7, "Exhaustive _condLoadInstr definition");
+static_assert(ConditionCount == 11, "Exhaustive _condLoadInstr definition");
 map<CondNames, string> _condLoadInstr {
 	{Ceq, "sete"},
 	{Cne, "setne"},
-	{Clt, "sets"},
+	{Clt, "setl"},
 	{Cle, "setle"},
 	{Cgt, "setg"},
-	{Cge, "setns"},
+	{Cge, "setge"},
+
+	{Cab, "seta"},
+	{Cae, "setae"},
+	{Cbl, "setb"},
+	{Cbe, "setbe"},
 };
 void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames cond, int instrNum) {
-	static_assert(ConditionCount == 7, "Exhaustive genCond definition");
+	static_assert(ConditionCount == 11, "Exhaustive genCond definition");
 	genRegisterFetch(outFile, condReg, -1, false);
 	if (instr == Ib) {
 		outFile << "	cmp bx, 0\n"
@@ -1673,16 +1732,20 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 }
 void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
-	// intermediate values - first - rbx, second - rcx
+	// operands - first - rbx, second - rcx (also result of operation)
 	// addr of cells[0] - r13
 	// responsibilities for clamping and register preserving:
 	// each operation, register fetch or instr body must touch only appropriate architecture registers, others must be left unchanged
 	// also, they need to make sure all changed architecture regs, intermediate value registers and the memory /
 	//		is clamped to the right bitsize and contains a valid value
+	if (instr.hasReg()) {
+		genRegisterFetch(outFile, instr.suffixes.reg, instrNum, !instr.hasOp());
+	}
 	if (instr.hasImm()) {
 		outFile << "	mov rcx, " << instr.immediate << '\n';
-	} else if (instr.hasReg()) {
-		genRegisterFetch(outFile, instr.suffixes.reg, instrNum);
+	}
+	if (instr.hasOp()) {
+		genOperation(outFile, instr.suffixes.op);
 	}
 	if (instr.hasMod()) {
 		genRegisterFetch(outFile, InstrToModReg[instr.instr], instrNum, false);

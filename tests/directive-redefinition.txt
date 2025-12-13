@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4715
+:stderr 4633
 tests\directive-redefinition.mx:6:8 ERROR: Define redefinition 'prep1'
 tests\directive-redefinition.mx:8:8 ERROR: Macro redefinition 'prep2'
 tests\directive-redefinition.mx:10:13 ERROR: Define redefinition 'prep1'
@@ -31,7 +31,6 @@ tests\directive-redefinition.mx:95:9 ERROR: Name shadows an instruction 'mov'
 tests\directive-redefinition.mx:96:9 ERROR: Name shadows an instruction 'lgt'
 tests\directive-redefinition.mx:98:9 ERROR: Invalid define name 'str|'
 tests\directive-redefinition.mx:100:8 ERROR: Name shadows an instruction 'inu'
-tests\directive-redefinition.mx:101:8 ERROR: Name shadows an instruction 'bmletr'
 tests\directive-redefinition.mx:104:13 ERROR: Name shadows an instruction 'outcp'
 tests\directive-redefinition.mx:105:20 ERROR: Name shadows an instruction 'ldam'
 tests\directive-redefinition.mx:107:12 ERROR: Name shadows an instruction 'inc'

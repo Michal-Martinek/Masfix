@@ -29,3 +29,39 @@ strar a
 strar 10
 
 mov
+
+ld
+ldm
+ldr
+ldr 9
+ld&
+ld& 8
+ld|r
+ld|r 8
+ldm>
+ldm> 8
+ld.m>
+ld.m> 8
+
+ldeq
+ldeqp
+ldeq 9
+
+ldrge
+ldtge
+ldtmge
+
+; too much
+jmp
+jmpp
+jmppp 
+jmpppp
+jmppppp
+jmppppp 8
+
+strap
+strra
+strra 9
+strrap
+strrap 10
+

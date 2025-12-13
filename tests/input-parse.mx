@@ -25,6 +25,7 @@ inc|
 inla
 inl&
 inlsm
+inlrt 9
 
 ipc
 ipcl
@@ -33,3 +34,8 @@ ipcm
 ipch
 ipca 1
 ipc<
+
+inuh
+inuh|
+inuh| 7
+inuh 7

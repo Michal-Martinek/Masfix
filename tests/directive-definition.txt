@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8823
+:stderr 8792
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -80,7 +80,7 @@ tests\directive-definition.mx:114:18 ERROR: Unexpected token after directive 'ld
 tests\directive-definition.mx:115:13 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:117:3 ERROR: Undeclared identifier 'b'
 tests\directive-definition.mx:118:14 ERROR: Unexpected token type '#'
-tests\directive-definition.mx:120:13 ERROR: Unexpected token type ':'
+tests\directive-definition.mx:120:14 ERROR: Unexpected token type ':'
 tests\directive-definition.mx:121:14 ERROR: Unexpected token type 'here'
 tests\directive-definition.mx:123:18 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:126:8 ERROR: Macro arglist expected
@@ -108,7 +108,7 @@ tests\directive-definition.mx:189:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:191:3 ERROR: Undeclared identifier 'here'
 tests\directive-definition.mx:193:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:196:3 ERROR: Undeclared identifier 'm'
-tests\directive-definition.mx:203:17 ERROR: Unexpected token type ':'
+tests\directive-definition.mx:203:18 ERROR: Unexpected token type ':'
 tests\directive-definition.mx:204:17 ERROR: Unexpected token type '%'
 tests\directive-definition.mx:205:16 ERROR: Unexpected token type ','
 tests\directive-definition.mx:206:17 ERROR: Unexpected token type ':'
@@ -124,7 +124,7 @@ tests\directive-definition.mx:145:2 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:194:1 ERROR: Unexpected token '{}'
 tests\directive-definition.mx:6:1 ERROR: Unknown instruction 'dir'
 tests\directive-definition.mx:95:1 ERROR: Unknown instruction 'name'
-tests\directive-definition.mx:165:1 ERROR: Max two letter suffixes are supported for now 'ldbad'
+tests\directive-definition.mx:165:1 ERROR: Unknown suffix 'ldbad'
 tests\directive-definition.mx:174:2 ERROR: Unknown condition 'somting'
 
 
