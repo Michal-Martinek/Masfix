@@ -9,6 +9,10 @@ class TestcaseException(Exception):
 class ExecutionException(TestcaseException):
 	pass
 
+TestDescRedirections = {
+	'examples': 'tests\\example-results'
+}
+
 def quoted(s):
 	return "'" + str(s) + "'"
 def check(cond, *messages, insideTestcase=True):
@@ -59,8 +63,14 @@ def parseTestcaseDesc(desc: str):
 			check(False, 'Unknown field in description', quoted(line))
 	check('returncode' in expected, 'Testcase description missing :returncode')
 	return expected
-def getTestcaseDesc(test: Path, update=False) -> dict:
+def _getTestcasePath(test: Path):
 	path = test.with_suffix('.txt')
+	if path.parts[0] in TestDescRedirections:
+		path = str(path).replace(path.parts[0], TestDescRedirections[path.parts[0]])
+	return path
+
+def getTestcaseDesc(test: Path, update=False) -> dict:
+	path = _getTestcasePath(test)
 	if update:
 		if not os.path.exists(path):
 			return {'returncode': 0, 'stdout': '', 'stderr': '', 'stdin': ''}
@@ -151,7 +161,9 @@ def updateFileOutputs(files: list[Path], verbose=False):
 def iterTestsInDirectory(dir):
 	for file in os.listdir(dir):
 		path = Path(os.path.join(dir, file))
-		if path.is_dir(): path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
+		if path.is_dir():
+			if str(path) in TestDescRedirections.values(): continue
+			path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
 		if path.suffix == '.mx':
 			yield path
 def runTests(dir: Path, quick: bool):
@@ -173,7 +185,7 @@ def saveDesc(file: Path, desc):
 	stdout = desc['stdout']
 	stderr = desc['stderr']
 	stdin = desc['stdin']
-	with open(file.with_suffix('.txt'), 'w') as f:
+	with open(_getTestcasePath(file), 'w') as f:
 		f.write(f':returncode {code}\n\n')
 		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
 		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
