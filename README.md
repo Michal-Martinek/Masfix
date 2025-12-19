@@ -23,38 +23,45 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 
 
 # Language specifications
-
+<!-- TODO recommended file ext -->
 Masfix ignores all whitespace  
 
 # Setup
-These commands should help you set up your enviroment.  
-You can theoretically use __interpretting mode only__.  
-- compile compiler: `g++ Masfix.cpp -o Masfix`
 
-#### interpretting mode
+1) Install toolchain
+	* `g++ (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0`
+	* native compilation:
+		* `NASM version 2.16.03 compiled on Apr 17 2024`
+		* `gcc version 13.2.0 (x86_64-posix-seh-rev0, Built by MinGW-Builds project)`
+	* The above are from http://winlibs.com/
+	* `Python 3.13.0`
+
+1) Build the compiler
+```powershell
+g++ Masfix.cpp -o Masfix.exe
 ```
-Masfix --interpret tests/basic-test.mx
+
+1) Run in interpreting mode  
+_You can theoretically use ONLY interpreting mode to avoid nasm/gcc setup._  
+```powershell
+Masfix --interpret tests\basic-test.mx
 test.py quick
 ```
-#### native copilation
-```
-Masfix --keep-asm --verbose tests/basic-test.mx
-nasm -fwin64 -g -F cv8 tests/basic-test.asm
-gcc -nostartfiles -Wl,-e,_start -lkernel32 -o tests/basic-test.exe -g tests/basic-test.obj
+
+1) Native compilation (assemble + link + run)  
+_This sequence should help you set up your enviroment._
+```powershell
+Masfix --keep-asm --verbose tests\basic-test.mx
+nasm -fwin64 -g -F cv8 tests\basic-test.asm
+gcc -nostartfiles -Wl,-e,_start -lkernel32 -o tests\basic-test.exe -g tests\basic-test.obj
 tests\basic-test.exe
 echo %ERRORLEVEL%
 test.py run
 ```
 
-#### normal operations
-```
-Masfix --run <.mx-file-to-run>
+1) Normal usage
+```powershell
+Masfix -r <.mx-file-to-run>
 ```
 
-<!-- TODO move above? -->
-## My tools
-* `g++ (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0`
-* `NASM version 2.16.03 compiled on Apr 17 2024`
-* `gcc version 13.2.0 (x86_64-posix-seh-rev0, Built by MinGW-Builds project)`
-* The above are from http://winlibs.com/
-* `Python 3.13.0`
+<!-- TODO footer? 2026 by Michal-Martinek -->
