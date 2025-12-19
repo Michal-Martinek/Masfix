@@ -70,26 +70,32 @@ Masfix -r <.mx-file-to-run>
 
 ## example
 ```asm
-mov 6 ; mov to addr 6
+mov 6    ; mov to addr 6
 ldm      ; load r with value from memory
 ld 42    ; load internal register (r) with immediate value
 ld& 7    ; and r with 7
 movart 3 ; addr += r * 3
 strr     ; store r in memory at new addr
 
-; preprocessor includes
+
+; include standart library with preprocessor
 %include "std/memory"
 %include "std/math"
 %include "std/procedures"
 %include "std/control"
 
+; define preprocessor directives
 %define divideBy 7
+%macro callDiv_macro(local_param_divWith) {
+	; macro body
+	%stack:pushm() ; using macros
+	%stack:push(%local_param_divWith)
+	%call(divide)  ; call procedures
+}
 
 :loop              ; start of while loop
 	outum          ; ouput memory
-	%stack:pushm() ; using macros
-	%stack:push(%divideBy)
-	%call(divide)  ; call procedures
+	%callDiv_macro(%divideBy)
 	%stack:pop()
 
 	%if {          ; control flow from std
