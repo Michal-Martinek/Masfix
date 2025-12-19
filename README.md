@@ -8,7 +8,6 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 	- Low level assembly: based on simple instructions 
 	- Suffix semantics: instruction meaning is specified by their suffixes.
 
-> Work in progress — This project may change at any time. Some features may be unimplemented or inconsistent with docs.
 
 ## Architecture Overview
 - Execution model resembles a [Turing machine](https://en.wikipedia.org/wiki/Turing_machine)
@@ -17,17 +16,16 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 - Direct compilation to x64 assembly
 	- developed for x64 Windows-Intel system
   
-* [How to set up the enviroment?](#setup)
+> Work in progress — This project may change at any time. Some features may be unimplemented or inconsistent with docs.
+
+<!-- 
+## Check out
 * [Code examples?](./examples)
 * [And the macro system?](#macro-system)
+-->
 
-
-# Language specifications
-<!-- TODO recommended file ext -->
-Masfix ignores all whitespace  
 
 # Setup
-
 1) Install toolchain
 	* `g++ (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0`
 	* native compilation:
@@ -63,5 +61,9 @@ test.py run
 ```powershell
 Masfix -r <.mx-file-to-run>
 ```
+
+# Language specifications
+<!-- TODO recommended file ext -->
+Masfix ignores all whitespace  
 
 <!-- TODO footer? 2026 by Michal-Martinek -->
