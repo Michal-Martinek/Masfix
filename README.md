@@ -63,7 +63,39 @@ Masfix -r <.mx-file-to-run>
 ```
 
 # Language specifications
-<!-- TODO recommended file ext -->
-Masfix ignores all whitespace  
+- intended Masfix file extension - `.mx`
+- whitespace insensitive
+- single line comments - `;`
+- one instruction per line
+
+## example
+```asm
+mov 6 ; mov to addr 6
+ldm      ; load r with value from memory
+ld 42    ; load internal register (r) with immediate value
+ld& 7    ; and r with 7
+movart 3 ; addr += r * 3
+strr     ; store r in memory at new addr
+
+; preprocessor includes
+%include "std/memory"
+%include "std/math"
+%include "std/procedures"
+%include "std/control"
+
+%define divideBy 7
+
+:loop              ; start of while loop
+	outum          ; ouput memory
+	%stack:pushm() ; using macros
+	%stack:push(%divideBy)
+	%call(divide)  ; call procedures
+	%stack:pop()
+
+	%if {          ; control flow from std
+		lrge 3,    ; if condition: load 1 -> r if r >= 3
+		jmp loop   ; jmp back ^
+	}
+```
 
 <!-- TODO footer? 2026 by Michal-Martinek -->
