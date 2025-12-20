@@ -1,3 +1,6 @@
+- Issue reports welcome!
+- share difficulties encountered (in setup, missing/unclear docs...)
+
 BEFORE SUBMITTING TO THE MAIN BRACH:
 
 check if all features have appropriate tests
