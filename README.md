@@ -8,6 +8,7 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 	- Low level assembly: based on simple instructions 
 	- Suffix semantics: instruction meaning is specified by their suffixes.
 
+<!-- TODO bullet point features overview -->
 
 ## Architecture Overview
 - Execution model resembles a [Turing machine](https://en.wikipedia.org/wiki/Turing_machine)
@@ -17,13 +18,6 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 	- developed for x64 Windows-Intel system
   
 > Work in progress — This project may change at any time. Some features may be unimplemented or inconsistent with docs.
-
-<!-- 
-## Check out
-* [Code examples?](./examples)
-* [And the macro system?](#macro-system)
--->
-
 
 # Setup
 1) Install toolchain
@@ -40,7 +34,7 @@ g++ Masfix.cpp -o Masfix.exe
 ```
 
 1) Run in interpreting mode  
-_You can theoretically use ONLY interpreting mode to avoid nasm/gcc setup._  
+_Interpreter works even without nasm/gcc setup._
 ```powershell
 Masfix --interpret tests\basic-test.mx
 test.py quick
@@ -62,13 +56,21 @@ test.py run
 Masfix -r <.mx-file-to-run>
 ```
 
-# Language specifications
+# Getting started
 - intended Masfix file extension - `.mx`
 - whitespace insensitive
-- single line comments - `;`
+- single line comments use `;`
 - one instruction per line
+- macro system directives start with `%`
 
-## example
+## Explore the repo
+- [Code examples](./examples)
+	- check out newest Masfix code standart [here](TODO)
+- [Standart library](./std)
+- language docs: [assembly](./docs/assembly.md), [macro system](./docs/macro-system.md)
+
+
+## Code example
 ```asm
 mov 6    ; mov to addr 6
 ldm      ; load r with value from memory
@@ -94,7 +96,7 @@ strr     ; store r in memory at new addr
 }
 
 :loop              ; start of while loop
-	outum          ; ouput memory
+	outum          ; output memory
 	%callDiv_macro(%divideBy)
 	%stack:pop()
 
