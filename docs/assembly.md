@@ -6,50 +6,28 @@ Masfix has 4 so called "registers":
 
 * `h` - position of the read-write head, effecfivelly the current memory address
 * `m` - contents of the currently selected memory cell (by the h register)
-* `r` - the head's internal register, keeps its contents with head movements
+* `r` - general purpose internal register, keeps its contents with head movements
 * `p` - instruction pointer, contains the address of the currently executed instruction, increments after each instruction
 
 ## Instructions
 
 ### Basic instructions
 
-These 4 instructions are used for setting the values of the [registers](#registers):
+These 4 instructions are used for setting the values of [registers](#registers):
 * `mov` - stores the value into the **h** register, efectively moving the head along the memory
 * `str` - stores the value into the active memory cell
 * `ld` - stores the value into the internal **r** register
 * `jmp` - stores the value into the instruction pointer, effectively altering the execution flow
 
-These are the only instructions that are allowed to have a [modifier](#modifier).
 
 ### Suffixes
-
-Instructions are behaving like simple variable assignments. They have suffixes specifying the shape of the assignment.  
-Namely the left side of the assignment is the destination register of the instruction  
-and the right side called **target** can be an immediate value, register or an operation between a register and an immediate value.
-
-For example:
-```
-instruction ; meaning 
-ld 5 ; r = 5 
-movm ; h = m 
-strrs 2 ; m = r - 2 
-ldamt 2 ; r += m * 2 
-```
-
-Let's discuss the fields of the last instruction "*ldamt 2*":
-
-| example field | ld | a | m | t | 2 |
-| --- | --- | --- | --- | --- | --- |
-| **field type** | [instruction](#basic-instructions) | [modifier](#modifier) | [register](#basic-instructions) | [intermediate operation](#operations) | [immediate value](#immediate) |
-| **description** | specifies instruction performed, here the destination will be **r** | operation modifying the destination | register used as argument | operation between register and immediate | constant value |
-
-#### Instruction execution
-
-1. load the **immediate value**, if present
-1. load the **register** argument, if present
-1. perform the **intermediate operation** between the **register** and the **immediate**, if used
-1. perform the **modifier** operation, taking the instruction's **destination** as the first argument and the previously computed value as the second
-1. store the result into the **destination**
+Instructions behave like simple variable assignments.  
+Suffixes specify shape of the assignment.  
+Left side of the assignment is the destination register of the instruction.  
+The right side (called **target value**) can take these forms:
+- immediate value
+- register
+- operation between a register and an immediate value
 
 #### Modifier
 The modifier [operation](#operations) changes the destination by the target like `<destination> <operation>= <target>`,  
@@ -58,17 +36,72 @@ Only the [4 basic instructions](#basic-instructions) are allowed a modifier.
 
 #### Immediate
 Immediate value supplied to the instruction. It's possible forms are: 
-* A numerical value in the range [0, <the maximum value which can fit inside 16 bit unsigned int> = 65535]
+* A numerical value in the range [0, 65535] _(maximum of 16 bit unsigned int)_
 * A [label](#labels) name, gets replaced with the address of the label
 
+### Basic instruction examples
+```
+ld 5 ; r = 5
+movm ; h = m
+strrs 2 ; m = r - 2
+ldamt 2 ; r += m * 2
+```
+
+Breakdown of last instruction's `ldamt 2` fields:
+
+| field | ld _(load)_ | a _(add)_ | m _(memory)_ | t _(times)_ | 2 |
+| --- | --- | --- | --- | --- | --- |
+| **type** | [instruction](#basic-instructions) | [modifier](#modifier) | [register](#basic-instructions) | [intermediate operation](#operations) | [immediate value](#immediate) |
+| **description** | specifies instruction performed, here the destination will be **r** | operation modifying the destination by target value | register used as argument | operation between register and immediate value | constant value |
+
+
+### Instruction execution
+- Instructions are generally evaluated from right to left:
+1. load the **immediate value**, if present
+1. load the **register** argument, if present
+1. perform the **intermediate operation** between the **register** and the **immediate**, if used
+1. perform the **modifier** operation, taking the instruction's **destination** as the first argument and the previously computed value as the second
+1. store the result into the **destination**
+
+
 ### Conditional instructions
-These instructions apply some conditiotion against a condition register (**r** / **m**) and a second value.  
-They take the form `<instr><cond-reg>?<cond><suffixes>*`, which means: instruction followed optionally with a letter specifying the destination register, then two letters specifying the condition and then standard suffixes.  
-The default condition register is **r**.
+Test some condition between condition register (**r** / **m**) and **target value**.  
+Condition register may be omitted - default is **r**.
+
+#### conditinal instruction's fields
+Example: `lmltra 7 ; r = m < (r + 7)`  
+| field | l | m | lt  | r a 7 |
+| --- | --- | --- | --- | --- |
+| **type** | [conditional load](#condition-load-instructions) | [memory register](#registers) | [condition](#conditions) | [other suffixes](#suffixes) |
+| **description** | loads condition result (0/1) to **r** | comparison LHS - memory (default **r**) | `<` - signed less than | suffixes forming the RHS of comparison |
+
+#### Branches
+Branches test the [condition register](#conditional-instructions) against 0.  
+If the condition holds, then the instruction pointer is assigned the value of **target**.
+
+Examples:
+```
+beq <label> ; jumps to <label> if r == 0
+bmge label2 ; jumps to label2 if m >= 0
+brltm< 15   ; jumps to (m << 15) if r < 0
+            ; WARNING - the above doesn't mean "jump to 15 if r < m"!
+```
+
+#### Condition load instructions
+
+These perform a comparison between the [condition register](#conditional-instructions) and **target** and store a boolean value *{0, 1}* into the destination.
+
+* `l` - stores the result in **r**
+* `s` - stores the result in **m**
+
+Examples:
+```
+seq 56   ; m = (r == 56)
+lmltra 7 ; r = m < (r + 7)
+```
 
 #### Conditions
-
-In conditions the numbers are interpreted as signed 2's complement numbers.
+Conditions compare two numbers either as signed or unsigned.
 
 | cond | meaning | description |
 | :---: | :---: | --- |
@@ -78,31 +111,10 @@ In conditions the numbers are interpreted as signed 2's complement numbers.
 | `le` | reg <= sec | performs (reg - sec), then tests the sign bit of the result to be set or the result equal to 0 |
 | `gt` | reg >  sec | performs (reg - sec), then tests the sign bit of the result to be clear and the result not equal to 0 |
 | `ge` | reg >= sec | performs (reg - sec), then tests the sign bit of the result to be clear |
-
-#### Branches
-
-Branches test the [condition register](#conditional-instructions) against 0.  
-If its true that `<cond-reg> <condition> 0` then the instruction pointer is assigned the value of the **target**.
-
-Examples:
-```
-beq <label> ; jumps to <label> if r == 0
-bmge label2 ; jumps to label2 if m >= 0
-brltm< 15 ; jumps to (m << 15) if r < 0
-```
-
-#### Condition load instructions
-
-These perform a comparison between the [condition register](#conditional-instructions) and the **target** and store a boolean value *{0, 1}* into the destination.
-
-* `l` - stores the result in **r**
-* `s` - stores the result in **m**
-
-Examples:
-```
-seq 56 ; m = (r == 56)
-lmltra 7 ; r = m < (r + 7)
-```
+| `ab` | reg > sec | unsigned above |
+| `ae` | reg >= sec | unsigned above equal |
+| `bl` | reg < sec | unsigned below |
+| `be` | reg <= sec | unsigned below equal |
 
 ### Special instructions
 
@@ -145,18 +157,16 @@ outurs 30 ; prints (65 - 30) = 35
 ```
 
 ### Operations
+Operations perform aritmetic or bitwise operations between [registers](#registers) and [immediate value](#immediate).  
+Operands "come in the same order" (_L/R_) as in the [instruction suffix](#suffixes).  
+Their results are always constrained to 16 bits (even intermediate calculations)
 
 #### Arithmetic operations
-
-Masfix has 3 basic numerical operations. Two different characters can be used to describe each operation,  
-but we recommend using the letter in [instruction suffixes](#suffixes) and the special symbol in the [immediate value](#immediate).
-
-* `a` *or* `+` - addition
-* `s` *or* `-` - subtraction
-* `t` *or* `*` - unsigned multiplication
+* `a` - addition
+* `s` - subtraction
+* `t` - unsigned multiplication
 
 #### Bitwise operations
-
 * `&` - bitwise and
 * `|` - bitwise or
 * `^` - bitwise xor
@@ -168,7 +178,7 @@ but we recommend using the letter in [instruction suffixes](#suffixes) and the s
 
 Examples:
 ```
-At the start of each line r = 13 = 0x1101
+; Assume r = 13 = 0x1101 for each line
 ldr& 10 ; r = 0x1000
 ldr| 17 ; r = 0x11101
 ld^ 6   ; r = 0x1011
@@ -180,8 +190,11 @@ ld. 1   ; r = 0
 
 ### Labels
 
-Labels are used to simplify addressing of instructions in the source code. On use in [instruction immediates](#immediate), they are replaced with the exact address of the instruction directly following them.  
-They need to be first on a line, **starting** with `:` followed with the label name.  
-There are two predefined labels:
-* `begin` - address 0
-* `end` - address after the last instruction
+Labels are used to simplify addressing of instructions in the source code.  
+When used in [instruction immediate](#immediate), they are replaced with the exact address of instruction directly following the label definition.  
+Label definition needs to be first on line, **starting** with `:` followed by the label name.  
+`:label <possible-instr>`
+
+- predefined labels:
+	* `begin` - address 0
+	* `end` - address after the last instruction
