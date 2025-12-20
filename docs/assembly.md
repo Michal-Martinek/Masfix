@@ -198,3 +198,15 @@ Label definition needs to be first on line, **starting** with `:` followed by th
 - predefined labels:
 	* `begin` - address 0
 	* `end` - address after the last instruction
+
+## complex identifiers
+Instruction / label names can be constructed from multiple fields.  
+Useful for defining labels / using instructions with preprocessor information.  
+In instructions first letter must be inplace.  
+```asm
+%macro l_cond_instr(condReg, cond, op, imm) {
+	l(%condReg)(%cond)r(%op) %imm
+}
+%l_cond_instr(m, "lt", &, 15)
+; expands to lmltr& 15
+```
