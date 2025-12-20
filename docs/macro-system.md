@@ -87,3 +87,28 @@ Syntax: `%include "path/to/code.mx"`
 Include paths can be customized with compiler's `--include` option.  
 Included code is placed atop the current file.  
 Repeated including of the same file is safe and ignored.  
+
+## Compile time macro use
+Enable use of assembly functionality (like arithmetics and IO) inside the preprocessor.  
+Macro uses can be used in compile time mode by using `!` instead of `%`.  
+1) ctime macro's body is fully preprocessed to instruction flow as usual
+2) their body is executed in special compile-time VM
+3) content of `r` register is used as return value, which is inserted as numerical token instead of the macro use
+
+Example:
+```asm
+%macro add(a, b) {
+	ld %a
+	lda %b
+	; return value taken from r
+}
+
+mov !add(2, 7)
+; expands & processes the macro body into instructions
+; executes them inside VM
+; value in r after excution of the body is 9
+; numerical token '9' is pushed in place of macro use, becoming:
+mov 9
+```
+
+Potential nested ctime uses are evaluated from the inside.  
