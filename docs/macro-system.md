@@ -10,7 +10,9 @@ Token lists are simply groups of tokens used by the macro system.
 Tokens are grouped by matching bracket pairs - `()`, `[]` or `{}`.  
 _The bracket types are meaningless._
 
-<!-- TODO allowed names -->
+### Directive names
+Allowed directive names consist of letters or `_`.  
+No name can overwrite an instruction opcode and identifier redefinition rules apply.
 
 ## Defining directives
 Defining directives define a [constant](#directive-define), a [macro](#macro-directive) or [namespace](#namespaces).  
