@@ -106,4 +106,11 @@ strr     ; store r in memory at new addr
 	}
 ```
 
-<!-- TODO footer? 2026 by Michal-Martinek -->
+
+# Background & philosophy
+The idea of developing a programming language first came to me when watching [Tsoding's development of _Porth_ language](https://gitlab.com/tsoding/porth).  
+The turing machine basis also comes from his project: [Tula](https://github.com/tsoding/tula).  
+  
+The main goal of this project is to explore how programming language internals work by implementing them from scratch and discovering the various challenges that emerge along the way.
+
+> Proudly by __Michal-Martinek__
