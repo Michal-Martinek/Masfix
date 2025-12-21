@@ -96,6 +96,7 @@ Macro uses can be used in compile time mode by using `!` instead of `%`.
 1) ctime macro's body is fully preprocessed to instruction flow as usual
 2) their body is executed in special compile-time VM
 3) content of `r` register is used as return value, which is inserted as numerical token instead of the macro use
+- _Ctime machinery explained in great detail [here](impl_ctime-machinery-desc.md)_
 
 Example:
 ```asm
