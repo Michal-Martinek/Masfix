@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2662
+:stderr 2673
 tests\complex-names.mx:41:4 ERROR: Directive must not continue
 tests\complex-names.mx:42:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Expected label field
@@ -20,6 +20,7 @@ tests\complex-names.mx:31:1 ERROR: Invalid label name 'a:b$(,)$'
 tests\complex-names.mx:34:5 ERROR: Expected immediate field
 tests\complex-names.mx:35:4 ERROR: Expected instr field
 tests\complex-names.mx:36:1 ERROR: Missing immediate field name
+tests\complex-names.mx:37:1 ERROR: Label definitions BEGIN with ':'
 tests\complex-names.mx:38:4 ERROR: Expected immediate field
 tests\complex-names.mx:39:4 ERROR: Missing instr field name
 tests\complex-names.mx:43:3 ERROR: Simple instr field expected
@@ -30,7 +31,6 @@ tests\complex-names.mx:59:1 ERROR: Unexpected token 'ld'
 tests\complex-names.mx:60:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:67:20 ERROR: Expected immediate field
 tests\complex-names.mx:68:20 ERROR: Simple immediate field expected
-tests\complex-names.mx:37:1 ERROR: Unknown suffix 'inc:'
 tests\complex-names.mx:40:1 ERROR: Unknown instruction 'huhutata'
 tests\complex-names.mx:41:1 ERROR: Target value expected 'jmp'
 tests\complex-names.mx:46:1 ERROR: Target value expected 'mov'

@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 1476
+:stderr 1475
 tests\strings.mx:1:1 ERROR: Expected string termination
 tests\strings.mx:5:1 ERROR: Expected string termination
 tests\strings.mx:6:13 ERROR: Expected string termination
@@ -11,6 +11,7 @@ tests\strings.mx:14:3 ERROR: Missing define name
 tests\strings.mx:2:1 ERROR: Unexpected token ''
 tests\strings.mx:3:1 ERROR: Unexpected token ' '
 tests\strings.mx:4:1 ERROR: Unexpected token 'Hello, world!'
+tests\strings.mx:9:1 ERROR: Label definitions BEGIN with ':'
 tests\strings.mx:10:1 ERROR: Unexpected token 'got the loc bro?'
 tests\strings.mx:11:1 ERROR: Unexpected token '( } ) '!'
 tests\strings.mx:13:1 ERROR: Unexpected token '()'
@@ -21,7 +22,6 @@ tests\strings.mx:26:1 ERROR: Missing immediate field name
 tests\strings.mx:29:24 ERROR: Simple immediate field expected
 tests\strings.mx:6:1 ERROR: Unknown instruction 'nuefounland'
 tests\strings.mx:8:1 ERROR: Unknown instruction 'Where's'
-tests\strings.mx:9:1 ERROR: Unknown instruction 'He:replied:'
 tests\strings.mx:24:1 ERROR: Unknown instruction 'a \n'
 tests\strings.mx:25:1 ERROR: Missing condition 'b s trin g'
 tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa sd $a   ld  	  \t'

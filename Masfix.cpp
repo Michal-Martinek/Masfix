@@ -1316,6 +1316,7 @@ outer_loop_continue:
 		} else if (top.type == Talpha) {
 			// NOTE ignores whole instr on any err in parsing
 			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
+			eatLineOnFalse(check(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc)); // note for bad label definition
 			Instr instr(name, loc);
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;

@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 5324
+:stderr 5328
 tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
 tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
 tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
@@ -69,10 +69,10 @@ tests\namespace-accessors.mx:91:16 ERROR: Namespace already imported 'time'
 tests\namespace-accessors.mx:91:21 ERROR: Unexpected token after directive '%'
 tests\namespace-accessors.mx:92:15 ERROR: Namespace already imported 'time'
 tests\namespace-accessors.mx:92:20 ERROR: Unexpected token after directive '15'
-tests\namespace-accessors.mx:95:8 ERROR: Namespace parameter shouldn't be a string ''
-tests\namespace-accessors.mx:96:9 ERROR: Namespace parameter shouldn't be a string ''
-tests\namespace-accessors.mx:97:9 ERROR: Namespace parameter shouldn't be a string 'namespace'
-tests\namespace-accessors.mx:98:9 ERROR: Namespace parameter shouldn't be a string 'A'
+tests\namespace-accessors.mx:95:8 ERROR: Namespace parameter shouldn't be in string ''
+tests\namespace-accessors.mx:96:9 ERROR: Namespace parameter shouldn't be in string ''
+tests\namespace-accessors.mx:97:9 ERROR: Namespace parameter shouldn't be in string 'namespace'
+tests\namespace-accessors.mx:98:9 ERROR: Namespace parameter shouldn't be in string 'A'
 tests\namespace-accessors.mx:99:9 ERROR: Namespace not found 'a'
 tests\namespace-accessors.mx:100:12 ERROR: Missing namespace name
 tests\namespace-accessors.mx:101:9 ERROR: Missing directive name
