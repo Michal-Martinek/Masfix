@@ -90,4 +90,13 @@
 	%using space %define
 	%using space :time %macro
 	%using space:time 15
+
+	"%using"
+	%using""
+	%using ""
+	%using "namespace"
+	%using "A":
+	%using a"B"
+	%using loo:"C"
+	%using :"D"
 }

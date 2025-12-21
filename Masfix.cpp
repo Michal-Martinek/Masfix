@@ -1167,6 +1167,7 @@ bool lookupName(Token& percentToken, string directiveName, list<string>& prefixe
 }
 bool processUsing(Loc loc, Scope& scope) {
 	int namespaceId = scope.currNamespaceId();
+	if (scope.hasNext() && scope->type == Tstring) checkReturnOnFail(false, "Namespace parameter shouldn't be in string", scope.currToken());
 	string firstName; list<string> prefixes; list<Loc> locs;
 	returnOnFalse(getDirectivePrefixes(firstName, prefixes, locs, loc, scope, "namespace"));
 	// NOTE the first namespace can be used, others down the using chain must be defined inside one another
