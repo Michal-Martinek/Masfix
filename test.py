@@ -10,7 +10,8 @@ class ExecutionException(TestcaseException):
 	pass
 
 TestDescRedirections = {
-	'examples': 'tests\\example-results'
+	'examples': 'tests\\example-results',
+	'examples\\project_euler': 'UNREACHABLE, inherited from above'
 }
 
 def quoted(s):
@@ -63,10 +64,12 @@ def parseTestcaseDesc(desc: str):
 			check(False, 'Unknown field in description', quoted(line))
 	check('returncode' in expected, 'Testcase description missing :returncode')
 	return expected
-def _getTestcasePath(test: Path):
+def _getTestcasePath(test: Path, createFolders=False):
 	path = test.with_suffix('.txt')
 	if path.parts[0] in TestDescRedirections:
 		path = str(path).replace(path.parts[0], TestDescRedirections[path.parts[0]])
+	if createFolders:
+		Path(path).parent.mkdir(parents=True, exist_ok=True)
 	return path
 
 def getTestcaseDesc(test: Path, update=False) -> dict:
@@ -163,8 +166,11 @@ def iterTestsInDirectory(dir):
 		path = Path(os.path.join(dir, file))
 		if path.is_dir():
 			if str(path) in TestDescRedirections.values(): continue
-			path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
-		if path.suffix == '.mx':
+			if str(path) in TestDescRedirections.keys():
+				yield from iterTestsInDirectory(str(path))
+			else:
+				path = Path(os.path.join(path, os.path.basename(path.with_suffix('.mx'))))
+		if path.suffix == '.mx' and os.path.exists(path):
 			yield path
 def runTests(dir: Path, quick: bool):
 	failedTests = []
@@ -185,7 +191,7 @@ def saveDesc(file: Path, desc):
 	stdout = desc['stdout']
 	stderr = desc['stderr']
 	stdin = desc['stdin']
-	with open(_getTestcasePath(file), 'w') as f:
+	with open(_getTestcasePath(file, createFolders=True), 'w') as f:
 		f.write(f':returncode {code}\n\n')
 		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
 		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')

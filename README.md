@@ -65,7 +65,7 @@ Masfix -r <.mx-file-to-run>
 
 ## Explore the repo
 - [Code examples](./examples)
-	- check out newest Masfix code standart [here](TODO)
+	- check out newest Masfix code standart [here](./examples/project_euler/multiples-3or5.mx)
 - [Standart library](./std)
 - language docs: [assembly](./docs/assembly.md), [macro system](./docs/macro-system.md)
 
