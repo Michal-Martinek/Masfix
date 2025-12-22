@@ -30,8 +30,8 @@
 }
 
 ; a, b -> a / b
+; remainder - seg_temp[0]
 %func {divide, 2, 1,
-	; TODO remainder - where to store it?
 	%stack:top() ; local result = 0
 	str 0
 	%while {
@@ -47,7 +47,12 @@
 		movs 1
 		strsr
 	}
+	%func_arg(0) ; store remainder
+	%storem(%MEMORY_LAYOUT:SEG_TEMP)
 	%stack:top() ; return result
+}
+%macro ld_remainder() {
+	%load(%MEMORY_LAYOUT:SEG_TEMP)
 }
 
 ; a, b -> a ** b

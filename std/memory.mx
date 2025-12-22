@@ -8,6 +8,10 @@
 	mov %addr
 	strr
 }
+%macro storem(addr) {
+	ldm
+	%storer(%addr)
+}
 %macro load(addr) {
 	mov %addr
 	ldm
@@ -114,6 +118,18 @@
 	%macro dropN(N) {
 		mov %G_STACK_PTR
 		strs %N
+	}
+
+	; stack operations
+	%macro apply_op(binary_op) {
+		%stack:pop()
+		movs 1
+		str(%binary_op)r
+	}
+	%macro compare(comparison) {
+		%stack:pop()
+		movs 1
+		sm(%comparison)r
 	}
 }
 
