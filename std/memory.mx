@@ -38,7 +38,8 @@
 	%define SEG_TEMP 8
 	%define SEG_STACK 16
 	%define SEG_HEAP 2048
-	%define SEG_DEBUG_STACK 63488 ; 2048
+	%define SEG_DEBUG_GLOBALS 63488 ; 8
+	%define SEG_DEBUG_STACK   63496 ; 2040
 
 ; GLOBALS
 	; points to the last occupied space
