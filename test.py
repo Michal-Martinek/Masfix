@@ -11,7 +11,8 @@ class ExecutionException(TestcaseException):
 
 TestDescRedirections = {
 	'examples': 'tests\\example-results',
-	'examples\\project_euler': 'UNREACHABLE, inherited from above'
+	'examples\\project_euler': 'UNREACHABLE, inherited from above',
+	'examples\\AdventOfCode2025': 'UNREACHABLE',
 }
 
 def quoted(s):
