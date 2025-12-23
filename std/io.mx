@@ -34,6 +34,25 @@
 	outum
 }
 
+%namespace char {
+	; stack -> r
+	%macro is_digit() {
+		%stack:drop()
+		lmge 48
+		smle 57
+		ld&m
+	}
+	%macro to_uint() {
+		lds 48
+	}
+	; is first char in stdin >= ' '?
+	; char not eaten
+	%macro stdin_valid_char() {
+		ipc
+		lrge 32
+	}
+}
+
 
 ; VM / runtime delim
 %macro print_delim(vm) {

@@ -49,6 +49,8 @@
 	%define G_ARGS_PTR 1
 	; start of procedure local vars
 	%define G_LOCALS_PTR 2
+	; this object for methods
+	%define G_THIS_PTR 3
 
 	%define G_IOTA 4
 
@@ -102,6 +104,10 @@
 	%macro reserve(N) {
 		mov %G_STACK_PTR
 		stra %N
+	}
+	%macro dup() {
+		%top()
+		%pushr()
 	}
 	%macro dup_over(n) {
 		%over(%n)
