@@ -33,12 +33,12 @@
 }
 
 ; from, count -> void (stdout)
-%proc {memdump,
-; NOTE procedure bcs it doesn't modify segments
-	%stack:ld_over(1) ; ld count
+%void_func {memdump, 2, 0,
+	%func_arg(1) ; ld count
+	ldm
 	%for {
 		%stack:top() ; idx
-		movs 4 ; from
+		%func_arg(0) ; from
 		movm
 		movar ; *(from + idx)
 
