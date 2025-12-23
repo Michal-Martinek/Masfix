@@ -97,3 +97,18 @@
 	outc 10
 	jmp end
 }
+
+%macro seeFuncFrame() {
+	outc 10
+	outc 70
+	outc 58
+
+	%load(%G_LOCALS_PTR) ; memdump(locals:top)
+	%stack:pushr()
+	%load(%G_STACK_PTR)
+	mov %G_LOCALS_PTR
+	ldsm
+	%stack:pushr()
+	%call(memdump)
+	outc 10
+}
