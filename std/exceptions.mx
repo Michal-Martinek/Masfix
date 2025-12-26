@@ -1,0 +1,26 @@
+%include "control"
+
+%define ERR_ASSERT 0
+
+%macro error(code) {
+	outc 10
+	outc 69
+	outc 82
+	outc 82
+	outc 79
+	outc 82
+	outc 58
+	outc 32
+	outu %code
+	outc 10
+	jmp end
+}
+
+%macro assert(cond) {
+	%if {
+		%cond
+		leq 0
+	,
+		%error(%ERR_ASSERT) ; TODO source info
+	}
+}

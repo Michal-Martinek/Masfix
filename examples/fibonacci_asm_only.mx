@@ -17,18 +17,18 @@ ld 1
 :not_zero
 
 ; mem [a, b, num]
-; init
+; init: a=0, b=1, num=r
 mov 0
 str 0
 mov 1
 str 1
 mov 2
 strr
-mov 0
 
-:loop ; at a
+:loop
 
 ; print a
+mov 0
 outum
 outc 10
 
@@ -41,9 +41,7 @@ strar
 mov 0
 strr
 
-; branch
+; loop if --num == 0
 mov 2
 strs 1
-ldm
-mov 0
-bne loop
+bmne loop

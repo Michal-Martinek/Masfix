@@ -4,15 +4,26 @@
 %include "memory"
 %using MEMORY_LAYOUT
 %include "io"
+%include "math"
 
-%define SAVED_STACK_PTR 63488 ; bottom of debug stack
-%store(%SAVED_STACK_PTR, %SEG_DEBUG_STACK)
+%store(%SEG_DEBUG_GLOBALS, %SEG_DEBUG_STACK) ; INIT debug SP
 
-; toggles between normal stack and debug stack
-%macro toggleDebugMode() {
-	%loadmov(%G_STACK_PTR, %SAVED_STACK_PTR)
+%macro _swapGlobalCell(idx) {
+	%loadmov(!op(a, %SEG_GLOBAL, %idx), !op(a, %SEG_DEBUG_GLOBALS, %idx))
 	swap
-	%storer(%G_STACK_PTR)
+	%storer(!op(a, %SEG_GLOBAL, %idx))
+}
+; toggle between normal mode and debug mode
+; (swap global segments)
+%macro toggleDebugMode() {
+	%_swapGlobalCell(0)
+	%_swapGlobalCell(1)
+	%_swapGlobalCell(2)
+	%_swapGlobalCell(3)
+	%_swapGlobalCell(4)
+	%_swapGlobalCell(5)
+	%_swapGlobalCell(6)
+	%_swapGlobalCell(7)
 }
 
 %macro emitMemdumpAddr() {
@@ -22,12 +33,12 @@
 }
 
 ; from, count -> void (stdout)
-%proc {memdump,
-; NOTE procedure bcs it doesn't modify segments
-	%stack:ld_over(1) ; ld count
+%void_func {memdump, 2, 0,
+	%func_arg(1) ; ld count
+	ldm
 	%for {
 		%stack:top() ; idx
-		movs 4 ; from
+		%func_arg(0) ; from
 		movm
 		movar ; *(from + idx)
 
@@ -46,24 +57,26 @@
 	}
 }
 
-; original SP -> r
 %macro _dumpStackPrologue() {
 	outc 10
 	%print_key_val(114, r)
 	%print_key_val(104, h)
 	%print_key_val(109, m)
+	mov %G_STACK_PTR ; "0: <SP>"
+	%print_spaced(%emitMemdumpAddr())
+	outum
 	%toggleDebugMode()
-
-	mov 0
-	%emitMemdumpAddr()
-	outc 32
-	%load(%SAVED_STACK_PTR)
-	outum ; show original SP
 }
 %macro _dumpStack2Top() {
 	%_dumpStackPrologue()
-	%stack:push(1) ; from 1 (mem [0] shown ^)
-	%stack:pushr() ; count
+	%stack:push(%SEG_DEBUG_GLOBALS) ; memdump(SP+1, 7)
+	stra 1
+	%stack:push(7)
+	%call(memdump)
+	%stack:push(8) ; memdump from 8
+	%load(%SEG_DEBUG_GLOBALS)
+	lds 7
+	%stack:pushr() ; count: original SP - 7
 	%call(memdump)
 }
 
@@ -76,11 +89,26 @@
 	%_dumpStack2Top()
 	; show overrun
 	outc 124 ; separator
-	%load(%SAVED_STACK_PTR)
+	%load(%SEG_DEBUG_GLOBALS)
 	lda 1
 	%stack:pushr() ; from original SP
 	%stack:push(%overrun) ; count
 	%call(memdump)
 	outc 10
 	jmp end
+}
+
+%macro seeFuncFrame() {
+	outc 10
+	outc 70
+	outc 58
+
+	%load(%G_LOCALS_PTR) ; memdump(locals:top)
+	%stack:pushr()
+	%load(%G_STACK_PTR)
+	mov %G_LOCALS_PTR
+	ldsm
+	%stack:pushr()
+	%call(memdump)
+	outc 10
 }

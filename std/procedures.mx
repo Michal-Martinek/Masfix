@@ -112,10 +112,18 @@
 	%movptr(%G_LOCALS_PTR)
 	mova %idx
 }
+%define arg 1 ; MEMORY_LAYOUT:G_ARGS_PTR
+%define local 2
+; use ^ for name
+%macro func_seg(name, idx, after) {
+	mov %name
+	movma %idx
+	%after
+}
 
 ; calling functions with constant arguments
-%macro callWith1Arg(name, arg) {
-	%push(%arg)
+%macro callWith1Arg(name, argument) {
+	%push(%argument)
 	%call(%name)
 }
 %macro callWith2Arg(name, a, b) {

@@ -1,0 +1,59 @@
+%include "memory"
+%include "control"
+%include "procedures"
+%include "io"
+
+%func {fibRecursive, 1, 0,
+	%if { ; if number <= 1: return number-1
+		%func_seg(%arg, 0, lmle 1)
+	,
+		%func_seg(%arg, 0, ldm)
+		%returnr(fibRecursive)
+	}
+	; push fib(arg-2)
+	%func_seg(%arg, 0,
+		ldms 2
+		%stack:pushr()
+	)
+	%call(fibRecursive)
+	; push fib(arg-1)
+	%func_seg(%arg, 0,
+		ldms 1
+		%stack:pushr()
+	)
+	%call(fibRecursive)
+	; sum & return
+	%stack:apply_op(a)
+	%stack:pop()
+}
+
+%void_func {main, 0, 1,
+	; input prompt
+	outc 72
+	outc 111
+	outc 119
+	outc 32
+	outc 109
+	outc 97
+	outc 110
+	outc 121
+	outc 63
+	outc 32
+
+	%func_local(0)
+	inum ; input
+	inl
+	%if { lmle 0, ; prohibit 0
+		str 1
+	}
+
+	%func_seg(%local, 0, ldm)
+	%for { ; for 0..input
+		%stack:dup()
+		%call(fibRecursive)
+		%stack:pop()
+		%print_endl(outum)
+	}
+}
+
+%call(main)
