@@ -56,7 +56,7 @@ tests\directive-definition.mx:74:9 ERROR: Define value expected
 tests\directive-definition.mx:75:9 ERROR: Define value expected
 tests\directive-definition.mx:77:2 ERROR: Undeclared identifier 'ijkl'
 tests\directive-definition.mx:79:8 ERROR: Unexpected continued token '()'
-tests\directive-definition.mx:80:2 ERROR: Missing define name
+tests\directive-definition.mx:80:9 ERROR: Missing define name
 tests\directive-definition.mx:81:8 ERROR: Invalid macro name '$'
 tests\directive-definition.mx:82:8 ERROR: Missing directive name
 tests\directive-definition.mx:84:9 ERROR: Invalid define name '59var'

@@ -992,6 +992,9 @@ string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) 
 }
 
 // preprocess -------------------------------------------------------------------------
+bool preprocess(Scope& scope);
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose);
+
 bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
 	while (scope.hasNext()) {
@@ -1027,11 +1030,28 @@ bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope
 	scope.addNewNamespace(name, percentToken.loc, false);
 	return true;
 }
+
+bool eatDefinedDirectiveName(string directive, Scope& scope, string& name, Token& percentToken, Loc& loc) {
+	if (scope.hasNext() && scope->type == Tlist) {
+		// TODO check !firstOnLine
+		Token& token = scope.currToken(); loc = token.loc;
+		processArglistWrapper( bool retval = preprocess(scope); );
+		processArglistWrapper(
+			retval = eatComplexIdentifier(scope, loc, name, directive);
+			retval = retval && check(!scope.hasNext(), "Unexpected token after define name", scope.currToken());
+		);
+		scope.eatenToken();
+	} else {
+		directiveEatIdentifier(directive, true, 1);
+	}
+	return true;
+}
 bool processDirectiveDef(string directive, Scope& scope, Token& percentToken, Loc loc) {
 	static_assert(DefiningDirectivesCount == 3, "Exhaustive processDirectiveDef definition");
-	string name; Token token;
-	directiveEatIdentifier(directive, true, 1);
+	string name;
+	returnOnFalse(eatDefinedDirectiveName(directive, scope, name, percentToken, loc));
 	if (directive == "define") {
+		Token token;
 		directiveEatToken(Tnumeric, "Define value expected", true);
 		scope.currNamespace().defines[name] = Define(name, percentToken.loc, token.data);
 	} else if (directive == "macro") {
@@ -1047,7 +1067,6 @@ void expandDefineUse(Token& percentToken, Scope& scope, int namespaceId, string 
 	Define& define = IdToNamespace[namespaceId].defines[defineName];
 	scope.insertToken(Token::fromCtx(Tnumeric, define.value, percentToken));
 }
-bool preprocess(Scope& scope);
 bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 	assert(token.type == Tlist);
 	if (token.tlist.size()) {

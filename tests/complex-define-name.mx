@@ -1,0 +1,79 @@
+
+%include "memory"
+
+%define a 8
+%macro namefrom(data) { ; macro exp not allowed in define name yet
+	name_of_field_(%data)_(!load(6))
+}
+
+; retarded name fields
+%define
+%define
+	[] ; NOTE bad error loc
+%define()
+%define ()[]
+%define ff()
+%define (
+	name?
+)
+%define (_^)
+%define (_
+	>
+) 8
+%define (!)
+; bad complex name fields
+%define {()}
+%define {(%)}
+%define {_()}
+%define {()_}
+%define {(
+	aa
+)}
+%define {(aa
+	bb
+)}
+%define {(aa bb)}
+
+; directive use inside
+%define {(aa)(%a)} 1
+%aa8
+
+%define (%namefrom(ffr)) 7
+%define (oo_(%a)) 7
+ld %oo_8
+%define ((%a)) 7
+%define (%a) 7
+%define (_%a) 7
+%define (mem_(%MEMORY_LAYOUT:G_ARGS_PTR)) 7
+ld %mem_1
+
+; weird stuff inside
+%define %macro
+%define (%define)
+%define (%namespace)
+%define (name
+	%macro)
+%define (!namefrom(data))
+%define (([]))
+
+ld !stack:push(6)
+ld !stack:push(7)
+%define (%stack:pop())
+%define (!stack:pop())
+%define (a_(!stack:pop())) 66
+%define (a_( %stack:pop())) 55
+%define (a_(
+	%stack:pop())
+) 55
+%define (a_(
+	!stack:pop())
+) 44
+swap %a_6
+
+; multiple fields
+%define { (aa)(%a)(7)(_) } 99
+test %aa87_
+%define { _(%a_6)_ ! }
+%define { _(%a_6)_ kraa }
+%define { _(%a_6)_ %stack:top() }
+%define { _(%a_6)_ !stack:top() }
