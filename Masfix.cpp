@@ -1009,6 +1009,23 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	}
 	return true;
 }
+bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
+	Token numeric;
+	if (scope.hasNext() && scope->type == Tlist && !scope->firstOnLine) {
+		Token& token = scope.currToken(); loc = token.loc;
+		checkReturnOnFail(!token.continued, "Unexpected continued field", token);
+		processArglistWrapper( bool retval = preprocess(scope); );
+		processArglistWrapper(
+			retval = eatToken(scope, loc, numeric, Tnumeric, "Define value expected", false);
+			retval = retval && check(!scope.hasNext(), "Unexpected token after value", scope.currToken());
+		);
+		scope.eatenToken(); // tlist
+	} else {
+		returnOnFalse(eatToken(scope, loc, numeric, Tnumeric, "Define value expected", true));
+	}
+	scope.currNamespace().defines[name] = Define(name, percentLoc, numeric.data);
+	return true;
+}
 bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	Token token;
 	scope.currNamespace().macros[name] = Macro(name, percentLoc);
@@ -1051,9 +1068,7 @@ bool processDirectiveDef(string directive, Scope& scope, Token& percentToken, Lo
 	string name;
 	returnOnFalse(eatDefinedDirectiveName(directive, scope, name, percentToken, loc));
 	if (directive == "define") {
-		Token token;
-		directiveEatToken(Tnumeric, "Define value expected", true);
-		scope.currNamespace().defines[name] = Define(name, percentToken.loc, token.data);
+		returnOnFalse(processDefineDef(scope, name, loc, percentToken.loc));
 	} else if (directive == "macro") {
 		returnOnFalse(processMacroDef(scope, name, loc, percentToken.loc));
 	} else if (directive == "namespace") {

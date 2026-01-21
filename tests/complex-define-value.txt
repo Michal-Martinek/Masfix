@@ -1,0 +1,50 @@
+:returncode 1
+
+:stderr 3221
+tests\complex-define-value.mx:92:14 ERROR: Unclosed token list '()'
+tests\complex-define-value.mx:10:9 ERROR: Define value expected
+tests\complex-define-value.mx:11:9 ERROR: Define value expected
+tests\complex-define-value.mx:13:9 ERROR: Define value expected
+tests\complex-define-value.mx:15:13 ERROR: Unexpected continued field '()'
+tests\complex-define-value.mx:16:14 ERROR: Define value expected
+tests\complex-define-value.mx:17:14 ERROR: Define value expected
+tests\complex-define-value.mx:19:2 ERROR: Unexpected token type 'value'
+tests\complex-define-value.mx:21:15 ERROR: Unexpected token type '_'
+tests\complex-define-value.mx:22:15 ERROR: Unexpected token type '_'
+tests\complex-define-value.mx:25:15 ERROR: Missing directive name
+tests\complex-define-value.mx:28:15 ERROR: Unexpected token type '()'
+tests\complex-define-value.mx:29:16 ERROR: Missing directive name
+tests\complex-define-value.mx:30:15 ERROR: Unexpected token type '_'
+tests\complex-define-value.mx:31:15 ERROR: Unexpected token type 'aa'
+tests\complex-define-value.mx:33:2 ERROR: Unexpected token type 'bb'
+tests\complex-define-value.mx:35:14 ERROR: Define value expected
+tests\complex-define-value.mx:40:15 ERROR: Unexpected token type 'namefrom'
+tests\complex-define-value.mx:46:14 ERROR: Unexpected token type '%'
+tests\complex-define-value.mx:47:15 ERROR: Definition not allowed inside arglist
+tests\complex-define-value.mx:48:15 ERROR: Definition not allowed inside arglist
+tests\complex-define-value.mx:50:2 ERROR: Definition not allowed inside arglist
+tests\complex-define-value.mx:7:2 ERROR: Unknown instruction 'name_of_field_data_0'
+tests\complex-define-value.mx:52:9 ERROR: Define redefinition 'wrd1'
+tests\complex-define-value.mx:58:15 ERROR: Unexpected token type 'pop'
+tests\complex-define-value.mx:60:15 ERROR: Unexpected token type 'a'
+tests\complex-define-value.mx:61:19 ERROR: Unexpected macro use
+tests\complex-define-value.mx:63:2 ERROR: Unexpected token type 'pop'
+tests\complex-define-value.mx:71:15 ERROR: Unexpected token after value '_'
+tests\complex-define-value.mx:72:16 ERROR: Unexpected token after value '_'
+tests\complex-define-value.mx:73:16 ERROR: Unexpected token after value '()'
+tests\complex-define-value.mx:74:16 ERROR: Missing directive name
+tests\complex-define-value.mx:75:15 ERROR: Unexpected token after value ','
+tests\complex-define-value.mx:76:26 ERROR: Unexpected token after value ','
+tests\complex-define-value.mx:78:2 ERROR: Unexpected token after value 'why'
+tests\complex-define-value.mx:82:23 ERROR: Unexpected token after directive '!'
+tests\complex-define-value.mx:83:23 ERROR: Unexpected token after directive '[]'
+tests\complex-define-value.mx:91:21 ERROR: Undeclared identifier 'circular'
+tests\complex-define-value.mx:94:2 ERROR: Unexpected token after value '$'
+tests\complex-define-value.mx:12:2 ERROR: Unexpected token '[]'
+tests\complex-define-value.mx:14:2 ERROR: Unexpected token '[]'
+tests\complex-define-value.mx:39:1 ERROR: Unexpected token '8'
+tests\complex-define-value.mx:43:1 ERROR: Unknown condition 'see 4 24'
+tests\complex-define-value.mx:68:1 ERROR: Only simple immediates for now 'swap 7 5 4'
+tests\complex-define-value.mx:89:1 ERROR: Unknown instruction 'value 14'
+
+
