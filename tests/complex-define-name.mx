@@ -9,7 +9,7 @@
 ; retarded name fields
 %define
 %define
-	[] ; NOTE bad error loc
+	[]
 %define()
 %define ()[]
 %define ff()
@@ -77,3 +77,11 @@ test %aa87_
 %define { _(%a_6)_ kraa }
 %define { _(%a_6)_ %stack:top() }
 %define { _(%a_6)_ !stack:top() }
+
+%define {
+	newline_name
+}
+%define {
+	newline
+	name
+}

@@ -993,7 +993,7 @@ string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) 
 
 // preprocess -------------------------------------------------------------------------
 bool preprocess(Scope& scope);
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose);
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine);
 
 bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
@@ -1049,12 +1049,11 @@ bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope
 }
 
 bool eatDefinedDirectiveName(string directive, Scope& scope, string& name, Token& percentToken, Loc& loc) {
-	if (scope.hasNext() && scope->type == Tlist) {
-		// TODO check !firstOnLine
+	if (scope.hasNext() && scope->type == Tlist && !scope->firstOnLine) {
 		Token& token = scope.currToken(); loc = token.loc;
 		processArglistWrapper( bool retval = preprocess(scope); );
 		processArglistWrapper(
-			retval = eatComplexIdentifier(scope, loc, name, directive);
+			retval = eatComplexIdentifier(scope, loc, name, directive, true);
 			retval = retval && check(!scope.hasNext(), "Unexpected token after define name", scope.currToken());
 		);
 		scope.eatenToken();
@@ -1293,8 +1292,8 @@ bool preprocess(Scope& scope) {
 	return errorLess;
 }
 // token stream parsing -----------------------------------
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose) {
-	string fragment; Loc fragLoc = loc; bool canStartLine = purpose == "instr";
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine) {
+	string fragment; Loc fragLoc = loc;
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
 	do {
 		Token& token = scope.currToken();
@@ -1342,19 +1341,19 @@ outer_loop_continue:
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
 			scope.eatenToken();
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label"));
+			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label", false));
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
 			dump(':' + name);
 		} else if (top.type == Talpha) {
 			// NOTE ignores whole instr on any err in parsing
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr"));
+			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true));
 			eatLineOnFalse(check(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc)); // note for bad label definition
 			Instr instr(name, loc);
 			while (scope.hasNext() && !scope->firstOnLine) {
 				string immFrag;
-				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate"), goto outer_loop_continue);
+				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate", false), goto outer_loop_continue);
 				instr.immFields.push_back(immFrag);
 			}
 			dump(instr.toStr());

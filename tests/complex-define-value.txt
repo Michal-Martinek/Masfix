@@ -1,7 +1,7 @@
 :returncode 1
 
 :stderr 3221
-tests\complex-define-value.mx:92:14 ERROR: Unclosed token list '()'
+tests\complex-define-value.mx:93:14 ERROR: Unclosed token list '()'
 tests\complex-define-value.mx:10:9 ERROR: Define value expected
 tests\complex-define-value.mx:11:9 ERROR: Define value expected
 tests\complex-define-value.mx:13:9 ERROR: Define value expected
@@ -38,13 +38,13 @@ tests\complex-define-value.mx:76:26 ERROR: Unexpected token after value ','
 tests\complex-define-value.mx:78:2 ERROR: Unexpected token after value 'why'
 tests\complex-define-value.mx:82:23 ERROR: Unexpected token after directive '!'
 tests\complex-define-value.mx:83:23 ERROR: Unexpected token after directive '[]'
-tests\complex-define-value.mx:91:21 ERROR: Undeclared identifier 'circular'
-tests\complex-define-value.mx:94:2 ERROR: Unexpected token after value '$'
+tests\complex-define-value.mx:92:21 ERROR: Undeclared identifier 'circular'
+tests\complex-define-value.mx:95:2 ERROR: Unexpected token after value '$'
 tests\complex-define-value.mx:12:2 ERROR: Unexpected token '[]'
 tests\complex-define-value.mx:14:2 ERROR: Unexpected token '[]'
 tests\complex-define-value.mx:39:1 ERROR: Unexpected token '8'
 tests\complex-define-value.mx:43:1 ERROR: Unknown condition 'see 4 24'
 tests\complex-define-value.mx:68:1 ERROR: Only simple immediates for now 'swap 7 5 4'
-tests\complex-define-value.mx:89:1 ERROR: Unknown instruction 'value 14'
+tests\complex-define-value.mx:90:1 ERROR: Unknown instruction 'value 14'
 
 

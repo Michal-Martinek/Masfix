@@ -1,12 +1,12 @@
 :returncode 1
 
-:stderr 2761
+:stderr 2926
 tests\complex-define-name.mx:10:2 ERROR: Missing define name
-tests\complex-define-name.mx:12:2 ERROR: Missing define name
+tests\complex-define-name.mx:11:2 ERROR: Missing define name
 tests\complex-define-name.mx:13:8 ERROR: Unexpected continued token '()'
 tests\complex-define-name.mx:14:9 ERROR: Missing define name
-tests\complex-define-name.mx:15:11 ERROR: Define value expected
-tests\complex-define-name.mx:16:9 ERROR: Missing define name
+tests\complex-define-name.mx:15:11 ERROR: Unexpected continued field '()'
+tests\complex-define-name.mx:16:9 ERROR: Invalid define name 'name?'
 tests\complex-define-name.mx:19:9 ERROR: Invalid define name '_^'
 tests\complex-define-name.mx:21:2 ERROR: Unexpected token after define name '>'
 tests\complex-define-name.mx:23:10 ERROR: Missing directive name
@@ -37,7 +37,9 @@ tests\complex-define-name.mx:76:20 ERROR: Missing directive name
 tests\complex-define-name.mx:77:20 ERROR: Unexpected token after define name 'kraa'
 tests\complex-define-name.mx:78:20 ERROR: Unexpected macro use
 tests\complex-define-name.mx:79:20 ERROR: Unexpected token after define name '0'
-tests\complex-define-name.mx:12:2 ERROR: Unexpected token '['
+tests\complex-define-name.mx:81:9 ERROR: Define value expected
+tests\complex-define-name.mx:86:2 ERROR: Unexpected token after define name 'name'
+tests\complex-define-name.mx:12:2 ERROR: Unexpected token '[]'
 tests\complex-define-name.mx:39:1 ERROR: Unexpected token '1'
 tests\complex-define-name.mx:71:1 ERROR: This instruction should have no arguments 'swap 66'
 tests\complex-define-name.mx:75:1 ERROR: Unknown instruction 'test 99'

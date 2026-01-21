@@ -82,7 +82,8 @@ swap %mac1 %mac2 !stack:pop()
 %define grrToken1  8  !
 %define grrToken2 (8) []
 
-%define ((complex)( _ )value_(!stack:top())
+%define (
+		(complex)( _ )value_(!stack:top())
 	) (
 		!op(a, %a, 6)
 	)
