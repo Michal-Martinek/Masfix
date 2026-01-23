@@ -85,3 +85,25 @@ test %aa87_
 	newline
 	name
 }
+
+; other defining directives - lower priority
+; macro expansion inside
+%macro echoP(arg) { %arg }
+%macro echoC(arg) { ld %arg }
+
+%namespace (%echoP(4)) {  }
+%namespace (!echoC(4)) {  }
+%namespace ((%echoP(4))_after) {  }
+%namespace ((
+			%echoP(4))_after) {  }
+%namespace ((!echoC(4))_after) {  }
+%namespace (name_(%echoP(4))) {  }
+%namespace (name_(
+			%echoP(4))) {  }
+%namespace (name_(!echoC(4))) {  }
+
+%macro(MD1)()()
+%macro (MD1)()()
+%macro (MD(11))(A)( outc %A )
+%MD1()
+%MD11($)
