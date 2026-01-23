@@ -16,14 +16,26 @@ No name can overwrite an instruction opcode and identifier redefinition rules ap
 
 ## Defining directives
 Defining directives define a [constant](#directive-define), a [macro](#macro-directive) or [namespace](#namespaces).  
+Directive name can have complex nature similar to [assembly instructions](./assembly.md#complex-identifiers) - tokens wrapped in `()`.  
+- _example:_ `%macro (name_(%a)) (arg1, arg2) { outu 6 }`
 
 #### Define directive
-The `%define` directive defines a numerical constant.  
+The `%define` directive defines a numerical constant - either literal or expr wrapped in braces.  
 Using the constant replaces the expression with the constant value.
 ```asm
-%define a_name 15
-lda %a_name
+%define a 15
+lda %a ; -> lda 15
+
+; define a constant with name=complex_value_0, value=21
+%define (
+		(complex)( _ )value_(!stack:top()) ; top of VM stack
+	) (
+		!op(a, %a, 6) ; math:op adds 6 to %a
+)
+outu %complex_value_0 ; 21
 ```
+  
+_Name and value fields must start inline._
 
 ### Macro directive
 The `%macro` directive defines a parametrized macro.  

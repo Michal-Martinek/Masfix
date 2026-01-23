@@ -1,0 +1,60 @@
+:returncode 1
+
+:stderr 3835
+tests\complex-define-name.mx:10:2 ERROR: Missing define name
+tests\complex-define-name.mx:11:2 ERROR: Missing define name
+tests\complex-define-name.mx:13:8 ERROR: Unexpected continued token '()'
+tests\complex-define-name.mx:14:9 ERROR: Missing define name
+tests\complex-define-name.mx:15:11 ERROR: Unexpected continued field '()'
+tests\complex-define-name.mx:16:9 ERROR: Invalid define name 'name?'
+tests\complex-define-name.mx:19:9 ERROR: Invalid define name '_^'
+tests\complex-define-name.mx:21:2 ERROR: Unexpected token after define name '>'
+tests\complex-define-name.mx:23:10 ERROR: Missing directive name
+tests\complex-define-name.mx:25:10 ERROR: Expected define field
+tests\complex-define-name.mx:26:11 ERROR: Missing directive name
+tests\complex-define-name.mx:27:11 ERROR: Expected define field
+tests\complex-define-name.mx:28:10 ERROR: Expected define field
+tests\complex-define-name.mx:29:10 ERROR: Missing define field name
+tests\complex-define-name.mx:32:10 ERROR: Simple define field expected
+tests\complex-define-name.mx:35:10 ERROR: Simple define field expected
+tests\complex-define-name.mx:41:9 ERROR: Missing define field name
+tests\complex-define-name.mx:44:9 ERROR: Invalid define name '8'
+tests\complex-define-name.mx:45:9 ERROR: Invalid define name '8'
+tests\complex-define-name.mx:46:11 ERROR: Directive must not continue
+tests\complex-define-name.mx:51:9 ERROR: Invalid define name '%macro'
+tests\complex-define-name.mx:52:10 ERROR: Definition not allowed inside arglist
+tests\complex-define-name.mx:53:10 ERROR: Definition not allowed inside arglist
+tests\complex-define-name.mx:55:2 ERROR: Definition not allowed inside arglist
+tests\complex-define-name.mx:6:2 ERROR: Unknown instruction 'name_of_field_data_0'
+tests\complex-define-name.mx:56:9 ERROR: Invalid define name '0'
+tests\complex-define-name.mx:57:9 ERROR: Invalid define name '[]'
+tests\complex-define-name.mx:61:9 ERROR: Missing define field name
+tests\complex-define-name.mx:62:9 ERROR: Invalid define name '7'
+tests\complex-define-name.mx:64:14 ERROR: Unexpected macro use
+tests\complex-define-name.mx:65:12 ERROR: Missing define field name
+tests\complex-define-name.mx:68:12 ERROR: Missing define field name
+tests\complex-define-name.mx:76:20 ERROR: Missing directive name
+tests\complex-define-name.mx:77:20 ERROR: Unexpected token after define name 'kraa'
+tests\complex-define-name.mx:78:20 ERROR: Unexpected macro use
+tests\complex-define-name.mx:79:20 ERROR: Unexpected token after define name '0'
+tests\complex-define-name.mx:81:9 ERROR: Define value expected
+tests\complex-define-name.mx:86:2 ERROR: Unexpected token after define name 'name'
+tests\complex-define-name.mx:94:12 ERROR: Missing namespace field name
+tests\complex-define-name.mx:95:12 ERROR: Invalid namespace name '4'
+tests\complex-define-name.mx:96:14 ERROR: Unexpected macro use
+tests\complex-define-name.mx:97:13 ERROR: Missing namespace field name
+tests\complex-define-name.mx:99:12 ERROR: Invalid namespace name '4_after'
+tests\complex-define-name.mx:100:19 ERROR: Unexpected macro use
+tests\complex-define-name.mx:101:18 ERROR: Missing namespace field name
+tests\complex-define-name.mx:105:7 ERROR: Unexpected continued token '()'
+tests\complex-define-name.mx:114:8 ERROR: Invalid macro name '%nonex'
+tests\complex-define-name.mx:115:8 ERROR: Missing macro field name
+tests\complex-define-name.mx:116:10 ERROR: Unexpected macro use
+tests\complex-define-name.mx:117:9 ERROR: Missing macro field name
+tests\complex-define-name.mx:12:2 ERROR: Unexpected token '[]'
+tests\complex-define-name.mx:39:1 ERROR: Unexpected token '1'
+tests\complex-define-name.mx:71:1 ERROR: This instruction should have no arguments 'swap 66'
+tests\complex-define-name.mx:75:1 ERROR: Unknown instruction 'test 99'
+tests\complex-define-name.mx:107:21 ERROR: Invalid instruction immediate 'outc $'
+
+

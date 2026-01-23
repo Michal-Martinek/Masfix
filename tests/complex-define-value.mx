@@ -1,0 +1,95 @@
+
+%include "memory"
+%include "math"
+
+%define a 8
+%macro namefrom(data) { ; macro exp not allowed in define value yet
+	name_of_field_(%data)_(!load(6))
+}
+; retarded name fields
+%define def1
+%define def1
+	[]
+%define def1
+	[ 99 ]
+%define def1()
+%define def1 ()
+%define def1 ()[]
+%define def1 (
+	value?
+)
+%define def1 (_^)
+%define def1 (_
+	>
+)
+%define def1 (!)
+
+; bad value fields
+%define def1 {()}
+%define def1 {(%)}
+%define def1 {_()}
+%define def1 {aa}
+%define def1 {
+	bb
+}
+%define def1 {}
+
+; directive use inside
+%define dir1 {%a}
+%dir1
+%define dir2 (%namefrom(ffr))
+%define dir3 (%MEMORY_LAYOUT:G_IOTA)
+%define dir4 (!op(t, %a, 3))
+see %dir3 %dir4
+
+; weird stuff inside
+%define wrd1 %macro
+%define wrd1 (%define wrd1)
+%define wrd1 (%namespace)
+%define wrd1 (name
+	%macro)
+%define wrd1 (!namefrom(data))
+%define wrd1
+ld !stack:push(3)
+ld !stack:push(4)
+ld !stack:push(5)
+ld !stack:push(6)
+ld !stack:push(7)
+%define mac1 (%stack:pop())
+%define mac1 (!stack:pop())
+%define mac2 (a_(!stack:pop()))
+%define mac2 (a_( %stack:pop()))
+%define mac2 (
+	%stack:pop()
+)
+%define mac2 (
+	!stack:pop()
+)
+swap %mac1 %mac2 !stack:pop()
+
+; multiple fields
+%define fs1 [8_  ]
+%define fs1 [8 _ ]
+%define fs1 [8 ()]
+%define fs1 [8 % ]
+%define fs1 [8, /]
+%define fs1 [!stack:top(),]
+%define fs1 [88
+	why-are-you-gay?
+]
+
+; tokens after directive
+%define grrToken1  8  !
+%define grrToken2 (8) []
+
+%define (
+		(complex)( _ )value_(!stack:top())
+	) (
+		!op(a, %a, 6)
+	)
+value %complex_value_3
+
+%define circular ( %circular )
+%define name (
+	!load(0)
+	$
