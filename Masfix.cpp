@@ -688,6 +688,9 @@ public:
 	Namespace& currNamespace() {
 		return IdToNamespace[currNamespaceId()];
 	}
+	Namespace& topNamespace() {
+		return IdToNamespace[namespaces.top()];
+	}
 	Macro& currMacro() {
 		assert(insideMacro());
 		return currNamespace().macros[macros.top().second];
@@ -1025,7 +1028,7 @@ bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	} else {
 		returnOnFalse(eatToken(scope, loc, numeric, Tnumeric, "Define value expected", true));
 	}
-	scope.currNamespace().defines[name] = Define(name, percentLoc, numeric.data);
+	scope.topNamespace().defines[name] = Define(name, percentLoc, numeric.data);
 	return true;
 }
 bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
@@ -1248,7 +1251,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken()); \
 	if (type != "macro arg") { \
 		checkReturnOnFail(!scope.insideTlistOfType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
-		checkReturnOnFail(!scope.insideMacro(), type " not allowed inside macro", percentToken.loc); \
+		checkReturnOnFail(!scope.insideMacro() || directiveName == "define", type " not allowed inside macro", percentToken.loc); \
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
 	}
 bool processDirective(Token percentToken, Scope& scope) {
