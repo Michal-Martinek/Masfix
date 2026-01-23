@@ -274,6 +274,8 @@ struct Token {
 		if (type == Tlist) {
 			if (isSeparated()) out.push_back(',');
 			out.push_back(tlistCloseChar());
+		} else if (type == TIexpansion) {
+			out = "%" + out;
 		}
 		// } else if (type == Tstring && quotedStr) {
 		// 	return '"' + data + '"';
