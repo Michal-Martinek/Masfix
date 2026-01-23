@@ -107,3 +107,12 @@ test %aa87_
 %macro (MD(11))(A)( outc %A )
 %MD1()
 %MD11($)
+
+
+%macro mm()()
+
+%macro %nonex() (){}
+%macro (%mm()) (){}
+%macro ((%mm())) ({})
+%macro ((
+		%mm())) ({})
