@@ -1,0 +1,99 @@
+
+; tests macro & const definitions nested inside macro
+
+%include "control"
+
+:first
+:const_inner
+:mac_mid
+
+
+%namespace first {
+	%macro defines(nameExt) {
+		%define (const_(%nameExt)) (!iota:increment())
+		%macro (mac_(%nameExt))(a) {
+			macro inside %a
+		}
+		outu 6
+		:mac_(%nameExt)
+	}
+	%namespace inner {
+		%defines(inner)
+		val %const_inner
+		%mac_inner(8)
+	}
+	%const_inner
+	inside %inner:const_inner
+	%mac_inner()
+
+	%defines(mid)
+	see %const_mid
+	%mac_mid(4)
+
+	%defines(inner)
+	%mac_inner(%const_inner)
+	%
+	%defines(inner)
+}
+
+%macro badArgs(closure) {
+	%define before 7
+	%macro badArg(arg) {
+		%closure
+		l %arg
+		%before
+		%after
+		%mac_after
+		%define mac_after 8
+		%mac_after
+	}
+	%define after (%closure)
+
+	%namespace middle {
+		%define wrong 8
+	}
+	%wrong
+}
+
+%namespace test {
+	%namespace accessible {
+		%badArg(1)
+		%after
+		%badArgs(12)
+		%badArg(2)
+		const %after
+		%wrong
+		%namespace inner {
+			%mac_after
+		}
+	}
+	%namespace not {
+		%badArg(5)
+		%before
+		%using accessible
+		%mac_after
+		%after
+		%badArg(5)
+	}
+}
+
+%macro otherDirs() {
+	%namespace jira {}
+	%using test
+}
+%otherDirs()
+
+
+%define a 5
+%namespace out_of_scope_redefs {
+	%macro mm(ui) {}
+	%macro defs() {
+		%define a 7
+		%macro mm() {}
+	}
+	%out_of_scope_redefs:defs()
+	%macro mm()() ; separator
+}
+%using out_of_scope_redefs
+%defs()
+%mm(ui) ; bad version

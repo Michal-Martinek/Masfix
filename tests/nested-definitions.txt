@@ -1,0 +1,48 @@
+:returncode 1
+
+:stderr 2949
+tests\nested-definitions.mx:25:3 ERROR: Undeclared identifier 'const_inner'
+tests\nested-definitions.mx:27:3 ERROR: Undeclared identifier 'mac_inner'
+tests\nested-definitions.mx:35:2 ERROR: Missing directive name
+tests\nested-definitions.mx:13:11 ERROR: Define redefinition 'const_inner'
+tests\nested-definitions.mx:14:10 ERROR: Macro redefinition 'mac_inner'
+tests\nested-definitions.mx:60:4 ERROR: Undeclared identifier 'badArg'
+tests\nested-definitions.mx:61:4 ERROR: Undeclared identifier 'after'
+tests\nested-definitions.mx:52:2 ERROR: Definition not allowed inside macro
+tests\nested-definitions.mx:55:3 ERROR: Undeclared identifier 'wrong'
+tests\nested-definitions.mx:42:4 ERROR: Undeclared identifier 'closure'
+tests\nested-definitions.mx:46:4 ERROR: Undeclared identifier 'mac_after'
+tests\nested-definitions.mx:65:4 ERROR: Undeclared identifier 'wrong'
+tests\nested-definitions.mx:71:4 ERROR: Undeclared identifier 'badArg'
+tests\nested-definitions.mx:72:4 ERROR: Undeclared identifier 'before'
+tests\nested-definitions.mx:42:4 ERROR: Undeclared identifier 'closure'
+tests\nested-definitions.mx:81:2 ERROR: Definition not allowed inside macro
+tests\nested-definitions.mx:82:2 ERROR: Directive not allowed inside macro
+tests\nested-definitions.mx:92:10 ERROR: Macro redefinition 'mm'
+tests\nested-definitions.mx:95:9 ERROR: Macro redefinition 'mm'
+tests\nested-definitions.mx:91:11 ERROR: Define redefinition 'a'
+tests\nested-definitions.mx:99:4 ERROR: Excesive expansion argument
+tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_mid'
+tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_inner'
+tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_inner'
+tests\nested-definitions.mx:44:3 ERROR: Unexpected token '7'
+tests\nested-definitions.mx:45:3 ERROR: Unexpected token '12'
+tests\nested-definitions.mx:48:3 ERROR: Unexpected token '8'
+tests\nested-definitions.mx:67:4 ERROR: Unexpected token '8'
+tests\nested-definitions.mx:74:3 ERROR: Unexpected token '8'
+tests\nested-definitions.mx:75:3 ERROR: Unexpected token '12'
+tests\nested-definitions.mx:44:3 ERROR: Unexpected token '7'
+tests\nested-definitions.mx:45:3 ERROR: Unexpected token '12'
+tests\nested-definitions.mx:46:3 ERROR: Unexpected token '8'
+tests\nested-definitions.mx:48:3 ERROR: Unexpected token '8'
+tests\nested-definitions.mx:22:3 ERROR: Unknown instruction 'val 0'
+tests\nested-definitions.mx:15:4 ERROR: Unknown instruction 'macro inside 8'
+tests\nested-definitions.mx:26:2 ERROR: Unknown instruction 'inside 0'
+tests\nested-definitions.mx:30:2 ERROR: Unknown condition 'see 1'
+tests\nested-definitions.mx:15:4 ERROR: Unknown instruction 'macro inside 4'
+tests\nested-definitions.mx:15:4 ERROR: Unknown instruction 'macro inside 2'
+tests\nested-definitions.mx:43:3 ERROR: Missing condition 'l 2'
+tests\nested-definitions.mx:64:3 ERROR: Unknown instruction 'const 12'
+tests\nested-definitions.mx:43:3 ERROR: Missing condition 'l 5'
+
+
