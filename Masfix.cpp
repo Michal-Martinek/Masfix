@@ -971,7 +971,7 @@ bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bo
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
 	returnOnFalse(eatIdentifier(scope, name, loc, identPurpose, false, eatAnything)); \
 	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
-	if (definition) returnOnFalse(checkIdentRedefinitions(name, loc, false, &scope.currNamespace()));
+	if (definition) returnOnFalse(checkIdentRedefinitions(name, loc, false, &scope.topNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
 
 /// constructs relative path from last 'Masfix' directory
@@ -1033,8 +1033,8 @@ bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 }
 bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	Token token;
-	scope.currNamespace().macros[name] = Macro(name, percentLoc);
-	Macro& mac = scope.currNamespace().macros[name];
+	scope.topNamespace().macros[name] = Macro(name, percentLoc);
+	Macro& mac = scope.topNamespace().macros[name];
 	directiveEatToken(Tlist, "Macro arglist expected", true);
 	if (token.tlist.size()) {
 		processArglistWrapper( bool retval = arglistFromTlist(scope, loc, mac); )
@@ -1251,7 +1251,9 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
 	if (dirType != "macro arg") {
 		checkReturnOnFail(!scope.insideTlistOfType(TIarglist), dirType + " not allowed inside arglist", percentToken.loc);
-		checkReturnOnFail(!scope.insideMacro() || directiveName == "define", dirType + " not allowed inside macro", percentToken.loc);
+		if (directiveName != "define" && directiveName != "macro") {
+			checkReturnOnFail(!scope.insideMacro(), dirType + " not allowed inside macro", percentToken.loc);
+		}
 		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc);
 	}
 	return true;
@@ -1321,7 +1323,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 	} while (scope.hasNext() && scope->continued);
 	if (purpose == "instr" || purpose == "immediate") return true;
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
-	return checkIdentRedefinitions(ident, loc, true);
+	return checkIdentRedefinitions(ident, loc, purpose == "label", &scope.topNamespace());
 }
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {

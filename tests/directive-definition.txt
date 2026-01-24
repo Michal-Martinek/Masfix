@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8714
+:stderr 8636
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -48,7 +48,6 @@ tests\directive-definition.mx:60:17 ERROR: Unexpected directive here 'macro'
 tests\directive-definition.mx:61:17 ERROR: Unexpected directive here 'namespace'
 tests\directive-definition.mx:62:13 ERROR: Unexpected directive here 'using'
 tests\directive-definition.mx:63:8 ERROR: Unexpected accessor
-tests\directive-definition.mx:67:2 ERROR: Definition not allowed inside macro
 tests\directive-definition.mx:68:2 ERROR: Definition not allowed inside macro
 tests\directive-definition.mx:69:2 ERROR: Directive not allowed inside macro
 tests\directive-definition.mx:74:9 ERROR: Define value expected
