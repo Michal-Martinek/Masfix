@@ -1245,27 +1245,29 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	}
 	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
-#define processDirectiveSituationChecks(type) \
-	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin())); \
-	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken); \
-	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken()); \
-	if (type != "macro arg") { \
-		checkReturnOnFail(!scope.insideTlistOfType(TIarglist), type " not allowed inside arglist", percentToken.loc); \
-		checkReturnOnFail(!scope.insideMacro() || directiveName == "define", type " not allowed inside macro", percentToken.loc); \
-		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc); \
+bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, list<string> prefixes, list<Loc> locs, Token& percentToken) {
+	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin()));
+	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken);
+	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
+	if (dirType != "macro arg") {
+		checkReturnOnFail(!scope.insideTlistOfType(TIarglist), dirType + " not allowed inside arglist", percentToken.loc);
+		checkReturnOnFail(!scope.insideMacro() || directiveName == "define", dirType + " not allowed inside macro", percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc);
 	}
+	return true;
+}
 bool processDirective(Token percentToken, Scope& scope) {
 	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
 	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope));
 	if (DefiningDirectivesSet.count(directiveName)) {
-		processDirectiveSituationChecks("Definition");
+		returnOnFalse(checkDirectiveContext(scope, "Definition", directiveName, prefixes, locs, percentToken));
 		returnOnFalse(processDirectiveDef(directiveName, scope, percentToken, loc));
 	} else if (BuiltinDirectivesSet.count(directiveName)) {
-		processDirectiveSituationChecks("Directive");
+		returnOnFalse(checkDirectiveContext(scope, "Directive", directiveName, prefixes, locs, percentToken));
 		returnOnFalse(processBuiltinUse(directiveName, scope, loc));
 	} else if (!prefixes.size() && scope.hasMacroArg(directiveName)) {
-		processDirectiveSituationChecks("macro arg");
+		returnOnFalse(checkDirectiveContext(scope, "macro arg", directiveName, prefixes, locs, percentToken));
 		list<Token>& argField = scope.currMacro().nameToArg(directiveName).value.top();
 		scope.insertList(argField, percentToken, true);
 	} else {
