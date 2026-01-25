@@ -182,3 +182,12 @@ rec
 %m(
 	%m(k8,420) , ULL69 ; ultra long long (expansion)
 )
+
+; unexpected ctime forcing
+%define const 9
+ld %const !const
+%macro ctime(i) {
+	ld %i !i
+	ld %const !const
+}
+%ctime(6)

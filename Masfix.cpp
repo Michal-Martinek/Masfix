@@ -1194,6 +1194,7 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
 bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
+		checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken);
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
