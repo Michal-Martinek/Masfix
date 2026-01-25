@@ -1,13 +1,13 @@
 :returncode 1
 
-:stderr 8636
+:stderr 8641
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
 tests\directive-definition.mx:8:2 ERROR: Undeclared identifier 'lulw'
 tests\directive-definition.mx:9:3 ERROR: Undeclared identifier 'lulw'
-tests\directive-definition.mx:11:1 ERROR: Missing directive name
-tests\directive-definition.mx:12:1 ERROR: Missing directive name
+tests\directive-definition.mx:11:2 ERROR: Missing directive name
+tests\directive-definition.mx:12:2 ERROR: Undeclared identifier 'arg'
 tests\directive-definition.mx:13:2 ERROR: Invalid directive name '89'
 tests\directive-definition.mx:14:2 ERROR: Undeclared identifier '_'
 tests\directive-definition.mx:15:3 ERROR: Undeclared identifier '_'
