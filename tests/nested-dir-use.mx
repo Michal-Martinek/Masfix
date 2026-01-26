@@ -1,0 +1,53 @@
+
+
+; empty arglist
+%()
+% () zz
+%
+  ()
+!() grr
+!
+  ()
+
+; bad name
+%(:)
+%( & )
+%(define) I 9
+!(%I)
+
+
+%macro lt(a, b) {
+	ld %a
+	llt %b
+}
+%macro gt(a, b) {
+	ld %a
+	lgt %b
+}
+%define a 2
+%define b 3
+%define c 4
+%define d 5
+%((macro)) (runFunc)(func, whichFirst, whichSecond) {
+	%(%func)(%(%whichFirst), %(%whichSecond))
+}
+first  !(run("Func"))   (gt, b, a)
+second !([runFunc])     (lt, c, a)
+third  !(("run")(Func)) (gt, b, c)
+
+
+; accessors
+%(namespace) (random) {
+	%define RNG 42
+}
+%random()
+%random:()
+%:random:()
+%(random):RNG
+%(random:RNG)
+%random:RNG
+
+; using
+%(using) (oups)
+
+%

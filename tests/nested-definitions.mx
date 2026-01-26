@@ -7,9 +7,9 @@
 :const_inner
 :mac_mid
 
-
 %namespace first {
 	%macro defines(nameExt) {
+		; these will be defined in namespace where %defines macro was expanded from
 		%define (const_(%nameExt)) (!iota:increment())
 		%macro (mac_(%nameExt))(a) {
 			macro inside %a
@@ -36,7 +36,7 @@
 	%defines(inner)
 }
 
-%macro badArgs(closure) {
+%macro badArgs(closure) { ; NOTE: Masfix has no closure, in fact %badArg's body won't see anything from this scope (%arg..)
 	%define before 7
 	%macro badArg(arg) {
 		%closure

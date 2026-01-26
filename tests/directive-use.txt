@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 7065
+:stderr 7262
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -51,6 +51,9 @@ tests\directive-use.mx:132:14 ERROR: Argument expected
 tests\directive-use.mx:132:18 ERROR: Excesive expansion argument
 tests\directive-use.mx:139:20 ERROR: Excesive expansion argument
 tests\directive-use.mx:145:20 ERROR: Missing expansion arguments
+tests\directive-use.mx:188:11 ERROR: Unexpected ctime forcing '!'
+tests\directive-use.mx:190:8 ERROR: Unexpected ctime forcing '!'
+tests\directive-use.mx:191:12 ERROR: Unexpected ctime forcing '!'
 tests\directive-use.mx:11:1 ERROR: Unexpected token '1'
 tests\directive-use.mx:26:1 ERROR: Unexpected token '3'
 tests\directive-use.mx:27:1 ERROR: Unexpected token '()'

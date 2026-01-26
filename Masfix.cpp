@@ -1123,6 +1123,21 @@ bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& 
 	}
 	return true;
 }
+bool complexDirectiveName(Scope& scope, string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc) {
+	if (scope.hasNext() && scope->type == Tlist && !scope->firstOnLine) {
+		Token& token = scope.currToken(); loc = token.loc;
+		processArglistWrapper( bool retval = preprocess(scope); );
+		processArglistWrapper(
+			retval = eatComplexIdentifier(scope, loc, firstName, "directive", false);
+			retval = retval && check(!scope.hasNext(), "Unexpected token after directive name", scope.currToken());
+		)
+		locs.push_back(loc);
+		scope.eatenToken();
+	} else {
+		return getDirectivePrefixes(firstName, prefixes, locs, loc, scope, "directive");
+	}
+	return true;
+}
 bool defineDefined(string& name, int& namespaceId, bool firstPrefix=false) {
 	if (IdToNamespace[namespaceId].defines.count(name)) return true;
 	if (firstPrefix) for (int id : IdToNamespace[namespaceId].usedNamespaces) {
@@ -1179,6 +1194,7 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
 bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
 		checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
+		checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken);
 		expandDefineUse(percentToken, scope, namespaceId, directiveName);
 		return true;
 	} else if (macroDefined(directiveName, namespaceId)) {
@@ -1261,7 +1277,7 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 bool processDirective(Token percentToken, Scope& scope) {
 	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
-	returnOnFalse(getDirectivePrefixes(directiveName, prefixes, locs, loc, scope));
+	returnOnFalse(complexDirectiveName(scope, directiveName, prefixes, locs, loc));
 	if (DefiningDirectivesSet.count(directiveName)) {
 		returnOnFalse(checkDirectiveContext(scope, "Definition", directiveName, prefixes, locs, percentToken));
 		returnOnFalse(processDirectiveDef(directiveName, scope, percentToken, loc));
@@ -1321,7 +1337,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);
-	if (purpose == "instr" || purpose == "immediate") return true;
+	if (purpose == "instr" || purpose == "immediate" || purpose == "directive") return true;
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
 	return checkIdentRedefinitions(ident, loc, purpose == "label", &scope.topNamespace());
 }

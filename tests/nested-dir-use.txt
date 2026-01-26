@@ -1,0 +1,26 @@
+:returncode 1
+
+:stderr 1299
+tests\nested-dir-use.mx:4:2 ERROR: Missing directive name
+tests\nested-dir-use.mx:5:3 ERROR: Missing directive name
+tests\nested-dir-use.mx:6:1 ERROR: Missing directive name
+tests\nested-dir-use.mx:8:2 ERROR: Missing directive name
+tests\nested-dir-use.mx:9:1 ERROR: Missing directive name
+tests\nested-dir-use.mx:13:2 ERROR: Undeclared identifier ':'
+tests\nested-dir-use.mx:14:2 ERROR: Undeclared identifier '&'
+tests\nested-dir-use.mx:16:2 ERROR: Undeclared identifier '9'
+tests\nested-dir-use.mx:43:2 ERROR: Namespace used as directive 'random'
+tests\nested-dir-use.mx:44:8 ERROR: Missing directive name
+tests\nested-dir-use.mx:45:1 ERROR: Missing directive name
+tests\nested-dir-use.mx:46:2 ERROR: Namespace used as directive 'random'
+tests\nested-dir-use.mx:47:2 ERROR: Undeclared identifier 'random:RNG'
+tests\nested-dir-use.mx:51:2 ERROR: Missing namespace name
+tests\nested-dir-use.mx:53:1 ERROR: Missing directive name
+tests\nested-dir-use.mx:7:3 ERROR: Unexpected token '()'
+tests\nested-dir-use.mx:10:3 ERROR: Unexpected token '()'
+tests\nested-dir-use.mx:48:1 ERROR: Unexpected token '42'
+tests\nested-dir-use.mx:34:1 ERROR: Unknown instruction 'first 1'
+tests\nested-dir-use.mx:35:1 ERROR: Unknown condition 'second 0'
+tests\nested-dir-use.mx:36:1 ERROR: Unknown instruction 'third 0'
+
+
