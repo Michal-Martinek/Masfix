@@ -82,10 +82,10 @@ strr     ; store r in memory at new addr
 
 
 ; include standart library with preprocessor
-%include "std/memory"
-%include "std/math"
-%include "std/procedures"
-%include "std/control"
+%include "memory"
+%include "math"
+%include "procedures"
+%include "control"
 
 ; define preprocessor directives
 %define divideBy 7

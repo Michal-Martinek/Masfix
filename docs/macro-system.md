@@ -89,9 +89,9 @@ Higher level namespaces are accessible, others can be accessed with `%namespace1
 #### using directive
 The `%using` directive makes all identifiers in another namespace accessible from the current one.
 ```asm
-%include "std/memory"
+%include "memory"
 %stack:push(1)
-%using stack:impl ; defined in std/memory
+%using stack:impl ; defined in std/core/memory
 %derefSPpop() ; from memory:impl
 ```
 

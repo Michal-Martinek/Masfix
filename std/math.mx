@@ -1,4 +1,4 @@
-%include "std/procedures"
+%include "procedures"
 %include "memory"
 %include "control"
 

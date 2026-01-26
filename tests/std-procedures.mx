@@ -1,7 +1,7 @@
 
 
-%include "std/memory"
-%include "std/procedures"
+%include "memory"
+%include "procedures"
 %using stack
 
 

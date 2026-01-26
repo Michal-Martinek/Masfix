@@ -44,7 +44,7 @@
 
 ; path searching
 %include "memory.mx"
-%include "std/procedures"
+%include "procedures"
 %include "fibonacci"
 %include "examples/fibonacci_asm_only.mx"
 %include "tests\includes\includee"

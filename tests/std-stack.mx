@@ -1,6 +1,6 @@
 
 
-%include "std/memory"
+%include "memory"
 %using stack
 
 %load(%MEMORY_LAYOUT:G_STACK_PTR)
