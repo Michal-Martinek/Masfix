@@ -349,6 +349,14 @@ struct Macro {
 			argList[i].value.pop();
 		}
 	}
+	string noteArglist() {
+		string args;
+		for (MacroArg& arg : argList) {
+			if (args.size()) args += ", ";
+			args += arg.name;
+		}
+		return "Expected arguments: " + name + "(" + args + ")";
+	}
 };
 struct Namespace {
 	string name;
@@ -507,9 +515,9 @@ Flags flags;
 #define continueOnFalse(cond) if (!(cond)) { errorLess = false; continue; }
 #define returnOnFalse(cond) if (!(cond)) return false;
 
-#define check(cond, message, obj) ((cond) || raiseError(message, obj))
-#define checkContinueOnFail(cond, message, obj) continueOnFalse(check(cond, message, obj));
-#define checkReturnOnFail(cond, message, obj) returnOnFalse(check(cond, message, obj));
+#define check(cond, ...) ((cond) || raiseError(__VA_ARGS__))
+#define checkContinueOnFail(cond, ...) continueOnFalse(check(cond, __VA_ARGS__));
+#define checkReturnOnFail(cond, ...) returnOnFalse(check(cond, __VA_ARGS__));
 
 bool FLAG_strictErrors = false;
 bool SupressErrors = false;
@@ -533,16 +541,23 @@ void addError(string message, bool strict=true) {
 	}
 }
 
-bool raiseError(string message, Token token, bool strict=false) {
+void _raiseNote(string message) {
+	string err = "    - NOTE: " + message + "\n";
+	addError(err, false);
+}
+
+bool raiseError(string message, Token token, string note="", bool strict=false) {
 	returnOnErrSupress();
 	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
 	addError(err, strict);
+	if (note.size()) _raiseNote(note);
 	return false;
 }
-bool raiseError(string message, Instr instr, bool strict=false) {
+bool raiseError(string message, Instr instr, string note="", bool strict=false) {
 	returnOnErrSupress();
 	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
 	addError(err, strict);
+	if (note.size()) _raiseNote(note);
 	return false;
 }
 bool raiseWarning(string message, Instr instr) {
@@ -551,10 +566,11 @@ bool raiseWarning(string message, Instr instr) {
 	addError(err, false);
 	return false;
 }
-bool raiseError(string message, Loc loc, bool strict=false) {
+bool raiseError(string message, Loc loc, string note="", bool strict=false) {
 	returnOnErrSupress();
 	string err = loc.toStr() + " ERROR: " + message + "\n";
 	addError(err, strict);
+	if (note.size()) _raiseNote(note);
 	return false;
 }
 // struct Scope --------------------------------------------------------
@@ -710,7 +726,7 @@ public:
 	/// adds macro expansion to macro scoping stack
 	void addMacroExpansion(int namespaceId, Token& expansionToken) {
 		if (macros.size() > MAX_EXPANSION_DEPTH) { // TODO?
-			raiseError("Maximum expansion depth exceeded", expansionToken.loc, true);
+			raiseError("Maximum expansion depth exceeded", expansionToken.loc, "", true);
 		}
 		macros.push(pair(namespaceId, expansionToken.data));
 		insertToken(move(expansionToken));
