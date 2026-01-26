@@ -836,8 +836,8 @@ public:
 	}
 
 // helpers -------------------------------------------------
-	bool _addMacroArg(vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
-		checkReturnOnFail(firstArg != itrs.top(), "Argument expected", loc);
+	bool _addMacroArg(Macro& mac, vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
+		checkReturnOnFail(firstArg != itrs.top(), "Argument expected", loc, mac.noteArglist());
 		argSpans.push_back(pair(firstArg, itrs.top()));
 		return true;
 	}
@@ -849,8 +849,8 @@ public:
 			checkReturnOnFail(mac.argList.size(), "Excesive expansion argument", loc);
 			if (currToken().type == Tseparator) {
 				loc = currToken().loc;
-				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc);
-				retval &= _addMacroArg(argSpans, ++argStart, loc);
+				checkReturnOnFail(argSpans.size()+1 < mac.argList.size(), "Excesive expansion argument", loc, mac.noteArglist());
+				retval &= _addMacroArg(mac, argSpans, ++argStart, loc);
 				argStart = itrs.top();
 			} else if (currToken().type == TIexpansion) {
 				Token exp = eatenToken();
@@ -859,8 +859,8 @@ public:
 			}
 			next();
 		}
-		retval &= _addMacroArg(argSpans, ++argStart, loc);
-		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc));
+		retval &= _addMacroArg(mac, argSpans, ++argStart, loc);
+		returnOnFalse(retval && check(argSpans.size() == mac.argList.size(), "Missing expansion arguments", loc, mac.noteArglist()));
 		mac.addExpansionArgs(argSpans);
 		return true;
 	}
@@ -1115,7 +1115,9 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 			bool retval = preprocess(scope);
 			retval = retval && scope.sliceArglist(mac, loc);
 		);
-	} else return check(mac.argList.size() == 0, "Missing expansion arguments", loc);
+	} else {
+		return check(mac.argList.size() == 0, "Missing expansion arguments", loc, mac.noteArglist());
+	}
 	return true;
 }
 bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& percentToken) {
