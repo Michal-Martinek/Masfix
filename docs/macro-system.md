@@ -41,8 +41,12 @@ _Name and value fields must start inline._
 The `%macro` directive defines a parametrized macro.  
 Two [token lists](#token-lists) are supplied:
 1) parameter list - comma separated argument names, must be inline
-1) macro body - token list, not parsed in any sense
-	- may contain other directives (including macro uses), defining directives in body is forbidden
+1) macro body - token list, not parsed during macro definition
+	- may contain other directives (including macro uses)
+	- advanced: `%define & %macro` directives in body are allowed
+		- defined values will be in namespace where current expansion chains begins
+		- see [tests/nested-definitions.mx](tests/nested-definitions.mx)
+
 ```
 %macro mac_name(x, y) {
 	ld %x    ;\
