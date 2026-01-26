@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8368
+:stderr 8503
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -43,31 +43,31 @@ tests\directive-use.mx:120:10 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: oneArg(a)
 tests\directive-use.mx:121:10 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: oneArg(a)
-tests\directive-use.mx:122:9 ERROR: Argument expected
+tests\directive-use.mx:122:9 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: twoArg(a, b)
-tests\directive-use.mx:122:9 ERROR: Argument expected
+tests\directive-use.mx:122:9 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:123:8 ERROR: Missing expansion arguments
     - NOTE: Expected arguments: twoArg(a, b)
-tests\directive-use.mx:124:10 ERROR: Argument expected
+tests\directive-use.mx:124:10 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:126:12 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: twoArg(a, b)
-tests\directive-use.mx:127:9 ERROR: Argument expected
+tests\directive-use.mx:127:9 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: twoArg(a, b)
-tests\directive-use.mx:128:9 ERROR: Argument expected
+tests\directive-use.mx:128:9 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:128:13 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:129:13 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: twoArg(a, b)
-tests\directive-use.mx:130:15 ERROR: Argument expected
+tests\directive-use.mx:130:15 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: threeArg(a, b, c)
-tests\directive-use.mx:131:11 ERROR: Argument expected
+tests\directive-use.mx:131:11 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: threeArg(a, b, c)
-tests\directive-use.mx:131:12 ERROR: Argument expected
+tests\directive-use.mx:131:12 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: threeArg(a, b, c)
-tests\directive-use.mx:132:14 ERROR: Argument expected
+tests\directive-use.mx:132:14 ERROR: Empty argument field not allowed
     - NOTE: Expected arguments: threeArg(a, b, c)
 tests\directive-use.mx:132:18 ERROR: Excesive expansion argument
     - NOTE: Expected arguments: threeArg(a, b, c)

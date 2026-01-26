@@ -837,7 +837,7 @@ public:
 
 // helpers -------------------------------------------------
 	bool _addMacroArg(Macro& mac, vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
-		checkReturnOnFail(firstArg != itrs.top(), "Argument expected", loc, mac.noteArglist());
+		checkReturnOnFail(firstArg != itrs.top(), "Empty argument field not allowed", loc, mac.noteArglist());
 		argSpans.push_back(pair(firstArg, itrs.top()));
 		return true;
 	}
