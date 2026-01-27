@@ -1,0 +1,45 @@
+
+%include "core/structs"
+%include "core/procedures"
+
+%namespace pair {
+	%struct:begin()
+	%struct:field(first, 1)
+	%struct:field(second, 1)
+
+	; swaps pair elements
+	%macro swapPair() {
+		%doAt(first, ldm)
+		%doAt(second, swap)
+		%doAt(first, strr)
+	}
+	; calculates first<op>second
+	%macro reduce(op) {
+		%do_at(first, ldm)
+		%do_at(second,
+			ld(%op)m
+		)
+	}
+	%func{pair_compare_eq, 2, 1,
+		%func_seg(%arg, 0,
+			movm
+			ldm
+		)
+		%func_seg(%arg, 1,
+			movm
+			leqm
+		)
+		%func_seg(%local, 0, strr)
+		%func_seg(%arg, 0,
+			movma %second
+			ldm
+		)
+		%func_seg(%arg, 1,
+			movma %second
+			leqm
+		)
+		%func_seg(%local, 0, ld&m)
+	}
+
+	%struct:end()
+}
