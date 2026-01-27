@@ -9,6 +9,11 @@
 	ld %a
 	ld(%opp) %b
 }
+
+%define uint_max (!op(s, 0, 1))
+%define  int_max (!op(>, %uint_max, 1))
+%define  int_min (!op(s, %uint_max, %int_max))
+
 %macro neg(a) {
 	ld %a
 	ld^ 65535
