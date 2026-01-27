@@ -1,0 +1,36 @@
+%include "memory"
+%include "math"
+
+%namespace struct {
+	%macro defineLocalMacros() {
+		%macro at(field) {
+			mova %(%field)
+		}
+		%macro reset(from_field) {
+			movs %(%from_field)
+		}
+		; does op at field, restores position to struct start
+		%macro do_at(field, op) {
+			%at(%field)
+			%op
+			%reset(%field)
+		}
+	}
+
+	%macro begin() {
+		; prevents struct redefinitions
+		%define struct_id 0
+		ld !store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, 0)
+		%defineLocalMacros()
+	}
+	%macro _get_increment_offset(field_size) {
+		%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
+		stra %field_size
+	}
+	%macro field(name, size) {
+		%define (%name) (!_get_increment_offset(%size))
+	}
+	%macro end() {
+		%define sizeof (!load(%MEMORY_LAYOUT:G_STRUCT_OFFSET))
+	}
+}

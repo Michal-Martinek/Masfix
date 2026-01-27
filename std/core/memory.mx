@@ -54,6 +54,7 @@
 	%define G_THIS_PTR 3
 
 	%define G_IOTA 4
+	%define G_STRUCT_OFFSET 5
 
 }
 %using MEMORY_LAYOUT
