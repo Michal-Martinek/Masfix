@@ -9,9 +9,9 @@
 
 	; swaps pair elements
 	%macro swapPair() {
-		%doAt(first, ldm)
-		%doAt(second, swap)
-		%doAt(first, strr)
+		%do_at(first, ldm)
+		%do_at(second, swap)
+		%do_at(first, strr)
 	}
 	; calculates first<op>second
 	%macro reduce(op) {
