@@ -1,0 +1,80 @@
+
+; testing heap
+%include "memory"
+%include "heap"
+%include "debug"
+%include "procedures"
+%include "io"
+%using MEMORY_LAYOUT
+
+%vm_runtime_delim()
+
+%macro see_heap(size) {
+	%callWith2Arg(memdump, 2040, %size)
+	outc 10
+	outc 10
+}
+; test ctime init
+%nop(!see_heap(24))
+
+; heap allocations
+%see_heap(24)
+
+%callWith1Arg(malloc, 6)
+%stack:top()
+outur
+outc 10
+
+%callWith1Arg(malloc, 3)
+%stack:pop()
+outur
+outc 10
+
+%see_heap(24)
+
+%call(free) ; first seg
+%see_heap(24)
+
+%callWith1Arg(malloc, 1)
+%stack:pop()
+outur
+outc 10
+
+%stack:push(2058) ; free the 3
+%call(free)
+
+%see_heap(24)
+
+%callWith1Arg(malloc, 1) ; dont split chunk when too small
+%stack:pop()
+outur
+outc 10
+
+%see_heap(24)
+
+%callWith1Arg(malloc, 8)
+%stack:top()
+outur
+outc 10
+
+%callWith1Arg(malloc, 3)
+%stack:pop()
+outur
+outc 10
+
+%call(free) ; free the 8
+
+%see_heap(32)
+
+%callWith1Arg(malloc, 4) ; biggest to split - leaves 2 sized after
+%stack:pop()
+outur
+outc 10
+
+%see_heap(32)
+
+; ; TODO malloc 0
+; %callWith1Arg(malloc, 0)
+; %stack:pop()
+; outur
+; outc 10
