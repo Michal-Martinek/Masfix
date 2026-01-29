@@ -31,6 +31,15 @@
 	ldt %item_size
 	movar
 }
+; VM helpers -----------------
+
+; do ctime, ignore retval
+%macro nop(arg) {}
+%macro VM_and_runtime_mem_init(addr, value) {
+	%store(%addr, %value)
+	%nop(!store(%addr, %value))
+}
+
 ; ----------------------------
 %namespace MEMORY_LAYOUT {
 ; SEGMENTS
@@ -44,7 +53,7 @@
 ; GLOBALS
 	; points to the last occupied space
 	%define G_STACK_PTR 0
-	%store(%G_STACK_PTR, %SEG_STACK)
+	%VM_and_runtime_mem_init(%G_STACK_PTR, %SEG_STACK)
 
 	; start of procedure args
 	%define G_ARGS_PTR 1
@@ -54,6 +63,7 @@
 	%define G_THIS_PTR 3
 
 	%define G_IOTA 4
+	%define G_STRUCT_OFFSET 5
 
 }
 %using MEMORY_LAYOUT
@@ -146,9 +156,3 @@
 		sm(%comparison)r
 	}
 }
-
-; TODO VM?
-%macro initVM() {
-	%store(%G_STACK_PTR, %SEG_STACK)
-}
-ld !initVM()

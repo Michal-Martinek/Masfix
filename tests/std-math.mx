@@ -20,4 +20,8 @@ outc 10
 %test(!op(s, 3, 12))
 %test(!op(t, 21, 13))
 %test(!op(>, 21, 3))
+outc 10
 
+%test(%uint_max)
+%test(%int_max)
+%test(%int_min)

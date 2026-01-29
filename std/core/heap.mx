@@ -1,0 +1,141 @@
+
+%include "memory"
+%include "control"
+%include "procedures"
+%include "math"
+%include "structs"
+%include "exceptions"
+
+; TODO memset, memcpy
+
+; memory is split into linear chunks:
+; chunks have 2-word header = data_size, flags
+; data follows after header
+%namespace chunk {
+	%struct:begin()
+	%struct:field(data_size, 1)
+	%struct:field(flags, 1)
+	%struct:field(data_offset, 0) ; unknown
+
+	%define FLAG_FREE 0
+	%define FLAG_OCCUPIED 1
+
+	; all macros expect @chunk header
+	%macro size() {
+		ldm
+	}
+	%macro free() {
+		mova %flags
+		lmeq %FLAG_FREE
+	}
+	%macro occupied() {
+		mova %flags
+		lmeq %FLAG_OCCUPIED
+	}
+	; moves to next chunk's header
+	%macro next() {
+		movama %data_offset ; data_size + 2
+	}
+
+	%struct:end()
+}
+
+; organized as linear stack (each chunk points to next)
+; searched from start till empty chunk is found
+%namespace heap {
+	%using MEMORY_LAYOUT
+
+	%define FIRST_CHUNK_HEADER (%SEG_HEAP)
+
+	%macro initHeap() {
+		; one big chunk spanning whole heap
+		mov %FIRST_CHUNK_HEADER
+		str !op(s, %SEG_DEBUG_GLOBALS, %FIRST_CHUNK_HEADER)
+		strs 4 ; 1 + sizeof(header)
+		; TODO better heap ending
+		mova %chunk:flags
+		str %chunk:FLAG_FREE
+	}
+	%initHeap()
+	%nop(!initHeap())
+
+	; size -> ptr
+	; reserves at least @size words, returns pointer to start of data array
+	%func {malloc, 1, 1,
+		; locals: *currChunk
+		%assert(%func_seg(%arg, 0, lmab 0))
+		%func_seg(%local, 0, str %FIRST_CHUNK_HEADER)
+		%while {
+			; chunkSize < size || occupied
+			%func_seg(%local, 0, movm)
+			%chunk:size()
+			%stack:pushr() ; save chunkSize
+
+			%func_seg(%arg, 0, lrblm)
+			%stack:pushr()
+
+			%func_seg(%local, 0, movm)
+			%chunk:occupied()
+			%stack:pushr()
+
+			%stack:apply_op(|)
+			%stack:pop()
+		,
+			%stack:drop() ; chunk_size
+			; mov to next chunk
+			%func_seg(%local, 0, movm)
+			%chunk:next()
+			ldh
+			%func_seg(%local, 0, strr)
+		}
+		; TODO check not at end
+
+		; if chunk_size - size > 3
+		%if_else {
+			%func_seg(%arg, 0, ldm)
+			%stack:drop() ; chunk size
+			strsr
+			lmab 3
+		,
+			;; split chunk
+			; curr.size = size, next.size = total_size
+			%func_seg(%arg, 0, ldm)
+			%func_seg(%local, 0,
+				movm
+				swap
+			)
+			%chunk:next()
+			strr
+			ldh
+			; curr.occupied, r = size
+			%func_seg(%local, 0,
+				movm
+				ldm
+			)
+			%chunk:at(flags)
+				str %chunk:FLAG_OCCUPIED
+			movs %chunk:flags
+			; next.size -= size + 2
+			%chunk:next()
+			strsra 2
+			; next.free
+			%chunk:at(flags)
+			str %chunk:FLAG_FREE
+		,
+			; reserve whole
+			%func_seg(%local, 0, movm)
+			%chunk:at(flags)
+			str %chunk:FLAG_OCCUPIED
+		}
+		; return data ptr
+		%func_seg(%local, 0, ldma 2)
+	}
+
+	; free segment @ data_ptr
+	%void_func {free, 1, 0,
+		%func_seg(%arg, 0, movm)
+		movs %chunk:data_offset
+		%chunk:at(flags)
+		str %chunk:FLAG_FREE
+	}
+}

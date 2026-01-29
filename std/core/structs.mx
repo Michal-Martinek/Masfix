@@ -1,0 +1,59 @@
+%include "memory"
+%include "math"
+%include "exceptions"
+
+
+%namespace struct {
+	%macro defineLocalMacros() {
+		%macro at(field) {
+			mova %(%field)
+		}
+		%macro reset(from_field) {
+			movs %(%from_field)
+		}
+		; does op at field, restores position to struct start
+		%macro do_at(field, op) {
+			%at(%field)
+			%op
+			%reset(%field)
+		}
+		%macro set(field, value) {
+			%do_at(%field, str %value)
+		}
+	}
+
+	; missing definition parts prevention
+	%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max)) ; signalizes uninitialized
+	%macro __assert_init_state(cond) {
+		%nop(!assert(
+			%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
+			l(%cond) %uint_max
+		))
+	}
+	%macro _assert_initialized()   {
+		%__assert_init_state(ne)
+	}
+	%macro _assert_uninitialized() {
+		%__assert_init_state(eq)
+	}
+
+	%macro begin() {
+		%_assert_uninitialized()
+		%define struct_id 0 ; prevent struct redefinitions
+		%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, 0))
+		%defineLocalMacros()
+	}
+	%macro _get_increment_offset(field_size) {
+		%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
+		stra %field_size
+	}
+	%macro field(name, size) {
+		%_assert_initialized()
+		%define (%name) (!_get_increment_offset(%size))
+	}
+	%macro end() {
+		%_assert_initialized()
+		%define sizeof (!load(%MEMORY_LAYOUT:G_STRUCT_OFFSET))
+		%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max))
+	}
+}

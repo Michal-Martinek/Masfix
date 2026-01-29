@@ -1,0 +1,87 @@
+
+%include "memory"
+%include "io"
+%include "structs"
+%include "control"
+%include "procedures"
+
+%macro separate_errs(num) {
+	%nop(!print_endl(outu %num))
+	%(("------------ ")(%num)(" ------------"))
+}
+
+; testing struct mis-definition
+%namespace more_in_one {
+	%struct:begin()
+	%struct:field(a, 1)
+	%1st
+	%struct:begin()
+	%2nd
+	%struct:end()
+	%3rd
+	%struct:begin()
+}
+%nop(!separate_errs(1))
+
+%struct:end()
+%namespace no_begin {
+	%struct:field(lala, 2)
+	%
+	%struct:end()
+}
+%nop(!separate_errs(2))
+
+%namespace more_ends {
+	%struct:begin()
+	%struct:field(lala, 2)
+	%struct:end()
+	%struct:end()
+}
+%nop(!separate_errs(3))
+
+; testing proper def on ds:pair
+%include "ds/pair"
+%(%pair:struct_id)
+%(%pair:first)
+%(%pair:second)
+%(%pair:third)
+%(%pair:sizeof)
+
+%nop(!print_spaced(
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	%pair:at(first)
+	outuh
+))
+%nop(!print_endl(
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	%pair:at(second)
+	%print_spaced(outuh) ;
+	%pair:reset(second)
+	outuh ;
+))
+
+%include "debug"
+%macro testPair() {
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	%pair:set(first, 6)
+	%pair:set(second, 4)
+	mova %pair:sizeof
+	%pair:set(first, 4)
+	%pair:set(second, 7)
+	%pair:do_at(second, strs 1)
+	%print_endl(
+		%callWith2Arg(memdump, %MEMORY_LAYOUT:SEG_TEMP, 4)
+	)
+
+	mov 10
+	%pair:swapPair()
+
+	%stack:push(%MEMORY_LAYOUT:SEG_TEMP)
+	%stack:push(10)
+	%call(pair_compare_eq)
+	%print_endl(
+		%stack:pop()
+		outur
+	)
+}
+%nop(!testPair())
