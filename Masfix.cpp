@@ -409,6 +409,8 @@ struct Instr {
 	Loc opcodeLoc;
 	vector<string> immFields;
 
+	bool needsReparsing = false; // references smth which might change
+
 	Instr() {}
 	Instr(string opcodeStr,	Loc opcodeLoc) {
 		this->opcodeStr = opcodeStr;
@@ -449,12 +451,16 @@ struct ParseCtx {
 	map<string, Label> strToLabel;
 	Module* lastModule = nullptr;
 	optional<ofstream> dumpFile;
+	vector<int> instrsToReparse; // reparsed every time ~ bcs using end label
 
 	void close() {
 		if (!!dumpFile) dumpFile->close();
 	}
 	void removeCtimeInstrs() {
 		instrs.resize(parseStartIdx);
+		while (instrsToReparse.size() && instrsToReparse[instrsToReparse.size()-1] >= instrs.size()) {
+			instrsToReparse.pop_back();
+		}
 	}
 };
 ParseCtx parseCtx;
@@ -1466,6 +1472,7 @@ bool parseInstrImmediate(Instr& instr) {
 	string immVal = instr.immFields[0];
 	if (parseCtx.strToLabel.count(immVal) > 0) {
 		instr.immediate = parseCtx.strToLabel[immVal].addr;
+		if (immVal == "end") instr.needsReparsing = true;
 		return true;
 	}
 	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
@@ -1516,12 +1523,14 @@ bool checkValidity(Instr& instr) {
 	return true;
 }
 /// parses instructions and immediates for their meaning
-bool parseInstrs(vector<Instr>& instrs, int startIdx) {
+bool parseInstrs(ParseCtx& parseCtx) {
 	bool errorLess = true;
-	for (size_t i = startIdx; i < instrs.size(); ++i) {
+	vector<Instr>& instrs = parseCtx.instrs;
+	for (size_t i = parseCtx.parseStartIdx; i < instrs.size(); ++i) {
 		Instr& instr = instrs[i];
 		continueOnFalse(parseInstrFields(instr));
 		continueOnFalse(checkValidity(instr));
+		if (instr.needsReparsing) parseCtx.instrsToReparse.push_back(i);
 	}
 	check(instrs.size() <= WORD_MAX_VAL+1, "The instruction count " + to_string(instrs.size()) + " exceeds WORD_MAX_VAL=" + to_string(WORD_MAX_VAL), instrs[instrs.size()-1].opcodeLoc);
 	return errorLess;
@@ -1530,7 +1539,11 @@ bool Scope::forceParseImpl() {
 	parseCtx.parseStartIdx = parseCtx.instrs.size();
 	parseTokenStream(*this);
 	parseCtx.strToLabel["end"].addr = parseCtx.instrs.size();
-	return parseInstrs(parseCtx.instrs, parseCtx.parseStartIdx);
+	for (int idx : parseCtx.instrsToReparse) {
+		Instr& instr = parseCtx.instrs[idx];
+		parseInstrFields(instr);
+	}
+	return parseInstrs(parseCtx);
 }
 // interpreting -------------------------------------------------
 unsigned short interpGetReg(VM& vm, RegNames reg) {
