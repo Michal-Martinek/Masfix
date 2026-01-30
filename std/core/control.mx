@@ -6,6 +6,11 @@
 	%macro get() {
 		%load(%G_IOTA)
 	}
+	%macro increment() {
+		%load(%G_IOTA)
+		stra 1
+	}
+
 	%macro get_offset(off) {
 		%get()
 		lda %off
@@ -17,11 +22,16 @@
 		%get_offset(1)
 	}
 
-	%macro increment() {
-		%load(%G_IOTA)
-		stra 1
+	;; iota assisted labels
+	%macro instr_with_label(instr, label_name) {
+		%instr (%label_name)_(!get())
 	}
+	; one iota number per expansion
+	; at macro end use !increment() / define last label with _increment variant
 	%macro def_label(name) {
+		: (%name)_(!get())
+	}
+	%macro def_label_increment(name) {
 		: (%name)_(!increment())
 	}
 }
@@ -29,38 +39,50 @@
 
 ; NOTE cond - loads boolean condition to r
 %macro if(cond, body) {
-	%cond
-	beq if_(!iota:get())
-	%body
-	%def_label(if)
+		%cond
+	%instr_with_label(beq, if)
+		%body
+	%def_label_increment(if)
 }
 %macro if_else(cond, body, else) {
-	%cond
-	beq else_(!iota:get())
+		%cond
+	%instr_with_label(beq, else)
 		%body
-		jmp else_end_(!iota:get_next())
+		%instr_with_label(jmp, else_end)
 	%def_label(else)
 		%else
-	%def_label(else_end)
+	%def_label_increment(else_end)
+}
+
+; loops
+%macro loop_continue() {
+	; TODO breaks when inside %if
+	%instr_with_label(jmp, while_continue)
+}
+%macro loop_break() {
+	%instr_with_label(jmp, while_end)
 }
 %macro do_while(cond, body) {
 	%def_label(do_start)
-	%body
-	%cond
-	bne do_start_(!iota:get_prev())
+		%body
+	%def_label(while_continue)
+		%cond
+		%instr_with_label(bne, do_start)
+	%def_label_increment(while_end)
 }
 %macro while(cond, body) {
-%def_label(while_start)
-	%cond
-	beq while_end_(!iota:get())
-	%body
-	jmp while_start_(!iota:get_prev())
-%def_label(while_end)
+	%def_label(while_continue)
+		%cond
+		%instr_with_label(beq, while_end)
+		%body
+		%loop_continue()
+	%def_label_increment(while_end)
 }
 
 ; stop - r
 ; curr idx @stack:top
 ; r - volatile
+; step must be positive
 %macro for_full(start, step, body) {
 	%stack:pushr() ; stop
 	%stack:push(%start) ; idx
