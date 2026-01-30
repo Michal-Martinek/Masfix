@@ -122,3 +122,10 @@ ld !rstCou_n_t()
 !cout() 7
 %cout(),
 !cout(),
+
+%macro inlineMacUse() { %cout() }
+%macro inlineMacUse2(){ !cout() }
+%inlineMacUse()
+ld !inlineMacUse()
+%inlineMacUse2()
+ld !inlineMacUse2()

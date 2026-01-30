@@ -680,7 +680,7 @@ public:
 	}
 	/// inside arglist, at start / after separator
 	bool macroUseAllowed() {
-		returnOnFalse(insideTlistOfType(TIarglist));
+		returnOnFalse(insideTlistOfType(TIarglist) || insideTlistOfType(TIexpansion) || insideTlistOfType(TIctime));
 		// NOTE tokens are not eaten at this stage (only directives) - so its pretty safe to check previous token
 		return itrs.top() == currList().begin() || std::prev(itrs.top())->type == Tseparator;
 	}

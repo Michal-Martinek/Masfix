@@ -30,12 +30,8 @@
 			l(%cond) %uint_max
 		))
 	}
-	%macro _assert_initialized()   {
-		%__assert_init_state(ne)
-	}
-	%macro _assert_uninitialized() {
-		%__assert_init_state(eq)
-	}
+	%macro _assert_initialized()   { %__assert_init_state(ne) }
+	%macro _assert_uninitialized() { %__assert_init_state(eq) }
 
 	%macro begin() {
 		%_assert_uninitialized()

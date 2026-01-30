@@ -1,13 +1,13 @@
 :returncode 1
 
-:stdout 37
+:stdout 40
 123456
 S123456
 S1234
 S123456789
-S1234
+S1234567
 
-:stderr 4540
+:stderr 4656
 tests\macro-use-ctx.mx:17:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:18:8 ERROR: Unexpected token after macro use '8'
 tests\macro-use-ctx.mx:21:8 ERROR: Unexpected token after macro use '%'
@@ -34,6 +34,7 @@ tests\macro-use-ctx.mx:102:24 ERROR: Unexpected macro use
 tests\macro-use-ctx.mx:112:22 ERROR: Unexpected token after macro use '3'
 tests\macro-use-ctx.mx:113:22 ERROR: Unexpected token after macro use '4'
 tests\macro-use-ctx.mx:118:15 ERROR: Unexpected macro use
+tests\macro-use-ctx.mx:127:25 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:19:9 ERROR: Unexpected token '8'
 tests\macro-use-ctx.mx:20:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:24:1 ERROR: Unexpected token '0'
@@ -76,6 +77,7 @@ tests\macro-use-ctx.mx:121:9 ERROR: Unexpected token '6'
 tests\macro-use-ctx.mx:122:1 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:123:8 ERROR: Unexpected token ','
 tests\macro-use-ctx.mx:124:1 ERROR: Unexpected token '0'
+tests\macro-use-ctx.mx:127:25 ERROR: Unexpected token '0'
 tests\macro-use-ctx.mx:72:1 ERROR: Target value expected 'ld'
 tests\macro-use-ctx.mx:74:5 ERROR: Target value expected 'ld'
 tests\macro-use-ctx.mx:97:28 ERROR: Unknown condition 'see 7 0'
