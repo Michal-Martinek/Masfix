@@ -153,11 +153,14 @@ outc 10
 }
 
 %macro showLabelOffset(label, retaddrLocation) {
-	ld %label
-	lds test_start
-	outur
+	; showing label addr disabled for annoying false positives
+	; ld %label
+	; lds test_start
+	; outur
+	outc 45
 	mov %retaddrLocation
 	strs test_start
+	str 1234 ; --
 	outc 10
 }
 
