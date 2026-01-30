@@ -73,8 +73,21 @@ outc 10
 
 %see_heap(32)
 
-; ; TODO malloc 0
-; %callWith1Arg(malloc, 0)
-; %stack:pop()
-; outur
-; outc 10
+; testing heap impl asserts
+%macro expect_assert_error(instrs) {
+	%instrs
+}
+%nop(!expect_assert_error(
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	%chunk:reset(data_offset)
+	str 8
+	outc 69
+	%callWith1Arg(free, %MEMORY_LAYOUT:SEG_TEMP) ; bad free - not occupied
+	outc 69
+))
+
+; malloc 0
+%callWith1Arg(malloc, 0)
+%stack:pop()
+outur
+outc 10

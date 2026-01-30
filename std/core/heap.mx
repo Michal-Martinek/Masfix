@@ -135,7 +135,9 @@
 	%void_func {free, 1, 0,
 		%func_seg(%arg, 0, movm)
 		movs %chunk:data_offset
+		%assert(ldm)
 		%chunk:at(flags)
+		%assert(lmeq %chunk:FLAG_OCCUPIED)
 		str %chunk:FLAG_FREE
 	}
 }
