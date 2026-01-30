@@ -81,8 +81,8 @@
 
 ; stop - r
 ; curr idx @stack:top
-; r - volatile
 ; step must be positive
+; r - volatile, ends with 0
 %macro for_full(start, step, body) {
 	%stack:pushr() ; stop
 	%stack:push(%start) ; idx

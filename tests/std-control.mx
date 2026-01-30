@@ -1,7 +1,41 @@
 
 %include "memory"
+%include "math"
 %include "control"
 %include "debug"
+
+; false while cond
+%while {ld 0,
+	outc 65
+}
+%do_while {ld 0,
+	outc 66
+}
+outc 10
+
+; generalized for
+ld 107
+%for_full(7, 10,
+	%stack:top()
+	outum
+	outc 32
+)
+outc 10
+
+%store(%MEMORY_LAYOUT:SEG_TEMP, 7)
+%do_while {
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	ldm
+,
+	strs 1
+	; if odd continue
+	ldm& 1
+	beq no_continue
+	%loop_continue()
+:no_continue
+	outum
+}
+outc 10
 
 ; for loop
 ld 10
@@ -10,4 +44,5 @@ ld 10
 	outum
 	ld< 3 ; should be irrelevant
 }
+outc 10
 %dumpStackOverrun(7)
