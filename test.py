@@ -201,7 +201,7 @@ def saveDesc(file: Path, desc):
 # modes --------------------------------------
 def processFileArg(arg) -> Path:
 	file = None
-	for folder in ['examples', 'tests', '']: # highest priority on the right
+	for folder in [*TestDescRedirections, 'examples', 'tests', '']: # highest priority on the right
 		for ext in ['', '.mx']:
 			path = os.path.join(folder, arg + ext)
 			if os.path.exists(path):
