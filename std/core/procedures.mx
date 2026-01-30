@@ -23,6 +23,7 @@
 	%push(2) ; ret addr offset
 	strap
 	jmp proc_(%name)
+	%stack:top() ; load retval for ctime
 }
 
 ; functions --------------------
