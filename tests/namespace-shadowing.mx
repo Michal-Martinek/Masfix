@@ -1,0 +1,21 @@
+
+; tests namespace name shadowing warning
+
+%namespace vav {
+	%namespace vav {}
+	%namespace vav {}
+}
+%namespace boo {
+	%namespace vav {}
+	%macro vav() {}
+}
+
+%namespace broo {
+	%macro vav() {}
+	%define vav 0
+}
+%namespace brooo {
+	%define vav 0
+	%macro vav() {}
+	%namespace vav {}
+}

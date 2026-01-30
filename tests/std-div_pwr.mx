@@ -14,9 +14,9 @@
 	%call(%op)
 	%stack:pop()
 }
-%macro testOp(op, char, numerator, denominator) {
+%macro testOp(op, char_u, numerator, denominator) {
 	outu %numerator
-	outc %char
+	outc %char_u
 	outu %denominator
 	outc 61
 	%callOp(%op, %numerator, %denominator)

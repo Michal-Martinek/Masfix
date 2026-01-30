@@ -573,6 +573,14 @@ bool raiseError(string message, Loc loc, string note="", bool strict=false) {
 	if (note.size()) _raiseNote(note);
 	return false;
 }
+bool raiseWarning(string message, Loc loc, string note="") {
+	// TODO supress warnigs
+	returnOnErrSupress();
+	string err = loc.toStr() + " WARNING: " + message + "\n";
+	addError(err, false);
+	if (note.size()) _raiseNote(note);
+	return false;
+}
 // struct Scope --------------------------------------------------------
 void interpret(int startIdx=0);
 
@@ -941,13 +949,15 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 	scope.tokenizeEnd();
 }
 // preprocess helpers -------------------------------------------------------------------------
+bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors);
+
 bool _validIdentChar(char c) { return isalnum(c) || c == '_'; }
 bool verifyNotInstrOpcode(string name);
 bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
 	checkReturnOnFail(name.size() > 0 && find_if_not(name.begin(), name.end(), _validIdentChar) == name.end(), errInvalid, loc)
 	return check(isalpha(name.at(0)) || name.at(0) == '_', errInvalid, loc);
 }
-bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
+bool checkIdentRedefinitions(Scope& scope, string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
 	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
 	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
 	if (label) {
@@ -957,6 +967,10 @@ bool checkIdentRedefinitions(string name, Loc& loc, bool label, Namespace* currN
 		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
 		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
 		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc);
+		int namespaceId = scope.currNamespaceId();
+		if (lookupNamespaceAbove(name, namespaceId, loc, true)) {
+			raiseWarning("Definition shadowing existing namespace" errorQuoted(name), loc);
+		};
 	}
 	return true;
 }
@@ -993,7 +1007,7 @@ bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bo
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
 	returnOnFalse(eatIdentifier(scope, name, loc, identPurpose, false, eatAnything)); \
 	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
-	if (definition) returnOnFalse(checkIdentRedefinitions(name, loc, false, &scope.topNamespace()));
+	if (definition) returnOnFalse(checkIdentRedefinitions(scope, name, loc, false, &scope.topNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
 
 /// constructs relative path from last 'Masfix' directory
@@ -1019,6 +1033,7 @@ string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) 
 }
 
 // preprocess -------------------------------------------------------------------------
+bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors=false);
 bool preprocess(Scope& scope);
 bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine);
 
@@ -1067,7 +1082,7 @@ bool processMacroDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	return true;
 }
 bool processNamespaceDef(string name, Loc loc, Token& percentToken, Scope& scope) {
-	Token token; // TODO no seps in namespace body
+	Token token;
 	directiveEatToken(Tlist, "Namespace body expected", false);
 	scope.insertToken(Token::fromCtx(TInamespace, name, percentToken));
 	scope->tlist = token.tlist;
@@ -1205,7 +1220,7 @@ void lookupFinalAbove(string directiveName, int& namespaceId, bool& namespaceSee
 		namespaceId = currNamespace->upperNamespaceId;
 	}
 }
-bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
+bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors) {
 	Namespace* currNamespace;
 	while (true) {
 		currNamespace = &IdToNamespace[namespaceId];
@@ -1213,7 +1228,8 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc) {
 		if (!currNamespace->isUpperAccesible) break;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
-	return check(false, "Namespace not found" errorQuoted(directiveName), loc);
+	check(supressErrors, "Namespace not found" errorQuoted(directiveName), loc);
+	return false;
 }
 bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
 	if (defineDefined(directiveName, namespaceId)) {
@@ -1363,7 +1379,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 	} while (scope.hasNext() && scope->continued);
 	if (purpose == "instr" || purpose == "immediate" || purpose == "directive") return true;
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
-	return checkIdentRedefinitions(ident, loc, purpose == "label", &scope.topNamespace());
+	return checkIdentRedefinitions(scope, ident, loc, purpose == "label", &scope.topNamespace());
 }
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {

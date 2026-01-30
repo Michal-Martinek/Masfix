@@ -130,10 +130,10 @@ bmletr
 ; defining shadowing name + resolution order test
 %define a 7
 %macro m() { A }
-%namespace N {
+%namespace iN {
 	%define v1 0
 }
-%namespace M {
+%namespace iM { ; a little deutch, nicht wahr?
 	%define v2 4
 }
 %namespace names {
