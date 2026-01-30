@@ -1,0 +1,29 @@
+
+%include "memory"
+%include "debug"
+%include "procedures"
+
+%func {triArg, 3, 2,
+	%stack:push(2)
+	%stack:push(13)
+	%stack:swap2()
+	%func_seg(%local, 0, str 22)
+	%func_seg(%local, 1, str 5)
+	%seeFuncFrame()
+	ld 17
+}
+
+%void_func {main, 0, 3,
+	%func_seg(%local, 0, str 1)
+	%func_seg(%local, 1, str 0)
+	%func_seg(%local, 2, str 1)
+
+	%stack:push(77) ; stays
+
+	%stack:push(8)
+	%stack:push(14)
+	%stack:push(95)
+	%call(triArg)
+	%seeFuncFrame()
+}
+%call(main)

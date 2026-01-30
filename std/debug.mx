@@ -65,7 +65,7 @@
 	mov %G_STACK_PTR ; "0: <SP>"
 	%print_spaced(%emitMemdumpAddr())
 	outum
-	%toggleDebugMode()
+	%toggleDebugMode() ;; ^^ restricted ^^
 }
 %macro _dumpStack2Top() {
 	%_dumpStackPrologue()
@@ -102,6 +102,20 @@
 	outc 10
 	outc 70
 	outc 58
+	
+	%load(%G_ARGS_PTR) ; memdump args
+	%stack:pushr()
+	mov %G_LOCALS_PTR
+	ldsm ; ARGS-LOCALS
+	ld^ 65535 ; negate
+	lds 2
+	%stack:pushr()
+	%if_else { ldm ,
+		%call(memdump)
+		outc 124
+	,
+		%stack:dropN(2)
+	}
 
 	%load(%G_LOCALS_PTR) ; memdump(locals:top)
 	%stack:pushr()
