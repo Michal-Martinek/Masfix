@@ -195,5 +195,36 @@ outc 10
 	%dumpStackOverrun(18)
 }
 
+%macro testRounding(value) {
+	%stack:push(%value)
+	%print_spaced( outum )
+	%print_spaced(
+		outc 45
+		outc 62
+	)
+	%call(round_up_to_2_power)
+	%print_endl(
+		%stack:pop()
+		outum
+	)
+}
+%testRounding(0)
+%testRounding(1)
+%testRounding(3)
+%testRounding(4)
+%testRounding(7)
+%testRounding(55)
+%testRounding(150)
+%testRounding(1000)
+%testRounding(10000)
+%testRounding(%int_max)
+%testRounding(%int_min)
+; after it returns uint_max instead
+%testRounding(!op(a, %int_min,  1))
+%testRounding(!op(s, %uint_max, 1))
+%testRounding(%uint_max)
+
+outc 10
+
 %call(main)
 :module_end
