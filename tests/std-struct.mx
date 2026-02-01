@@ -1,5 +1,6 @@
 
 %include "memory"
+%include "math"
 %include "io"
 %include "structs"
 %include "control"
@@ -83,5 +84,16 @@
 		%stack:pop()
 		outur
 	)
+
+	; test memcopy
+	mov %MEMORY_LAYOUT:SEG_TEMP
+	%pair:shallow_copy()
+	%stack:pop()
+	movr
+	%pair:default_print()
+
+	%stack:push(%MEMORY_LAYOUT:SEG_HEAP)
+	%stack:push(8)
+	%call(memdump)
 }
 %nop(!testPair())

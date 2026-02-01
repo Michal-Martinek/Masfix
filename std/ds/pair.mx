@@ -1,5 +1,8 @@
 
+%include "core/memory"
+%include "core/heap"
 %include "core/structs"
+%include "std/math"
 %include "core/procedures"
 
 %namespace pair {

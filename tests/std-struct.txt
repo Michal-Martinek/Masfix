@@ -1,6 +1,6 @@
 :returncode 1
 
-:stdout 56
+:stdout 86
 
 ERROR: 0
 1
@@ -14,10 +14,11 @@ ERROR: 0
 
 8: 6 4 4 6
 1
-
+ 6 4
+2048: 2 1 6 4 61432 0 0 0
 
 :stderr 2089
-tests\std-struct.mx:17:3 ERROR: Invalid directive name '1st'
+tests\std-struct.mx:18:3 ERROR: Invalid directive name '1st'
 std\core\structs.mx:92:11 ERROR: Define redefinition 'struct_id'
 std\core\structs.mx:23:10 ERROR: Macro redefinition 'new'
 std\core\structs.mx:27:10 ERROR: Macro redefinition 'dealloc'
@@ -28,8 +29,8 @@ std\core\structs.mx:65:10 ERROR: Macro redefinition 'reset'
 std\core\structs.mx:71:10 ERROR: Macro redefinition 'do_at'
 std\core\structs.mx:78:10 ERROR: Macro redefinition 'set'
 std\core\structs.mx:82:10 ERROR: Macro redefinition 'default_print'
-tests\std-struct.mx:19:3 ERROR: Invalid directive name '2nd'
-tests\std-struct.mx:21:3 ERROR: Invalid directive name '3rd'
+tests\std-struct.mx:20:3 ERROR: Invalid directive name '2nd'
+tests\std-struct.mx:22:3 ERROR: Invalid directive name '3rd'
 std\core\structs.mx:92:11 ERROR: Define redefinition 'struct_id'
 std\core\structs.mx:23:10 ERROR: Macro redefinition 'new'
 std\core\structs.mx:27:10 ERROR: Macro redefinition 'dealloc'
@@ -40,15 +41,15 @@ std\core\structs.mx:65:10 ERROR: Macro redefinition 'reset'
 std\core\structs.mx:71:10 ERROR: Macro redefinition 'do_at'
 std\core\structs.mx:78:10 ERROR: Macro redefinition 'set'
 std\core\structs.mx:82:10 ERROR: Macro redefinition 'default_print'
-tests\std-struct.mx:10:3 ERROR: Undeclared identifier '------------ 1 ------------'
-tests\std-struct.mx:29:2 ERROR: Missing directive name
-tests\std-struct.mx:10:3 ERROR: Undeclared identifier '------------ 2 ------------'
+tests\std-struct.mx:11:3 ERROR: Undeclared identifier '------------ 1 ------------'
+tests\std-struct.mx:30:2 ERROR: Missing directive name
+tests\std-struct.mx:11:3 ERROR: Undeclared identifier '------------ 2 ------------'
 std\core\structs.mx:104:11 ERROR: Define redefinition 'sizeof'
-tests\std-struct.mx:10:3 ERROR: Undeclared identifier '------------ 3 ------------'
-tests\std-struct.mx:44:2 ERROR: Undeclared identifier '0'
+tests\std-struct.mx:11:3 ERROR: Undeclared identifier '------------ 3 ------------'
 tests\std-struct.mx:45:2 ERROR: Undeclared identifier '0'
-tests\std-struct.mx:46:2 ERROR: Undeclared identifier '1'
-tests\std-struct.mx:47:9 ERROR: Undeclared identifier 'third'
-tests\std-struct.mx:48:2 ERROR: Undeclared identifier '2'
+tests\std-struct.mx:46:2 ERROR: Undeclared identifier '0'
+tests\std-struct.mx:47:2 ERROR: Undeclared identifier '1'
+tests\std-struct.mx:48:9 ERROR: Undeclared identifier 'third'
+tests\std-struct.mx:49:2 ERROR: Undeclared identifier '2'
 
 
