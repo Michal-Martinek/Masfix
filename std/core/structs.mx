@@ -5,6 +5,23 @@
 
 %namespace struct {
 	%macro defineLocalMacros() {
+		; allocate new uninitialized instance on heap
+		; ptr -> r
+		%macro new() {
+			%callWith1Arg(malloc, %sizeof)
+			%stack:pop()
+		}
+		; free struct from heap
+		%macro dealloc() {
+			ldh
+			%stack:pushr()
+			%call(free)
+		}
+		; copies struct values to new instance on heap
+		%macro shallow_copy() {
+
+		}
+
 		%macro at(field) {
 			mova %(%field)
 		}

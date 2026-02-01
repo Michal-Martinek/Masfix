@@ -2,6 +2,7 @@
 ; testing heap
 %include "memory"
 %include "heap"
+%include "structs"
 %include "debug"
 %include "procedures"
 %include "io"
@@ -52,8 +53,13 @@ outc 10
 
 %see_heap(24)
 
-%callWith1Arg(malloc, 8)
-%stack:top()
+%namespace eight_bit { ; pew pew pew
+	%struct:begin()
+	%struct:field(values, 8)
+	%struct:end()
+}
+%eight_bit:new()
+%stack:pushr() ; save 8B ptr
 outur
 outc 10
 
@@ -62,7 +68,9 @@ outc 10
 outur
 outc 10
 
-%call(free) ; free the 8
+%stack:pop()
+movm ; -> eight_bit start
+%eight_bit:dealloc() ; free the 8B
 
 %see_heap(32)
 
