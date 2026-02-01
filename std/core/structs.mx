@@ -5,11 +5,11 @@
 
 %namespace struct {
 	%macro defineLocalMacros() {
+	;; creation & destruction
 		; allocate new uninitialized instance on heap
-		; ptr -> r
+		; new ptr -> stack
 		%macro new() {
 			%callWith1Arg(malloc, %sizeof)
-			%stack:pop()
 		}
 		; free struct from heap
 		%macro dealloc() {
@@ -18,10 +18,21 @@
 			%call(free)
 		}
 		; copies struct values to new instance on heap
+		; -> copied @stack
 		%macro shallow_copy() {
-
+			ldh ; temp store this
+			mov !op(a, %MEMORY_LAYOUT:SEG_TEMP, 3)
+			strr
+			%new()
+			mov !op(a, %MEMORY_LAYOUT:SEG_TEMP, 3)
+			%stack:pushm() ; new, this
+			%stack:dup_over(1)
+			%stack:push(%sizeof) ; new | this, new, count
+			%call(memcopy)
+			; -> new
 		}
 
+	;; accessing
 		%macro at(field) {
 			mova %(%field)
 		}
@@ -37,9 +48,15 @@
 		%macro set(field, value) {
 			%do_at(%field, str %value)
 		}
+
+		%macro default_print() {
+			%stack:pushh()
+			%stack:push(%sizeof)
+			%call(memdump)
+		}
 	}
 
-	; missing definition parts prevention
+	;; missing definition parts prevention
 	%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max)) ; signalizes uninitialized
 	%macro __assert_init_state(cond) {
 		%nop(!assert(

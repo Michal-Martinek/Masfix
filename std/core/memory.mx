@@ -64,7 +64,8 @@
 
 	%define G_IOTA 4
 	%define G_STRUCT_OFFSET 5
-
+	%define G_SRC 6
+	%define G_DEST 7
 }
 %using MEMORY_LAYOUT
 ; interfaces -----------------------
@@ -109,6 +110,10 @@
 	}
 	%macro pushm() {
 		ldm
+		%pushr()
+	}
+	%macro pushh() {
+		ldh
 		%pushr()
 	}
 
