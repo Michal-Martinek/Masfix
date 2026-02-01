@@ -27,3 +27,8 @@
 	%seeFuncFrame()
 }
 %call(main)
+
+%void_func {nothing, 0, 0,
+	%seeFuncFrame()
+}
+%call(nothing)

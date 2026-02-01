@@ -99,13 +99,15 @@
 }
 
 %macro seeFuncFrame() {
+	; TODO factor to function
+	%toggleDebugMode()
 	outc 10
 	outc 70
 	outc 58
 	
-	%load(%G_ARGS_PTR) ; memdump args
+	%load(!op(a, %SEG_DEBUG_GLOBALS, %G_ARGS_PTR)) ; memdump normal args
 	%stack:pushr()
-	mov %G_LOCALS_PTR
+	mov !op(a, %SEG_DEBUG_GLOBALS, %G_LOCALS_PTR)
 	ldsm ; ARGS-LOCALS
 	ld^ 65535 ; negate
 	lds 2
@@ -117,12 +119,14 @@
 		%stack:dropN(2)
 	}
 
-	%load(%G_LOCALS_PTR) ; memdump(locals:top)
+	%load(!op(a, %SEG_DEBUG_GLOBALS, %G_LOCALS_PTR)) ; memdump(locals:top)
 	%stack:pushr()
-	%load(%G_STACK_PTR)
-	mov %G_LOCALS_PTR
-	ldsm
+	%load(!op(a, %SEG_DEBUG_GLOBALS, %G_STACK_PTR))
+	mov !op(a, %SEG_DEBUG_GLOBALS, %G_LOCALS_PTR)
+	ldsms 1
 	%stack:pushr()
 	%call(memdump)
 	outc 10
+
+	%toggleDebugMode()
 }
