@@ -2,23 +2,44 @@
 %include "math"
 %include "exceptions"
 
+;; Define userspace structures with named fields
+;; API: macros return via stack
+;;    - instance expected @h (except constructors)
+
+;; USERS SHOULD DEFINE:
+;; %init() macro with this signature:
+;;     ; instance @h -> void
+;;     ; inplace initialization
+;;     %macro init() { ... }
 
 %namespace struct {
+
+	; macros defined in user's namespace
 	%macro defineLocalMacros() {
 	;; creation & destruction
+
+		; -> new: ptr
 		; allocate new uninitialized instance on heap
-		; new ptr -> stack
 		%macro new() {
 			%callWith1Arg(malloc, %sizeof)
 		}
-		; free struct from heap
+		; free instance @h from heap
 		%macro dealloc() {
-			ldh
-			%stack:pushr()
+			%stack:pushh()
 			%call(free)
 		}
+		; -> new: ptr
+		; constructs new instance on heap
+		; initializes with user-defined %init()
+		%macro constructor() {
+			%new()
+			%stack:top()
+			movm
+			%init()
+		}
+
+		; -> copied: ptr
 		; copies struct values to new instance on heap
-		; -> copied @stack
 		%macro shallow_copy() {
 			ldh ; temp store this
 			mov !op(a, %MEMORY_LAYOUT:SEG_TEMP, 3)
@@ -33,22 +54,31 @@
 		}
 
 	;; accessing
+
+		; field: name token
+		; moves h to field
 		%macro at(field) {
 			mova %(%field)
 		}
+		; field: name token
+		; resets h back to struct start from field
 		%macro reset(from_field) {
 			movs %(%from_field)
 		}
-		; does op at field, restores position to struct start
-		%macro do_at(field, op) {
+		; field: name token
+		; performs %instrs at field
+		; restores position to struct start
+		%macro do_at(field, instrs) {
 			%at(%field)
-			%op
+			%instrs
 			%reset(%field)
 		}
+		; field: name token, value: imm
+		; sets instance field to value
 		%macro set(field, value) {
 			%do_at(%field, str %value)
 		}
-
+		; raw prints structure's memory view
 		%macro default_print() {
 			%stack:pushh()
 			%stack:push(%sizeof)
@@ -56,34 +86,40 @@
 		}
 	}
 
-	;; missing definition parts prevention
-	%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max)) ; signalizes uninitialized
-	%macro __assert_init_state(cond) {
-		%nop(!assert(
-			%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
-			l(%cond) %uint_max
-		))
-	}
-	%macro _assert_initialized()   { %__assert_init_state(ne) }
-	%macro _assert_uninitialized() { %__assert_init_state(eq) }
-
+	;; struct definition
 	%macro begin() {
-		%_assert_uninitialized()
+		%impl:_assert_uninitialized()
 		%define struct_id 0 ; prevent struct redefinitions
 		%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, 0))
 		%defineLocalMacros()
 	}
-	%macro _get_increment_offset(field_size) {
-		%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
-		stra %field_size
-	}
+	; reserves field of given size
+	; access with .at(name)
 	%macro field(name, size) {
-		%_assert_initialized()
-		%define (%name) (!_get_increment_offset(%size))
+		%impl:_assert_initialized()
+		%define (%name) (!impl:_get_increment_offset(%size))
 	}
 	%macro end() {
-		%_assert_initialized()
+		%impl:_assert_initialized()
 		%define sizeof (!load(%MEMORY_LAYOUT:G_STRUCT_OFFSET))
 		%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max))
+	}
+
+	%namespace impl { ; -----------------------------------------------------
+		;; missing definition parts prevention
+		%nop(!store(%MEMORY_LAYOUT:G_STRUCT_OFFSET, %uint_max)) ; signalizes uninitialized
+		%macro __assert_init_state(cond) {
+			%nop(!assert(
+				%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
+				l(%cond) %uint_max
+			))
+		}
+		%macro _assert_initialized()   { %__assert_init_state(ne) }
+		%macro _assert_uninitialized() { %__assert_init_state(eq) }
+
+		%macro _get_increment_offset(field_size) {
+			%load(%MEMORY_LAYOUT:G_STRUCT_OFFSET)
+			stra %field_size
+		}
 	}
 }
