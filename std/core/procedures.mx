@@ -156,6 +156,9 @@
 	%macro this(idx, instrs)  { %_func_seg(%MEMORY_LAYOUT:G_THIS_PTR,   %idx, %instrs) }
 	%macro src(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_SRC,        %idx, %instrs) }
 	%macro dest(idx, instrs)  { %_func_seg(%MEMORY_LAYOUT:G_DEST,       %idx, %instrs) }
+	%macro temp(idx, instrs)  { mov !op(a, %MEMORY_LAYOUT:SEG_TEMP,     %idx)
+		%instrs
+	}
 }
 
 ; calling functions with constant arguments
