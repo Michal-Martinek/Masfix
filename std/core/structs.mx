@@ -7,10 +7,14 @@
 ;;    - instance expected @h (except constructors)
 
 ;; USERS SHOULD DEFINE:
-;; %init() macro with this signature:
-;;     ; instance @h -> void
-;;     ; inplace initialization
-;;     %macro init() { ... }
+;; macros with this signature:
+;;    ; instance @h -> void
+;;    
+;; %init()
+;;    - inplace initialization of values
+;; %deinit()
+;;    - inplace deinitialization of values
+
 
 %namespace struct {
 
@@ -36,6 +40,15 @@
 			%stack:top()
 			movm
 			%init()
+		}
+		; -> void
+		; destructs instance from heap
+		; deinits value with user-defined %deinit()
+		%macro destructor() {
+			%stack:pushh()
+			movm
+			%deinit()
+			%call(free)
 		}
 
 		; -> copied: ptr

@@ -96,13 +96,13 @@
 ; first argument must be ptr to instance
 %macro method(name, args, locals, body) {
 	%func(%name, %args, %locals,
-		%func_seg(%arg, 0, %storem(%MEMORY_LAYOUT:G_THIS_PTR))
+		%func_seg(%arg, 0, %storem(%this))
 		%body
 	)
 }
 %macro void_method(name, args, locals, body) {
 	%void_func(%name, %args, %locals,
-		%func_seg(%arg, 0, %storem(%MEMORY_LAYOUT:G_THIS_PTR))
+		%func_seg(%arg, 0, %storem(%this))
 		%body
 	)
 }
@@ -132,11 +132,18 @@
 %define arg   (%MEMORY_LAYOUT:G_ARGS_PTR)
 %define local (%MEMORY_LAYOUT:G_LOCALS_PTR)
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
+%define src   (%MEMORY_LAYOUT:G_SRC)
+%define dest  (%MEMORY_LAYOUT:G_DEST)
 ; use ^ for name
 %macro func_seg(name, idx, after) {
 	mov %name
 	movma %idx
 	%after
+}
+%macro push_seg_addr(name, idx) {
+	mov %name
+	ldma %idx
+	%stack:pushr()
 }
 
 ; calling functions with constant arguments
