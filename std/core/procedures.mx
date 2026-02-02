@@ -134,16 +134,28 @@
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
 %define src   (%MEMORY_LAYOUT:G_SRC)
 %define dest  (%MEMORY_LAYOUT:G_DEST)
-; use ^ for name
 %macro func_seg(name, idx, after) {
 	mov %name
 	movma %idx
 	%after
 }
-%macro push_seg_addr(name, idx) {
-	mov %name
-	ldma %idx
-	%stack:pushr()
+%namespace seg {
+	; use ^ for name
+	%macro push_addr(name, idx) {
+		mov %name
+		ldma %idx
+		%stack:pushr()
+	}
+	%macro _func_seg(ptr_addr, idx, after) {
+		mov %ptr_addr
+		movma %idx
+		%after
+	}
+	%macro arg(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_ARGS_PTR,   %idx, %instrs) }
+	%macro local(idx, instrs) { %_func_seg(%MEMORY_LAYOUT:G_LOCALS_PTR, %idx, %instrs) }
+	%macro this(idx, instrs)  { %_func_seg(%MEMORY_LAYOUT:G_THIS_PTR,   %idx, %instrs) }
+	%macro src(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_SRC,        %idx, %instrs) }
+	%macro dest(idx, instrs)  { %_func_seg(%MEMORY_LAYOUT:G_DEST,       %idx, %instrs) }
 }
 
 ; calling functions with constant arguments
