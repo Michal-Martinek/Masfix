@@ -86,13 +86,13 @@
 ; num: uint -> 2**k >= num
 ; num above 2**15 rounds to uint_max
 %func {round_up_to_2_power, 1, 1,
-	%if { %func_seg(%arg, 0, lmab %int_min),
+	%if { %seg:arg(0, lmab %int_min),
 		%return_imm(round_up_to_2_power, %uint_max)
 	}
-	%func_seg(%local, 0, str 1) ; 2 power
+	%seg:local(0, str 1) ; 2 power
 	%while {
-		%func_seg(%arg, 0, ldm)
-		%func_seg(%local, 0, lmblr)
+		%seg:arg(0, ldm)
+		%seg:local(0, lmblr)
 	,
 		str< 1
 	}

@@ -96,13 +96,13 @@
 ; first argument must be ptr to instance
 %macro method(name, args, locals, body) {
 	%func(%name, %args, %locals,
-		%func_seg(%arg, 0, %storem(%this))
+		%seg:arg(0, %storem(%this))
 		%body
 	)
 }
 %macro void_method(name, args, locals, body) {
 	%void_func(%name, %args, %locals,
-		%func_seg(%arg, 0, %storem(%this))
+		%seg:arg(0, %storem(%this))
 		%body
 	)
 }
@@ -134,11 +134,6 @@
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
 %define src   (%MEMORY_LAYOUT:G_SRC)
 %define dest  (%MEMORY_LAYOUT:G_DEST)
-%macro func_seg(name, idx, after) {
-	mov %name
-	movma %idx
-	%after
-}
 %namespace seg {
 	; use ^ for name
 	%macro push_addr(name, idx) {

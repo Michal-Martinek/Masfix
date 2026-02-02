@@ -16,18 +16,18 @@
 %define sum 1
 %define counter5 2
 %func {main, 1, 3,
-	%func_seg(%local, %sum,      str 0) ; sum = 0
-	%func_seg(%local, %counter5, str 0) ; counter = 0
+	%seg:local(%sum,      str 0) ; sum = 0
+	%seg:local(%counter5, str 0) ; counter = 0
 
-	%func_seg(%arg, 0, ldm)
+	%seg:arg(0, ldm)
 	%for {
 		%stack:top() ; local[0] = idx
-		%func_seg(%local, %idx, strr)
+		%seg:local(%idx, strr)
 
 		; %print_endl(outur)
 
 		%if_else { ; idx % 3 == 0
-			%func_seg(%local, %idx,
+			%seg:local(%idx,
 				%stack:pushm()
 			)
 			%stack:push(3)
@@ -43,12 +43,12 @@
 		}
 
 	:add
-		%func_seg(%local, %idx, ldm)
-		%func_seg(%local, %sum, strar)
+		%seg:local(%idx, ldm)
+		%seg:local(%sum, strar)
 
 	:update_counter
 		%if {
-			%func_seg(%local, %counter5, 
+			%seg:local(%counter5, 
 				stra 1
 				lmge 5
 			)
@@ -58,7 +58,7 @@
 
 	}
 	; %dumpStackOverrun(8)
-	%func_seg(%local, %sum, ldm) ; return sum
+	%seg:local(%sum, ldm) ; return sum
 }
 
 ; TODO result has to fit in 16 bits

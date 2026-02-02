@@ -5,19 +5,19 @@
 
 %func {fibRecursive, 1, 0,
 	%if { ; if number <= 1: return number-1
-		%func_seg(%arg, 0, lmle 1)
+		%seg:arg(0, lmle 1)
 	,
-		%func_seg(%arg, 0, ldm)
+		%seg:arg(0, ldm)
 		%returnr(fibRecursive)
 	}
 	; push fib(arg-2)
-	%func_seg(%arg, 0,
+	%seg:arg(0,
 		ldms 2
 		%stack:pushr()
 	)
 	%call(fibRecursive)
 	; push fib(arg-1)
-	%func_seg(%arg, 0,
+	%seg:arg(0,
 		ldms 1
 		%stack:pushr()
 	)
@@ -47,7 +47,7 @@
 		str 1
 	}
 
-	%func_seg(%local, 0, ldm)
+	%seg:local(0, ldm)
 	%for { ; for 0..input
 		%stack:dup()
 		%call(fibRecursive)

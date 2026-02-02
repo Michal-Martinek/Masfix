@@ -15,13 +15,13 @@
 		lmab 0
 	,
 		; mem[ptr++] = value
-		%func_seg(%arg, 2, ldm)
-		%func_seg(%arg, 0,
+		%seg:arg(2, ldm)
+		%seg:arg(0,
 			stra 1
 			movms 1
 			strr
 		)
-		%func_seg(%arg, 1, strs 1) ; count --
+		%seg:arg(1, strs 1) ; count --
 	}
 }
 ; from, to, count
@@ -33,17 +33,17 @@
 		lmab 0
 	,
 		; mem[to++] = mem[from++]
-		%func_seg(%arg, 0,
+		%seg:arg(0,
 			stra 1
 			movms 1
 			ldm
 		)
-		%func_seg(%arg, 1,
+		%seg:arg(1,
 			stra 1
 			movms 1
 			strr
 		)
-		%func_seg(%arg, 2, strs 1) ; count --
+		%seg:arg(2, strs 1) ; count --
 	}
 }
 
@@ -102,18 +102,18 @@
 	; reserves at least @size words, returns pointer to start of data array
 	%func {malloc, 1, 1,
 		; locals: *currChunk
-		%assert(%func_seg(%arg, 0, lmab 0))
-		%func_seg(%local, 0, str %FIRST_CHUNK_HEADER)
+		%assert(%seg:arg(0, lmab 0))
+		%seg:local(0, str %FIRST_CHUNK_HEADER)
 		%while {
 			; chunkSize < size || occupied
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:size()
 			%stack:pushr() ; save chunkSize
 
-			%func_seg(%arg, 0, lrblm)
+			%seg:arg(0, lrblm)
 			%stack:pushr()
 
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:occupied()
 			%stack:pushr()
 
@@ -122,24 +122,24 @@
 		,
 			%stack:drop() ; chunk_size
 			; mov to next chunk
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:next()
 			ldh
-			%func_seg(%local, 0, strr)
+			%seg:local(0, strr)
 		}
 		; TODO check not at end
 
 		; if chunk_size - size > 3
 		%if_else {
-			%func_seg(%arg, 0, ldm)
+			%seg:arg(0, ldm)
 			%stack:drop() ; chunk size
 			strsr
 			lmab 3
 		,
 			;; split chunk
 			; curr.size = size, next.size = total_size
-			%func_seg(%arg, 0, ldm)
-			%func_seg(%local, 0,
+			%seg:arg(0, ldm)
+			%seg:local(0,
 				movm
 				swap
 			)
@@ -147,7 +147,7 @@
 			strr
 			ldh
 			; curr.occupied, r = size
-			%func_seg(%local, 0,
+			%seg:local(0,
 				movm
 				ldm
 			)
@@ -162,17 +162,17 @@
 			str %chunk:FLAG_FREE
 		,
 			; reserve whole
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:at(flags)
 			str %chunk:FLAG_OCCUPIED
 		}
 		; return data ptr
-		%func_seg(%local, 0, ldma 2)
+		%seg:local(0, ldma 2)
 	}
 
 	; free segment @ data_ptr
 	%void_func {free, 1, 0,
-		%func_seg(%arg, 0, movm)
+		%seg:arg(0, movm)
 		movs %chunk:data_offset
 		%assert(ldm)
 		%chunk:at(flags)
