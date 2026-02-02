@@ -36,6 +36,7 @@
 	%stack:pushm()
 	mov %MEMORY_LAYOUT:G_LOCALS_PTR
 	%stack:pushm()
+	; TODO save G_this_ptr
 }
 ; reset SP to expected length, restore caller's segments, pop retaddr -> r
 %macro rstSP_pop_segment_ptrs() {
@@ -91,6 +92,21 @@
 	)
 }
 
+; same as %func + saves first arg to G_THIS_PTR
+; first argument must be ptr to instance
+%macro method(name, args, locals, body) {
+	%func(%name, %args, %locals,
+		%func_seg(%arg, 0, %storem(%MEMORY_LAYOUT:G_THIS_PTR))
+		%body
+	)
+}
+%macro void_method(name, args, locals, body) {
+	%void_func(%name, %args, %locals,
+		%func_seg(%arg, 0, %storem(%MEMORY_LAYOUT:G_THIS_PTR))
+		%body
+	)
+}
+
 ; saves retval from r
 %macro save_retval() {
 	%func_arg(0)
@@ -113,8 +129,9 @@
 	%movptr(%G_LOCALS_PTR)
 	mova %idx
 }
-%define arg 1 ; MEMORY_LAYOUT:G_ARGS_PTR
-%define local 2
+%define arg   (%MEMORY_LAYOUT:G_ARGS_PTR)
+%define local (%MEMORY_LAYOUT:G_LOCALS_PTR)
+%define this  (%MEMORY_LAYOUT:G_THIS_PTR)
 ; use ^ for name
 %macro func_seg(name, idx, after) {
 	mov %name
