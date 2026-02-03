@@ -38,7 +38,7 @@
 	; this, min_capacity ->
 	; reserve at least min_capacity total capacity in array
 	%void_method{ reserve, 2, 0,
-		%seg:arg(1, %stack:pushm())
+		%seg:push(%arg, 1)
 		%call(at_least_capacity)
 	}
 	; this ->
@@ -100,7 +100,7 @@
 		)
 		%call(at_least_capacity)
 		%seg:push_addr(%this, 0) ; from = this[index] (DEST)
-		%seg:arg(1, %stack:pushm())
+		%seg:push(%arg, 1)
 		%call(index)
 		%stack:dup()             ; to = this[index+1]
 		stra 1
@@ -108,18 +108,18 @@
 			ldms 1 ; orig_size = new_size - 1
 			%stack:pushr()
 		)
-		%seg:arg(1, %stack:pushm())
+		%seg:push(%arg, 1)
 		%stack:apply_op(s)
 		%call(memcopy)           ; move data after inserted
 		%seg:arg(2, ldm)         ; this[index] = value
 		%seg:dest(0, strr)
 	}
-	
+
 	; this, index -> value
 	; pop value at index
 	%method{ pop_index, 2, 0,
 		%seg:push_addr(%this, 0) ; this[index] (DEST)
-		%seg:arg(1, %stack:pushm())
+		%seg:push(%arg, 1)
 		%call(index)
 		%stack:pop() ; return this[index] (DESTROYS this arg)
 		movm
@@ -131,9 +131,9 @@
 			strs 1 ; push(--size)
 			%stack:pushm()
 		)
-		%seg:arg(1, %stack:pushm()) ; -index
+		%seg:push(%arg, 1) ; -index
 		%stack:apply_op(s)
-		%call(memcopy)           ; move data to fill hole
+		%call(memcopy)     ; move data to fill hole
 		%returnFunc(pop_index)
 	}
 
@@ -147,18 +147,18 @@
 			%stack:pushm()
 		)
 		%call(at_least_capacity)
-		%seg:src(%data_ptr, %stack:pushm()) ; from
-			%seg:src(%size,	ldm) ; this.size += other.size
+		%seg:push(%src, %data_ptr) ; from
+			%seg:src(%size,	ldm)   ; this.size += other.size
 			%seg:this(%size,
 				swap
 				strar
 				%stack:pushr()
 			)
 			%call(index_impl)
-		%seg:push_addr(%dest, 0)        ; to = this[size]
-		%seg:src(%size, %stack:pushm()) ; count = src.size
+		%seg:push_addr(%dest, 0)   ; to = this[size]
+		%seg:push(%src, %size)     ; count = src.size
 		%call(memcopy)
-		%seg:push_addr(%src, 0) ; src.clear()
+		%seg:push_addr(%src, 0)    ; src.clear()
 		%call(clear) ; WARNING destroys THIS_PTR
 	}
 
@@ -232,12 +232,12 @@
 		%void_func {_copy_data, 1, 1,
 			; locals: new_ptr
 			%stack:drop() ; drop empty local - malloc returns to local
-				%seg:arg(0, %stack:pushm())
+				%seg:push(%arg, 0)
 				%seg:this(%capacity, strr) ; this.capacity = new_capacity
 			%call(malloc) ; -> new_ptr
-				%seg:this(%data_ptr, %stack:pushm())
-				%seg:local(0, %stack:pushm())
-				%seg:this(%size, %stack:pushm())
+				%seg:push(%this, %data_ptr)
+				%seg:push(%local, 0)
+				%seg:push(%this, %size)
 			%call(memcopy) ; old_ptr, new_ptr, size
 				%seg:local(0, ldm)
 				%seg:this(%data_ptr, swap) ; this.ptr = new_ptr

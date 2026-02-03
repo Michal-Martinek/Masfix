@@ -51,7 +51,7 @@
 %macro emitBank() {
 	%load(%MEMORY_LAYOUT:G_THIS_PTR)
 	%stack:pushr()
-	%seg:local(%bankIdx, %stack:pushm())
+	%seg:push(%local, %bankIdx)
 	%call(memdump)
 	outc 10
 }
