@@ -112,13 +112,18 @@
 	%func_arg(0)
 	strr
 }
-%macro returnr(funcName) {
-	%save_retval()
+; ends function execution without affecting retval
+%macro returnFunc(funcName) {
 	jmp return_(%funcName)
 }
+%macro returnr(funcName) {
+	%save_retval()
+	%returnFunc(%funcName)
+}
 %macro return_imm(funcName, imm) {
-	ld %imm
-	%returnr(%funcName)
+	%func_arg(0)
+	str %imm
+	%returnFunc(%funcName)
 }
 
 %macro func_arg(idx) {
