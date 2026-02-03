@@ -9,7 +9,8 @@
 %store(%SEG_DEBUG_GLOBALS, %SEG_DEBUG_STACK) ; INIT debug SP
 
 %macro _swapGlobalCell(idx) {
-	%loadmov(!op(a, %SEG_GLOBAL, %idx), !op(a, %SEG_DEBUG_GLOBALS, %idx))
+	%load(!op(a, %SEG_GLOBAL, %idx))
+	mov !op(a, %SEG_DEBUG_GLOBALS, %idx)
 	swap
 	%storer(!op(a, %SEG_GLOBAL, %idx))
 }

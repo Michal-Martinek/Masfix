@@ -2,6 +2,9 @@
 %using stack
 %using MEMORY_LAYOUT
 
+;; basic procedures -----------------------------------
+;; handle only return address
+
 ; proc definition: after body expects retval in reg %where_retaddr
 %macro _proc_impl(name, where_retaddr, body) {
 		jmp proc_(%name)_body_end ; skip over proc body
@@ -26,11 +29,13 @@
 	%stack:top() ; load retval for ctime
 }
 
-; functions --------------------
-
+;; functions ---------------------------------
+;; allow argument passing, local variables and returning
+;; safe even with misaligned stack after function body
+;; funcs properly preserve memory segments (args, locals) even when nested
 
 ; saves ARGS, LOCALS segment pointers of caller by pushing in function prologue (above retaddr)
-%macro push_segment_ptrs() {
+%macro _push_segment_ptrs() {
 	; TODO optimization - save only in non-leaf funcs
 	mov %MEMORY_LAYOUT:G_ARGS_PTR
 	%stack:pushm()
@@ -39,7 +44,7 @@
 	; TODO save G_this_ptr
 }
 ; reset SP to expected length, restore caller's segments, pop retaddr -> r
-%macro rstSP_pop_segment_ptrs() {
+%macro _rstSP_pop_segment_ptrs() {
 	%load(%MEMORY_LAYOUT:G_LOCALS_PTR)
 	%storer(%MEMORY_LAYOUT:G_STACK_PTR)
 	strs 1 ; SP = locals-1
@@ -57,7 +62,7 @@
 %macro _func_impl(name, args, drop_args, locals, body) {
 	; function frame: stack top of prev func-| A1..An retaddr seg_args seg_locals L1..Ln
 	%_proc_impl(%name, r,
-		%push_segment_ptrs()
+		%_push_segment_ptrs()
 		ldh ; r = &retaddr + 2 (segments)
 		%storer(%G_LOCALS_PTR) ; LOCALS = top() + 1
 		stra 1
@@ -68,7 +73,7 @@
 
 		%body
 	:return_(%name) ; function epilogue - jump here to exit func (doesn't save retval!)
-		%rstSP_pop_segment_ptrs()
+		%_rstSP_pop_segment_ptrs()
 		%stack:dropN(%drop_args) ; drop #drop_args
 		; retaddr in r
 	)
@@ -82,7 +87,7 @@
 	)
 }
 ; caller: push args on stack - auto removed after, retval appears "pushed" instead
-; callee: returns value in r on function end (not when called return!)
+; callee: returns value in r on function end (see function returning)
 ; args, locals - number of vars to reserve
 ; !! args must be >= 1 (space for retval)
 %macro func(name, args, locals, body) {
@@ -107,38 +112,49 @@
 	)
 }
 
+;; function returning ------------------------
+
 ; saves retval from r
 %macro save_retval() {
-	%func_arg(0)
-	strr
+	%seg:arg(0, strr)
 }
 ; ends function execution without affecting retval
 %macro returnFunc(funcName) {
 	jmp return_(%funcName)
 }
+; return value in r and exit function
 %macro returnr(funcName) {
 	%save_retval()
 	%returnFunc(%funcName)
 }
 %macro return_imm(funcName, imm) {
-	%func_arg(0)
-	str %imm
+	%seg:arg(0, str %imm)
 	%returnFunc(%funcName)
 }
 
+;; data segments ---------------------------------------------------
+;; arg   - current function arguments
+;; local - current function local variables
+;; this  - current instance in methods
+;; src   - object pointed to by G_SRC
+;; dest  - object pointed to by G_DEST
+;; temp  - segment for temporary values - volatile!
+
 %macro func_arg(idx) {
-	%movptr(%G_ARGS_PTR)
-	mova %idx
+	mov %G_ARGS_PTR
+	movma %idx
 }
 %macro func_local(idx) {
-	%movptr(%G_LOCALS_PTR)
-	mova %idx
+	mov %G_LOCALS_PTR
+	movma %idx
 }
+
 %define arg   (%MEMORY_LAYOUT:G_ARGS_PTR)
 %define local (%MEMORY_LAYOUT:G_LOCALS_PTR)
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
 %define src   (%MEMORY_LAYOUT:G_SRC)
 %define dest  (%MEMORY_LAYOUT:G_DEST)
+%define temp  (%MEMORY_LAYOUT:SEG_TEMP)
 %namespace seg {
 	; use ^ for name
 	%macro push_addr(name, idx) {
@@ -146,10 +162,9 @@
 		ldma %idx
 		%stack:pushr()
 	}
-	%macro _func_seg(ptr_addr, idx, after) {
-		mov %ptr_addr
+	%macro move(name, idx) {
+		mov %name
 		movma %idx
-		%after
 	}
 	%macro arg(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_ARGS_PTR,   %idx, %instrs) }
 	%macro local(idx, instrs) { %_func_seg(%MEMORY_LAYOUT:G_LOCALS_PTR, %idx, %instrs) }
@@ -159,9 +174,16 @@
 	%macro temp(idx, instrs)  { mov !op(a, %MEMORY_LAYOUT:SEG_TEMP,     %idx)
 		%instrs
 	}
+
+	;; impl
+	%macro _func_seg(ptr_addr, idx, after) {
+		mov %ptr_addr
+		movma %idx
+		%after
+	}
 }
 
-; calling functions with constant arguments
+;; calling functions with constant arguments
 %macro callWith1Arg(name, argument) {
 	%push(%argument)
 	%call(%name)
