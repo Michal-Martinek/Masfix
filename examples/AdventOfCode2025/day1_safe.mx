@@ -10,7 +10,7 @@
 ; noarg -> offset / 0 (no next input)
 %func {readInput, 1, 1,
 	; local: bool-left
-	%func_local(0)
+	%seg:move(%local, 0)
 	%if_else { ; sign
 		incm
 		%print_spaced(outcm)

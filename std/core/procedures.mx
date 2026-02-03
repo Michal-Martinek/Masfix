@@ -140,15 +140,6 @@
 ;; dest  - object pointed to by G_DEST
 ;; temp  - segment for temporary values - volatile!
 
-%macro func_arg(idx) {
-	mov %G_ARGS_PTR
-	movma %idx
-}
-%macro func_local(idx) {
-	mov %G_LOCALS_PTR
-	movma %idx
-}
-
 %define arg   (%MEMORY_LAYOUT:G_ARGS_PTR)
 %define local (%MEMORY_LAYOUT:G_LOCALS_PTR)
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
@@ -156,15 +147,23 @@
 %define dest  (%MEMORY_LAYOUT:G_DEST)
 %define temp  (%MEMORY_LAYOUT:SEG_TEMP)
 %namespace seg {
-	; use ^ for name
+	;; use ^ for name arg
+
+	; push segment address
 	%macro push_addr(name, idx) {
 		mov %name
 		ldma %idx
 		%stack:pushr()
 	}
+	; move to segment
 	%macro move(name, idx) {
 		mov %name
 		movma %idx
+	}
+	; push segment value
+	%macro push(name, idx) {
+		%move(%name, %idx)
+		%stack:pushm()
 	}
 	%macro arg(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_ARGS_PTR,   %idx, %instrs) }
 	%macro local(idx, instrs) { %_func_seg(%MEMORY_LAYOUT:G_LOCALS_PTR, %idx, %instrs) }

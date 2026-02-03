@@ -38,7 +38,7 @@
 		,
 			jmp add
 		,
-			%func_local(%counter5) ; add if counter == 0
+			%seg:move(%local, %counter5) ; add if counter == 0
 			bmne update_counter
 		}
 

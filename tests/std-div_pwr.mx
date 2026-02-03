@@ -70,8 +70,7 @@ outc 10
 	%stack:pushr()
 	%call(power)
 	%stack:pop()
-	%func_local(%localIdx)
-	strr
+	%seg:local(%localIdx, strr)
 }
 
 ; which power to break -> status
@@ -96,15 +95,12 @@ outc 10
 		%callPwrStrLocal(2, 1) ; currPwr = 2 ** idx
 		%print_spaced(outum)
 
-		%func_local(0)
-		%stack:pushm()
-		%func_local(1)
-		%stack:pushm()
+		%seg:push(%local, 0)
+		%seg:push(%local, 1)
 		%call(divide) ; maxPwr / currPwr
 :second_divide_return ; stack dump purposes
 
-		%func_local(0)
-		ldm
+		%seg:local(0, ldm)
 		%stack:over(1)
 		ld>m ; r = maxPwr >> idx
 		%stack:pushr()
@@ -112,12 +108,11 @@ outc 10
 
 		; force error on arg0
 		%if {
-			%func_arg(0)
-			ld&m
+			%seg:arg(0, ld&m)
 		,
 			%stack:top()
 			stra 1
-		}		
+		}
 
 		%if {
 			%stack:pop()
@@ -165,8 +160,7 @@ outc 10
 }
 
 %void_func {main, 0, 1,
-	%func_local(0)
-	str 66
+	%seg:local(0, str 66)
 	%stack:push(42) ; should stay untouched
 
 	%testTest2powers(0)
@@ -174,7 +168,7 @@ outc 10
 :test_return
 
 	%print_endl(
-		%func_local(0)
+		%seg:move(%local, 0)
 		outum
 	)
 	%print_endl(

@@ -6,7 +6,8 @@
 %include "io"
 %include "math"
 
-%store(%SEG_DEBUG_GLOBALS, %SEG_DEBUG_STACK) ; INIT debug SP
+; INIT debug SP
+%VM_and_runtime_mem_init(%SEG_DEBUG_GLOBALS, %SEG_DEBUG_STACK)
 
 %macro _swapGlobalCell(idx) {
 	%load(!op(a, %SEG_GLOBAL, %idx))
@@ -35,12 +36,10 @@
 
 ; from, count -> void (stdout)
 %void_func {memdump, 2, 0,
-	%func_arg(1) ; ld count
-	ldm
+	%seg:arg(1, ldm) ; ld count
 	%for {
 		%stack:top() ; idx
-		%func_arg(0) ; from
-		movm
+		%seg:arg(0, movm) ; from
 		movar ; *(from + idx)
 
 		%if {

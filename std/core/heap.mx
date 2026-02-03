@@ -10,7 +10,7 @@
 ; sets @count entries starting @ptr to @value
 %void_func{ memset, 3, 0,
 	; locals: inc ptr, dec count
-	%func_arg(1)
+	%seg:move(%arg, 1)
 	%while { ; count > 0
 		lmab 0
 	,
@@ -39,7 +39,7 @@
 		%seg:arg(1, strar)
 		%seg:local(0, str %minus1) ; direction = -1
 	}
-	%func_arg(2)
+	%seg:move(%arg, 2)
 	%while { ; count > 0
 		lmab 0
 	,

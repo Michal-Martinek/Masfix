@@ -40,7 +40,7 @@
 	outc 63
 	outc 32
 
-	%func_local(0)
+	%seg:move(%local, 0)
 	inum ; input
 	inl
 	%if { lmle 0, ; prohibit 0
