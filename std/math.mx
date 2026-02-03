@@ -11,6 +11,7 @@
 }
 
 %define uint_max (!op(s, 0, 1)) ; 11111
+%define minus1   (%uint_max)    ; 11111
 %define  int_max (!op(>, %uint_max, 1))        ; 01111
 %define  int_min (!op(s, %uint_max, %int_max)) ; 10000
 

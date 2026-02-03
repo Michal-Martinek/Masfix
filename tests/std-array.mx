@@ -94,6 +94,41 @@
 	%call(memdump)
 	%seeFuncFrame()
 	outc 10
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; pop_index 0, 2, last
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 0)
+	%stack:pop()
+	outur
+	
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 2)
+	%stack:pop()
+	outur
+
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 4)
+	%stack:pop()
+	outur
+	outc 10
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; insert 7->end, 6->0, 9->2
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 4, 7)
+
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 0, 6)
+
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 2, 9)
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
 
 	; test empty[0]
 	outc 69

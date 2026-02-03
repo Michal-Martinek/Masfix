@@ -91,6 +91,52 @@
 		%seg:dest(0, ldm)
 	}
 
+	; this, index, value ->
+	; insert value before index
+	%void_method{ insert, 3, 0,
+		%seg:this(%size, ; this.reserve(++size) (also make [idx=orig_size] valid)
+			stra 1
+			%stack:pushm()
+		)
+		%call(at_least_capacity)
+		%seg:push_addr(%this, 0) ; from = this[index] (DEST)
+		%seg:arg(1, %stack:pushm())
+		%call(index)
+		%stack:dup()             ; to = this[index+1]
+		stra 1
+		%seg:this(%size,         ; count = orig_size - index
+			ldms 1 ; orig_size = new_size - 1
+			%stack:pushr()
+		)
+		%seg:arg(1, %stack:pushm())
+		%stack:apply_op(s)
+		%call(memcopy)           ; move data after inserted
+		%seg:arg(2, ldm)         ; this[index] = value
+		%seg:dest(0, strr)
+	}
+	
+	; this, index -> value
+	; pop value at index
+	%method{ pop_index, 2, 0,
+		%seg:push_addr(%this, 0) ; this[index] (DEST)
+		%seg:arg(1, %stack:pushm())
+		%call(index)
+		%stack:pop() ; return this[index] (DESTROYS this arg)
+		movm
+		ldm
+		%save_retval()
+		%seg:push_addr(%dest, 1) ; from = this[index+1]
+		%seg:push_addr(%dest, 0) ; to = this[index]
+		%seg:this(%size,         ; count = (--size) - index
+			strs 1 ; push(--size)
+			%stack:pushm()
+		)
+		%seg:arg(1, %stack:pushm()) ; -index
+		%stack:apply_op(s)
+		%call(memcopy)           ; move data to fill hole
+		%returnFunc(pop_index)
+	}
+
 	; this, other: *array ->
 	; extends end of this arr with values from other
 	%void_method{ extend, 2, 0,
