@@ -28,6 +28,13 @@
 	jmp proc_(%name)
 	%stack:top() ; load retval for ctime
 }
+; call proc / func by ptr in r
+%macro call_ptr() {
+	%push(2) ; ret addr offset
+	strap
+	jmpr
+	%stack:top()
+}
 
 ;; functions ---------------------------------
 ;; allow argument passing, local variables and returning

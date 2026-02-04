@@ -26,6 +26,10 @@
 	%macro instr_with_label(instr, label_name) {
 		%instr (%label_name)_(!get())
 	}
+	; label name of upper scope %offset away
+	%macro instr_with_label_offset(instr, label_name, offset) {
+		%instr (%label_name)_(!get_offset(%offset))
+	}
 	; one iota number per expansion
 	; at macro end use !increment() / define last label with _increment variant
 	%macro def_label(name) {
@@ -56,12 +60,21 @@
 
 ; loops
 %macro loop_continue() {
-	; TODO breaks when inside %if
 	%instr_with_label(jmp, while_continue)
+}
+; off: number of scopes above to continue to
+; example: %continue is nested in one %if -> off = 1
+%macro loop_continue_offset(off) {
+	%instr_with_label_offset(jmp, while_continue, %off)
 }
 %macro loop_break() {
 	%instr_with_label(jmp, while_end)
 }
+; off: number of scopes above to break
+%macro loop_break_offset(off) {
+	%instr_with_label_offset(jmp, while_end, %off)
+}
+
 %macro do_while(cond, body) {
 	%def_label(do_start)
 		%body
