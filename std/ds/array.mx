@@ -51,10 +51,8 @@
 	; this, index -> item: ptr (G_DEST)
 	; safely indexes array
 	%method{ index, 2, 0,
-		%seg:arg(1,
-			%stack:pushm()
-			%stack:dup()
-		)
+		%seg:push(%arg, 1)
+		%stack:dup()
 		%call(assert_good_idx)
 		%call(index_impl)
 		%load(%MEMORY_LAYOUT:G_DEST)
@@ -75,8 +73,8 @@
 			%stack:pushr()
 		)
 		%call(index_impl)
-		%seg:arg(1, ldm)
-		%seg:dest(0, strr)
+		%seg:load(%arg, 1)
+		%seg:store(%dest, 0)
 	}
 
 	; this -> value (G_DEST)
@@ -111,8 +109,8 @@
 		%seg:push(%arg, 1)
 		%stack:apply_op(s)
 		%call(memcopy)           ; move data after inserted
-		%seg:arg(2, ldm)         ; this[index] = value
-		%seg:dest(0, strr)
+		%seg:load(%arg, 2)  ; this[index] = value
+		%seg:store(%dest, 0)
 	}
 
 	; this, index -> value
@@ -141,14 +139,14 @@
 	; extends end of this arr with values from other
 	%void_method{ extend, 2, 0,
 		%seg:arg(1, %storem(%src))
-		%seg:this(%size, ldm)
+		%seg:load(%this, %size)
 		%seg:src(%size,
 			ldam
 			%stack:pushm()
 		)
 		%call(at_least_capacity)
-		%seg:push(%src, %data_ptr) ; from
-			%seg:src(%size,	ldm)   ; this.size += other.size
+		%seg:push(%src, %data_ptr)   ; from
+			%seg:load(%src, %size)   ; this.size += other.size
 			%seg:this(%size,
 				swap
 				strar
@@ -212,7 +210,7 @@
 		; asserts idx < size
 		%proc{ assert_good_idx,
 			%stack:swap2() ; retaddr, idx
-			%seg:this(%size, ldm)
+			%seg:load(%this, %size)
 			%assert(
 				%stack:drop()
 				lmltr
@@ -233,13 +231,13 @@
 			; locals: new_ptr
 			%stack:drop() ; drop empty local - malloc returns to local
 				%seg:push(%arg, 0)
-				%seg:this(%capacity, strr) ; this.capacity = new_capacity
+				%seg:store(%this, %capacity) ; this.capacity = new_capacity
 			%call(malloc) ; -> new_ptr
 				%seg:push(%this, %data_ptr)
 				%seg:push(%local, 0)
 				%seg:push(%this, %size)
 			%call(memcopy) ; old_ptr, new_ptr, size
-				%seg:local(0, ldm)
+				%seg:load(%local, 0)
 				%seg:this(%data_ptr, swap) ; this.ptr = new_ptr
 				%stack:pushr()
 			%if { lne 0 , ; if old_ptr != null
