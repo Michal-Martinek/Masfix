@@ -24,7 +24,7 @@
 %macro _rstBank() {
 	%stack:pop()
 	%firstMax(strr)
-	%func_seg(%local, %bankIdx, str 0)
+	%seg:local(%bankIdx, str 0)
 }
 ; secondMax = max(.., curr)
 %macro _updateSecondMax() {
@@ -37,7 +37,7 @@
 }
 ; banks[bankIdx++] = curr joltage
 %macro _saveCurr() {
-	%func_seg(%local, %bankIdx,
+	%seg:local(%bankIdx,
 		ldm
 		stra 1
 	)
@@ -51,23 +51,21 @@
 %macro emitBank() {
 	%load(%MEMORY_LAYOUT:G_THIS_PTR)
 	%stack:pushr()
-	%func_seg(%local, %bankIdx, %stack:pushm())
+	%seg:push(%local, %bankIdx)
 	%call(memdump)
 	outc 10
 }
 ; locals
 %define bankIdx 0
 %macro firstMax(op) {
-	%func_local(1)
-	%op
+	%seg:local(1, %op)
 }
 %macro secondMax(op) {
-	%func_local(2)
-	%op
+	%seg:local(2, %op)
 }
 ; noarg -> bank max
 %func {maximizeBank, 1, 3,
-	%func_seg(%local, %bankIdx, str 0)
+	%seg:local(%bankIdx, str 0)
 	%firstMax(str 0)
 	%secondMax(str 0)
 
@@ -102,8 +100,7 @@
 
 ; main variables
 %macro banksSum(op) {
-	%func_local(0)
-	%op
+	%seg:local(0, %op)
 }
 %void_func {main, 0, 1,
 	%callWith1Arg(malloc, 4) ; align the big array for better memdumps

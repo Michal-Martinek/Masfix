@@ -1,5 +1,8 @@
 
+%include "core/memory"
+%include "core/heap"
 %include "core/structs"
+%include "std/math"
 %include "core/procedures"
 
 %namespace pair {
@@ -21,24 +24,24 @@
 		)
 	}
 	%func{pair_compare_eq, 2, 1,
-		%func_seg(%arg, 0,
+		%seg:arg(0,
 			movm
 			ldm
 		)
-		%func_seg(%arg, 1,
+		%seg:arg(1,
 			movm
 			leqm
 		)
-		%func_seg(%local, 0, strr)
-		%func_seg(%arg, 0,
+		%seg:local(0, strr)
+		%seg:arg(0,
 			movma %second
 			ldm
 		)
-		%func_seg(%arg, 1,
+		%seg:arg(1,
 			movma %second
 			leqm
 		)
-		%func_seg(%local, 0, ld&m)
+		%seg:local(0, ld&m)
 	}
 
 	%struct:end()

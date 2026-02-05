@@ -1,0 +1,334 @@
+
+%include "memory"
+%include "heap"
+%include "control"
+%include "procedures"
+%include "math"
+%include "structs"
+%include "exceptions"
+
+;; variable size array with safe indexing
+;; consists of inplace struct holding metadata and resizeable heap-allocated array holding values
+%namespace array {
+	%struct:begin()
+
+	%struct:field(data_ptr, 1)
+	%struct:field(size, 1)
+	%struct:field(capacity, 1)
+	; %struct:field(item_size, 1) ; TODO
+
+	; h @ array
+	; initializes to empty state
+	%macro init() {
+		%set(data_ptr, 0)
+		%set(size, 0)
+		%set(capacity, 0)
+	}
+	; h @ array
+	; frees value array
+	%macro deinit() {
+		%at(data_ptr)
+		%if { lmne 0 , ; if ptr != null
+			%stack:pushm()
+			%call(free)
+		}
+	}
+
+
+	; this, min_capacity ->
+	; reserve at least min_capacity total capacity in array
+	%void_method{ reserve, 2, 0,
+		%seg:push(%arg, 1)
+		%call(at_least_capacity)
+	}
+	; this ->
+	; clears array
+	%void_method{ clear, 1, 0,
+		%seg:this(0, %deinit())
+		%seg:this(0, %init())
+	}
+
+	; this, index -> item: ptr (G_DEST)
+	; safely indexes array
+	%method{ index, 2, 0,
+		%seg:push(%arg, 1)
+		%stack:dup()
+		%call(assert_good_idx)
+		%call(index_impl)
+		%load(%MEMORY_LAYOUT:G_DEST)
+	}
+
+	; this, value ->
+	; append value at end of array
+	%void_method{ push_back, 2, 0,
+		%seg:this(%size,
+			ldma 1
+			%stack:pushr()
+		)
+		%call(at_least_capacity)
+		; data[size++]
+		%seg:this(%size,
+			ldm
+			stra 1
+			%stack:pushr()
+		)
+		%call(index_impl)
+		%seg:load(%arg, 1)
+		%seg:store(%dest, 0)
+	}
+
+	; this -> value (G_DEST)
+	; pops last value
+	%method{ pop_back, 1, 0,
+		%call(assert_nonempty)
+		%seg:this(%size, ; idx = --size
+			strs 1
+			%stack:pushm()
+		)
+		%call(index_impl)
+		%seg:dest(0, ldm)
+	}
+
+	; this, index, value ->
+	; insert value before index
+	%void_method{ insert, 3, 0,
+		%seg:this(%size, ; this.reserve(++size) (also make [idx=orig_size] valid)
+			stra 1
+			%stack:pushm()
+		)
+		%call(at_least_capacity)
+		%seg:push_addr(%this, 0) ; from = this[index] (DEST)
+		%seg:push(%arg, 1)
+		%call(index)
+		%stack:dup()             ; to = this[index+1]
+		stra 1
+		%seg:this(%size,         ; count = orig_size - index
+			ldms 1 ; orig_size = new_size - 1
+			%stack:pushr()
+		)
+		%seg:push(%arg, 1)
+		%stack:apply_op(s)
+		%call(memcopy)           ; move data after inserted
+		%seg:load(%arg, 2)  ; this[index] = value
+		%seg:store(%dest, 0)
+	}
+
+	; this, index -> value
+	; pop value at index
+	%method{ pop_index, 2, 0,
+		%seg:push_addr(%this, 0) ; this[index] (DEST)
+		%seg:push(%arg, 1)
+		%call(index)
+		%stack:pop() ; return this[index] (DESTROYS this arg)
+		movm
+		ldm
+		%save_retval()
+		%seg:push_addr(%dest, 1) ; from = this[index+1]
+		%seg:push_addr(%dest, 0) ; to = this[index]
+		%seg:this(%size,         ; count = (--size) - index
+			strs 1 ; push(--size)
+			%stack:pushm()
+		)
+		%seg:push(%arg, 1) ; -index
+		%stack:apply_op(s)
+		%call(memcopy)     ; move data to fill hole
+		%returnFunc(pop_index)
+	}
+
+	; this, other: *array ->
+	; extends end of this arr with values from other
+	%void_method{ extend, 2, 0,
+		%seg:arg(1, %storem(%src))
+		%seg:load(%this, %size)
+		%seg:src(%size,
+			ldam
+			%stack:pushm()
+		)
+		%call(at_least_capacity)
+		%seg:push(%src, %data_ptr)   ; from
+			%seg:load(%src, %size)   ; this.size += other.size
+			%seg:this(%size,
+				swap
+				strar
+				%stack:pushr()
+			)
+			%call(index_impl)
+		%seg:push_addr(%dest, 0)   ; to = this[size]
+		%seg:push(%src, %size)     ; count = src.size
+		%call(memcopy)
+		%seg:push_addr(%src, 0)    ; src.clear()
+		%call(clear) ; WARNING destroys THIS_PTR
+	}
+
+	; array @G_THIS_PTR
+	; performs instrs on each element
+	; instrs ABI - head will be at element (+ in G_DEST)
+	; idx - stack:top() - dont modify stack!
+	%macro foreach(instrs) {
+		%seg:this(%size, ldm)
+		%for {
+			%stack:dup() ; idx
+			%call(index_impl)
+			%seg:dest(0,
+				%instrs
+			)
+		}
+	}
+
+	; this, init_acc(), accumulate() -> accumulator
+	; init_acc: func_ptr: elem -> new_accumulator
+	; accumulate: func_ptr: accumulator, elem -> new_accumulator
+	; reduces array from left by first initializing accumulator (single value or ptr) with init_acc()
+	;   - uses this[0] if init_acc == null
+	; then reduces the array with accumulate(accumulator, elem)
+	%method{ reduce, 3, 1,
+		; locals: acc (duplicated above the for loop)
+		%call(assert_nonempty)
+		%stack:push(0) ; this[0]
+		%call(index_impl)
+		%stack:drop()  ; init_acc -> local acc
+		%seg:push(%dest, 0)
+		%if { %seg:arg(1, lmne 0),
+			ldm         ; if (init_acc != null):
+			%call_ptr() ;   acc = init_acc(this[0])
+		}
+		%seg:load(%this, %size)  ; for 1...size
+		%for_full{1, 1,
+			%stack:dup()         ; dest = this[idx]
+			%call(index_impl)
+			%seg:push(%local, 0) ; accumulator
+			%seg:push(%dest, 0)  ; elem
+			%seg:load(%arg, 2)   ; accumulate()
+			%call_ptr()
+			%seg:pop(%local, 0)  ; acc = accumulate()
+		}
+		%seg:load(%local, 0) ; return acc
+	}
+
+	; this, func_lt (elem, elem -> bool) -> void
+	; sort array inplace in ascending order
+	%void_method{ array_sort, 2, 1, ; inner idx to second in pair
+		;; insertion sort
+		%foreach { ; IDX inserting element
+			%stack:top()
+			%seg:store(%local, 0)
+			%while { ; for (idx = IDX; idx > 0; idx--)
+				%seg:local(0, lmab 0)
+			,
+				ldm    ; this[idx--]
+				strs 1
+				%stack:pushr()
+				%call(index_impl)
+				%seg:push(%dest, %minus1) ; idx-1
+				%seg:push(%dest, 0) ; idx
+				%seg:load(%arg, 1)
+				%call_ptr()
+
+				%if_else {
+					%stack:pop()
+					leq 0
+				, ; swap
+					%seg:load(%dest, 0)
+					movs 1
+					swap
+					mova 1
+					strr
+				,
+					%loop_break_offset(1)
+				}
+			}
+		}
+	}
+
+	; this ->
+	%void_method{ array_print, 1, 1,
+		; locals: first | for_stop, for_idx
+		%seg:local(0, str 1)
+		outc 91
+		%foreach {
+			%if_else { %seg:local(0, lmeq 0),
+				outc 44
+				outc 32
+			,
+				str 0
+			}
+			%stack:dup() ; idx
+			%call(index_impl)
+			%seg:dest(0,
+				outum
+			)
+		}
+		outc 93
+		outc 10
+	}
+
+
+	%namespace impl {
+		;; using procedures to save instrs, this param expected in G_THIS_PTR
+
+		; this ->
+		%proc{ assert_nonempty,
+			%assert( ; this.size > 0
+				%seg:this(%size, lmab 0)
+			)
+		}
+		; this, idx: uint ->
+		; asserts idx < size
+		%proc{ assert_good_idx,
+			%stack:swap2() ; retaddr, idx
+			%seg:load(%this, %size)
+			%assert(
+				%stack:drop()
+				lmltr
+			)
+		}
+
+		; this, index -> (G_DEST)
+		%proc {index_impl,
+			%stack:swap2()
+			%stack:pop() ; idx
+			%seg:this(%data_ptr, ldam)
+			%storer(%MEMORY_LAYOUT:G_DEST) ; G_DEST = this.data_ptr + idx
+		}
+
+		; this, new_capacity
+		; moves data[0:size] into new array of new_capacity
+		%void_func {_copy_data, 1, 1,
+			; locals: new_ptr
+			%stack:drop() ; drop empty local - malloc returns to local
+				%seg:push(%arg, 0)
+				%seg:store(%this, %capacity) ; this.capacity = new_capacity
+			%call(malloc) ; -> new_ptr
+				%seg:push(%this, %data_ptr)
+				%seg:push(%local, 0)
+				%seg:push(%this, %size)
+			%call(memcopy) ; old_ptr, new_ptr, size
+				%seg:load(%local, 0)
+				%seg:this(%data_ptr, swap) ; this.ptr = new_ptr
+				%stack:pushr()
+			%if { lne 0 , ; if old_ptr != null
+				%call(free) ; free(old_ptr)
+			}
+		}
+
+		; this, min_capacity ->
+		; establishes array having at least requested capacity
+		; generally rounds up capacity to power of 2
+		%proc{ at_least_capacity,
+			%stack:swap2() ; retaddr, min_capacity @r
+			%if_else { ; this.capacity < min_capacity
+				%seg:this(%capacity, lmltr)
+			, ; reallocate
+				%call(round_up_to_2_power) ; round_up(min_capacity)
+				; instead add 4 before rounding?
+				%if { lmbl 4, ; new_capacity = max(4, new_capacity)
+					str 4
+				}
+				%call(_copy_data)
+			,
+				%stack:drop() ; min_capacity
+			}
+		}
+	}
+	%struct:end()
+}

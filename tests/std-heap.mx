@@ -2,6 +2,8 @@
 ; testing heap
 %include "memory"
 %include "heap"
+%include "math"
+%include "structs"
 %include "debug"
 %include "procedures"
 %include "io"
@@ -52,9 +54,29 @@ outc 10
 
 %see_heap(24)
 
-%callWith1Arg(malloc, 8)
-%stack:top()
+%namespace eight_bit { ; pew pew pew
+	%struct:begin()
+	%struct:field(values, 8)
+
+	; initializes instance @h
+	%macro init() {
+		%stack:pushh()
+		%stack:push(%sizeof)
+		%stack:push(88)
+		%call(memset)
+	}
+	%struct:end()
+}
+%eight_bit:constructor()
+%stack:top() ; keep ptr to 8B
 outur
+outc 10
+
+; see memset result
+%stack:dup()
+%stack:push(!op(s, %uint_max, 7))
+%stack:apply_op(&)
+%callWith1Arg(memdump, 16)
 outc 10
 
 %callWith1Arg(malloc, 3)
@@ -62,7 +84,9 @@ outc 10
 outur
 outc 10
 
-%call(free) ; free the 8
+%stack:pop()
+movm ; -> eight_bit start
+%eight_bit:dealloc() ; free the 8B
 
 %see_heap(32)
 

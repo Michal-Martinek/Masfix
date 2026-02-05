@@ -10,9 +10,10 @@
 	ld(%opp) %b
 }
 
-%define uint_max (!op(s, 0, 1))
-%define  int_max (!op(>, %uint_max, 1))
-%define  int_min (!op(s, %uint_max, %int_max))
+%define uint_max (!op(s, 0, 1)) ; 11111
+%define minus1   (%uint_max)    ; 11111
+%define  int_max (!op(>, %uint_max, 1))        ; 01111
+%define  int_min (!op(s, %uint_max, %int_max)) ; 10000
 
 %macro neg(a) {
 	ld %a
@@ -40,20 +41,16 @@
 	%stack:top() ; local result = 0
 	str 0
 	%while {
-		%func_arg(1) ; a >= b
-		ldm
+		%seg:arg(1, ldm) ; a >= b
 		movs 1
-		lmger ; TODO unsigned comparison
+		lmaer
 	,
-		%func_local(0) ; result++
-		stra 1
-		%func_arg(1) ; a -= b
-		ldm
+		%seg:local(0, stra 1) ; result++
+		%seg:arg(1, ldm) ; a -= b
 		movs 1
 		strsr
 	}
-	%func_arg(0) ; store remainder
-	%storem(%MEMORY_LAYOUT:SEG_TEMP)
+	%seg:arg(0, %storem(%temp)) ; store remainder
 	%stack:top() ; return result
 }
 %macro ld_remainder() {
@@ -63,22 +60,46 @@
 ; a, b -> a ** b
 %func {power, 2, 1,
 	; local - result
-	%func_local(0) ; result = 1
-	str 1
+	%seg:local(0, str 1) ; result = 1
 	%while {
 		; b > 0
-		%func_arg(1)
-		ldm
+		%seg:arg(1, lmgt 0)
 	,
 		; result *= a
 		movs 1 ; a
 		ldm
-		%func_local(0)
-		strtr
+		%seg:local(0, strtr)
 		; b--
-		%func_arg(1)
-		strs 1
+		%seg:arg(1, strs 1)
 	}
-	%func_local(0) ; return result
+	%seg:local(0, ldm) ; return result
+}
+
+; num: uint -> 2**k >= num
+; num above 2**15 rounds to uint_max
+%func {round_up_to_2_power, 1, 1,
+	%if { %seg:arg(0, lmab %int_min),
+		%return_imm(round_up_to_2_power, %uint_max)
+	}
+	%seg:local(0, str 1) ; 2 power
+	%while {
+		%seg:arg(0, ldm)
+		%seg:local(0, lmblr)
+	,
+		str< 1
+	}
 	ldm
 }
+
+%macro defineIntOpAsFunc(name, opInstr) {
+	; int, int -> int
+	%func{ %name, 2, 0,
+		%seg:load(%arg, 0)
+		%seg:arg(1, %opInstr)
+	}
+}
+%defineIntOpAsFunc(int_eq,  leqm)
+%defineIntOpAsFunc(int_lt,  lltm)
+%defineIntOpAsFunc(uint_lt, lblm)
+%defineIntOpAsFunc(int_add, ldam)
+%defineIntOpAsFunc(int_mult,ldtm)

@@ -1,0 +1,185 @@
+
+%include "memory"
+%include "heap"
+%include "control"
+%include "ds/array"
+%include "math"
+%include "io"
+%include "structs"
+%include "procedures"
+%include "debug"
+
+%macro at_arr(idx, instrs) {
+	%seg:local(!op(t, %idx, %array:sizeof), %instrs)
+}
+%func { int_lt_with_emit, 2, 0,
+	%seg:push(%arg, 0)
+	outur
+	outc 60 ; '<'
+	%seg:push(%arg, 1)
+	%print_spaced(outur)
+	%call(uint_lt)
+}
+%func { debug_reduce_init, 1, 0,
+	%stack:push(2) ; 2 ^ (x+4)
+	%stack:push(4)
+	%seg:push(%arg, 0)
+	%stack:apply_op(a)
+	%call(power)
+	%stack:pop()
+}
+
+%void_func {main, 0, !op(t, %array:sizeof, 2),
+	; force array initialization
+	%seg:push_addr(%local, 0)
+	%stack:push(6)
+	%stack:push(420)
+	%call(memset)
+
+	%at_arr(0, %array:init())
+	%at_arr(1, %array:init())
+	
+	; print empty
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+	; push 7, 8 @ print
+	%seg:push_addr(%local, 0)
+	%stack:push(7)
+	%call(push_back)
+
+	%seg:push_addr(%local, 0)
+	%stack:push(8)
+	%call(push_back)
+	
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+	; arr[1]	
+	%seg:push_addr(%local, 0)
+	%stack:push(1)
+	%call(index)
+	%print_endl(
+		%stack:pop()
+		movm
+		outum
+	)
+	; arr0.reserve(6) - reserves 8
+	%seg:push_addr(%local, 0)
+	%stack:push(6)
+	%call(reserve)
+
+	; arr1 = [1, 2, 3, 4, 5, 6]
+	ld 6
+	%for {
+		%stack:dup()
+		stra 1
+		%seg:push_addr(%local, %array:sizeof)
+		%stack:swap2()
+		%call(push_back)
+	}
+
+	%seg:push_addr(%local, %array:sizeof)
+	%call(array_print)
+
+	%stack:push(%MEMORY_LAYOUT:SEG_HEAP)
+	%stack:push(32)
+	%call(memdump)
+	outc 10
+
+	%seeFuncFrame()
+
+	%seg:push_addr(%local, 0)
+	%seg:push_addr(%local, %array:sizeof)
+	%call(extend)
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	%seg:push_addr(%local, 0) ; tickle reserve
+	%stack:push(2)
+	%call(reserve)
+
+	%seg:push_addr(%local, 0)
+	%call(pop_back)
+	%print_endl(
+		%stack:pop()
+		outum
+	)
+
+	%stack:push(%MEMORY_LAYOUT:SEG_HEAP)
+	%stack:push(32)
+	%call(memdump)
+	%seeFuncFrame()
+	outc 10
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; pop_index 0, 2, last
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 0)
+	%stack:pop()
+	outur
+	
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 2)
+	%stack:pop()
+	outur
+
+	%seg:push_addr(%local, 0)
+	%callWith1Arg(pop_index, 4)
+	%stack:pop()
+	outur
+	outc 10
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; insert 7->end, 6->0, 9->2
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 4, 7)
+
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 0, 6)
+
+	%seg:push_addr(%local, 0)
+	%callWith2Arg(insert, 2, 9)
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	%seg:push_addr(%local, 0)
+	%stack:push(proc_int_lt_with_emit)
+	%call(array_sort)
+	outc 10
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; init(1) = 32, sum with rest
+	%seg:push_addr(%local, 0)
+	%stack:push(proc_debug_reduce_init)
+	%stack:push(proc_int_add)
+	%call(reduce)
+	%print_endl(
+		%stack:pop()
+		outur ; 69
+	)
+
+	; multiply elems together
+	%seg:push_addr(%local, 0)
+	%stack:push(0)
+	%stack:push(proc_int_mult)
+	%call(reduce)
+	%print_endl(
+		%stack:pop()
+		outur ; 36288
+	)
+
+	; test empty[0]
+	outc 69
+	%seg:push_addr(%local, %array:sizeof)
+	%stack:push(0)
+	%call(index)
+
+}
+
+%call(main)

@@ -10,7 +10,7 @@
 ; noarg -> offset / 0 (no next input)
 %func {readInput, 1, 1,
 	; local: bool-left
-	%func_local(0)
+	%seg:move(%local, 0)
 	%if_else { ; sign
 		incm
 		%print_spaced(outcm)
@@ -28,7 +28,7 @@
 	}
 	inu
 	inl
-	%func_seg(%local, 0, bmeq right)
+	%seg:local(0, bmeq right)
 	ld^ 65535
 	lda 1
 	:right
@@ -37,14 +37,14 @@
 %define safeVal 0
 %define zeroCount 1
 %void_func {main, 0, 2,
-	%func_seg(%local, %safeVal,   str 50)
-	%func_seg(%local, %zeroCount, str 0)
+	%seg:local(%safeVal,   str 50)
+	%seg:local(%zeroCount, str 0)
 	%while {
 		%stack:push(0)
 		%call(readInput)
 		%stack:top()
 	,
-		%func_seg(%local, %safeVal, strar)
+		%seg:local(%safeVal, strar)
 		%if { lmge 100,
 			strs 100
 		}
@@ -52,16 +52,16 @@
 			stra 100
 		}
 		%if { lmeq 0,
-			%func_seg(%local, %zeroCount, stra 1)
+			%seg:local(%zeroCount, stra 1)
 		}
 		%stack:pop() ; turn
 		%print_endl(
 			%outir()
 			outc 32
-			%func_seg(%local, %safeVal, outum)
+			%seg:local(%safeVal, outum)
 		)
 	}
-	%func_seg(%local, %zeroCount, outum)
+	%seg:local(%zeroCount, outum)
 	outc 10
 }
 

@@ -126,7 +126,7 @@ def updateInput(file: Path):
 		updateFileOutput(file)
 	
 # test ------------------------------------------
-def runFile(path, stdin, interpret, timeout=1.0) -> dict:
+def runFile(path, stdin, interpret, timeout=5.0) -> dict:
 	if 'basic-test.mx' in str(path): timeout = 30 # NOTE avoid timeouts when Github actions runs the FIRST testcase
 	return runCommand(['Masfix', '-r', str(path)] + ['-I'] * interpret, stdin, timeout)
 

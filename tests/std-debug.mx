@@ -7,16 +7,16 @@
 	%stack:push(2)
 	%stack:push(13)
 	%stack:swap2()
-	%func_seg(%local, 0, str 22)
-	%func_seg(%local, 1, str 5)
+	%seg:local(0, str 22)
+	%seg:local(1, str 5)
 	%seeFuncFrame()
 	ld 17
 }
 
 %void_func {main, 0, 3,
-	%func_seg(%local, 0, str 1)
-	%func_seg(%local, 1, str 0)
-	%func_seg(%local, 2, str 1)
+	%seg:local(0, str 1)
+	%seg:local(1, str 0)
+	%seg:local(2, str 1)
 
 	%stack:push(77) ; stays
 
@@ -27,3 +27,8 @@
 	%seeFuncFrame()
 }
 %call(main)
+
+%void_func {nothing, 0, 0,
+	%seeFuncFrame()
+}
+%call(nothing)

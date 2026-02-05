@@ -20,17 +20,7 @@
 	mov %addr
 	movm
 }
-%macro loadmov(addr, mov2) {
-	%load(%addr)
-	mov %mov2
-}
 
-; indexes linear field @ptr with idx from r
-%macro index(ptr, item_size) {
-	%movptr(%ptr)
-	ldt %item_size
-	movar
-}
 ; VM helpers -----------------
 
 ; do ctime, ignore retval
@@ -64,7 +54,8 @@
 
 	%define G_IOTA 4
 	%define G_STRUCT_OFFSET 5
-
+	%define G_SRC 6
+	%define G_DEST 7
 }
 %using MEMORY_LAYOUT
 ; interfaces -----------------------
@@ -78,21 +69,21 @@
 		%macro derefSPpop() {
 			mov %G_STACK_PTR
 			strs 1
-			movm
-			mova 1
+			movma 1
 		}
 	}
 	%using impl
 
 	; inspecting
 	%macro top() {
-		%movptr(%G_STACK_PTR)
+		mov %G_STACK_PTR
+		movm
 		ldm
 	}
 	; only primitive not loading the value
 	%macro over(n) {
-		%movptr(%G_STACK_PTR)
-		movs %n
+		mov %G_STACK_PTR
+		movms %n
 	}
 	%macro ld_over(n) {
 		%over(%n)
@@ -109,6 +100,10 @@
 	}
 	%macro pushm() {
 		ldm
+		%pushr()
+	}
+	%macro pushh() {
+		ldh
 		%pushr()
 	}
 

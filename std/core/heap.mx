@@ -6,7 +6,58 @@
 %include "structs"
 %include "exceptions"
 
-; TODO memset, memcpy
+; ptr, count, value
+; sets @count entries starting @ptr to @value
+%void_func{ memset, 3, 0,
+	; locals: inc ptr, dec count
+	%seg:move(%arg, 1)
+	%while { ; count > 0
+		lmab 0
+	,
+		; mem[ptr++] = value
+		%seg:arg(2, ldm)
+		%seg:arg(0,
+			stra 1
+			movms 1
+			strr
+		)
+		%seg:arg(1, strs 1) ; count --
+	}
+}
+; from, to, count
+; copies @count words
+; correct even if from&to areas overlap
+%void_func{ memcopy, 3, 1,
+	; args as locals  | direction
+	%seg:local(0, str 1)
+	%if { ; from < to: reverse directions (copy from end to begin)
+		%seg:arg(0, ldm)
+		%seg:arg(1, lrltm)
+	,
+		%seg:arg(2, ldms 1) ; ptrs += count - 1
+		%seg:arg(0, strar)
+		%seg:arg(1, strar)
+		%seg:local(0, str %minus1) ; direction = -1
+	}
+	%seg:move(%arg, 2)
+	%while { ; count > 0
+		lmab 0
+	,
+		; mem[to] = mem[from]
+		%seg:arg(0,
+			movm
+			ldm
+		)
+		%seg:arg(1,
+			movm
+			strr
+		)
+		%seg:local(0, ldm)  ; ptrs += dir
+		%seg:arg(0, strar)
+		%seg:arg(1, strar)
+		%seg:arg(2, strs 1) ; count --
+	}
+}
 
 ; memory is split into linear chunks:
 ; chunks have 2-word header = data_size, flags
@@ -63,18 +114,18 @@
 	; reserves at least @size words, returns pointer to start of data array
 	%func {malloc, 1, 1,
 		; locals: *currChunk
-		%assert(%func_seg(%arg, 0, lmab 0))
-		%func_seg(%local, 0, str %FIRST_CHUNK_HEADER)
+		%assert(%seg:arg(0, lmab 0))
+		%seg:local(0, str %FIRST_CHUNK_HEADER)
 		%while {
 			; chunkSize < size || occupied
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:size()
 			%stack:pushr() ; save chunkSize
 
-			%func_seg(%arg, 0, lrblm)
+			%seg:arg(0, lrblm)
 			%stack:pushr()
 
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:occupied()
 			%stack:pushr()
 
@@ -83,24 +134,24 @@
 		,
 			%stack:drop() ; chunk_size
 			; mov to next chunk
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:next()
 			ldh
-			%func_seg(%local, 0, strr)
+			%seg:local(0, strr)
 		}
 		; TODO check not at end
 
 		; if chunk_size - size > 3
 		%if_else {
-			%func_seg(%arg, 0, ldm)
+			%seg:arg(0, ldm)
 			%stack:drop() ; chunk size
 			strsr
 			lmab 3
 		,
 			;; split chunk
 			; curr.size = size, next.size = total_size
-			%func_seg(%arg, 0, ldm)
-			%func_seg(%local, 0,
+			%seg:arg(0, ldm)
+			%seg:local(0,
 				movm
 				swap
 			)
@@ -108,7 +159,7 @@
 			strr
 			ldh
 			; curr.occupied, r = size
-			%func_seg(%local, 0,
+			%seg:local(0,
 				movm
 				ldm
 			)
@@ -123,17 +174,17 @@
 			str %chunk:FLAG_FREE
 		,
 			; reserve whole
-			%func_seg(%local, 0, movm)
+			%seg:local(0, movm)
 			%chunk:at(flags)
 			str %chunk:FLAG_OCCUPIED
 		}
 		; return data ptr
-		%func_seg(%local, 0, ldma 2)
+		%seg:local(0, ldma 2)
 	}
 
 	; free segment @ data_ptr
 	%void_func {free, 1, 0,
-		%func_seg(%arg, 0, movm)
+		%seg:arg(0, movm)
 		movs %chunk:data_offset
 		%assert(ldm)
 		%chunk:at(flags)
