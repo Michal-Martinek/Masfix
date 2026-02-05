@@ -140,6 +140,7 @@
 }
 
 ;; data segments ---------------------------------------------------
+;; namespace seg is not meant for including
 ;; arg   - current function arguments
 ;; local - current function local variables
 ;; this  - current instance in methods
@@ -167,11 +168,27 @@
 		mov %name
 		movma %idx
 	}
+	; load segment value
+	%macro load(name, idx) {
+		%move(%name, %idx)
+		ldm
+	}
+	; store r in segment
+	%macro store(name, idx) {
+		%move(%name, %idx)
+		strr
+	}
 	; push segment value
 	%macro push(name, idx) {
 		%move(%name, %idx)
 		%stack:pushm()
 	}
+	; pop stack to segment
+	%macro pop(name, idx) {
+		%stack:pop()
+		%store(%name, %idx)
+	}
+
 	%macro arg(idx, instrs)   { %_func_seg(%MEMORY_LAYOUT:G_ARGS_PTR,   %idx, %instrs) }
 	%macro local(idx, instrs) { %_func_seg(%MEMORY_LAYOUT:G_LOCALS_PTR, %idx, %instrs) }
 	%macro this(idx, instrs)  { %_func_seg(%MEMORY_LAYOUT:G_THIS_PTR,   %idx, %instrs) }
