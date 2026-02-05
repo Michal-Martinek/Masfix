@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3224
+:stderr 3223
 tests\complex-define-value.mx:93:14 ERROR: Unclosed token list '()'
 tests\complex-define-value.mx:10:9 ERROR: Define value expected
 tests\complex-define-value.mx:11:9 ERROR: Define value expected
@@ -44,7 +44,7 @@ tests\complex-define-value.mx:12:2 ERROR: Unexpected token '[]'
 tests\complex-define-value.mx:14:2 ERROR: Unexpected token '[]'
 tests\complex-define-value.mx:39:1 ERROR: Unexpected token '8'
 tests\complex-define-value.mx:43:1 ERROR: Unknown condition 'see 4 24'
-tests\complex-define-value.mx:68:1 ERROR: Only simple immediates for now 'swap 7 5 4'
+tests\complex-define-value.mx:68:1 ERROR: Only single immediate allowed 'swap 7 5 4'
 tests\complex-define-value.mx:90:1 ERROR: Unknown instruction 'value 14'
 
 

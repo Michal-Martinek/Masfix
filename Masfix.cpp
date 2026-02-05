@@ -43,11 +43,11 @@ enum TokenTypes {
 	Tlist,
 
 	// intermediate preprocess tokens
-	TImodule,
-	TIexpansion,
-	TIctime,
-	TInamespace,
-	TIarglist,
+	TImodule,    // top-level token holding entire contents of a module
+	TIexpansion, // macro body expansion
+	TIctime,     // macro expansion expanded as compile time
+	TInamespace, // wraps tokens inside a namespace
+	TIarglist,   // macro argument list
 
 	TokenCount
 };
@@ -1502,7 +1502,7 @@ bool verifyNotInstrOpcode(string name) {
 	return ans;
 }
 bool parseInstrImmediate(Instr& instr) {
-	checkReturnOnFail(instr.immFields.size() == 1, "Only simple immediates for now", instr);
+	checkReturnOnFail(instr.immFields.size() == 1, "Only single immediate allowed", instr);
 	string immVal = instr.immFields[0];
 	if (parseCtx.strToLabel.count(immVal) > 0) {
 		instr.immediate = parseCtx.strToLabel[immVal].addr;

@@ -1,12 +1,12 @@
 :returncode 1
 
-:stderr 1561
+:stderr 1556
 tests\imm-parse.mx:2:1 ERROR: Unknown suffix 'ld7'
 tests\imm-parse.mx:4:1 ERROR: Target value expected 'stra'
-tests\imm-parse.mx:6:1 ERROR: Only simple immediates for now 'str 5 mov'
+tests\imm-parse.mx:6:1 ERROR: Only single immediate allowed 'str 5 mov'
 tests\imm-parse.mx:7:1 ERROR: Unknown suffix 'ld6 mov'
 tests\imm-parse.mx:8:1 ERROR: Unknown suffix 'ld7 str 5'
-tests\imm-parse.mx:9:1 ERROR: Only simple immediates for now 'ld 8 str 5'
+tests\imm-parse.mx:9:1 ERROR: Only single immediate allowed 'ld 8 str 5'
 tests\imm-parse.mx:11:1 ERROR: Invalid instruction immediate 'mov 8.5'
 tests\imm-parse.mx:12:1 ERROR: Invalid instruction immediate 'mov 8.'
 tests\imm-parse.mx:13:1 ERROR: Unknown suffix 'mov80'
@@ -18,10 +18,10 @@ tests\imm-parse.mx:20:1 ERROR: Invalid instruction immediate 'mov 10&000'
 tests\imm-parse.mx:25:1 ERROR: Value of the immediate is out of bounds 'mov 100000'
 tests\imm-parse.mx:26:1 ERROR: Value of the immediate is out of bounds 'lda 150000'
 tests\imm-parse.mx:28:1 ERROR: Value of the immediate is out of bounds 'jmp 65536'
-tests\imm-parse.mx:31:1 ERROR: Only simple immediates for now 'ld label 2'
+tests\imm-parse.mx:31:1 ERROR: Only single immediate allowed 'ld label 2'
 tests\imm-parse.mx:32:1 ERROR: Invalid instruction immediate 'lds label2'
 tests\imm-parse.mx:33:1 ERROR: Invalid instruction immediate 'str _lab-el5_'
-tests\imm-parse.mx:34:1 ERROR: Only simple immediates for now 'str _lab -el 5 _'
-tests\imm-parse.mx:35:1 ERROR: Only simple immediates for now 'str _lab mov _el5_'
+tests\imm-parse.mx:34:1 ERROR: Only single immediate allowed 'str _lab -el 5 _'
+tests\imm-parse.mx:35:1 ERROR: Only single immediate allowed 'str _lab mov _el5_'
 
 

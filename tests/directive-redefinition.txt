@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4633
+:stderr 4632
 tests\directive-redefinition.mx:6:8 ERROR: Define redefinition 'prep1'
 tests\directive-redefinition.mx:8:8 ERROR: Macro redefinition 'prep2'
 tests\directive-redefinition.mx:10:13 ERROR: Define redefinition 'prep1'
@@ -58,7 +58,7 @@ tests\directive-redefinition.mx:170:1 ERROR: Unexpected token '7'
 tests\directive-redefinition.mx:171:1 ERROR: Unexpected token '2'
 tests\directive-redefinition.mx:102:1 ERROR: This instruction cannot have a modifier 'bmletr'
 tests\directive-redefinition.mx:122:3 ERROR: Unknown instruction 'commit 9 11'
-tests\directive-redefinition.mx:127:2 ERROR: Only simple immediates for now 'outu 8 11 9'
+tests\directive-redefinition.mx:127:2 ERROR: Only single immediate allowed 'outu 8 11 9'
 tests\directive-redefinition.mx:132:14 ERROR: Unknown instruction 'A'
 tests\directive-redefinition.mx:158:15 ERROR: Unknown instruction 'C'
 

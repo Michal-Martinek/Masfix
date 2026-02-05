@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2009
+:stderr 2008
 tests\label-def.mx:6:2 ERROR: Missing label name
 tests\label-def.mx:8:1 ERROR: Missing label name
 tests\label-def.mx:9:2 ERROR: Missing label name
@@ -35,6 +35,6 @@ tests\label-def.mx:27:5 ERROR: Missing condition 'b'
 tests\label-def.mx:31:1 ERROR: Unknown suffix 'label'
 tests\label-def.mx:32:1 ERROR: Unknown instruction 'wabel'
 tests\label-def.mx:45:19 ERROR: Unknown suffix 'str$'
-tests\label-def.mx:49:8 ERROR: Only simple immediates for now 'ld n + 2'
+tests\label-def.mx:49:8 ERROR: Only single immediate allowed 'ld n + 2'
 
 
