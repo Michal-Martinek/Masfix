@@ -90,3 +90,15 @@
 	}
 	ldm
 }
+
+%macro defineIntOpAsFunc(name, opInstr) {
+	; int, int -> int
+	%func{ %name, 2, 0,
+		%seg:load(%arg, 0)
+		%seg:arg(1, %opInstr)
+	}
+}
+%defineIntOpAsFunc(int_eq,  leqm)
+%defineIntOpAsFunc(int_lt,  lltm)
+%defineIntOpAsFunc(uint_lt, lblm)
+%defineIntOpAsFunc(int_add, ldam)
