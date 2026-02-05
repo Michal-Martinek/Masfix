@@ -12,6 +12,22 @@
 %macro at_arr(idx, instrs) {
 	%seg:local(!op(t, %idx, %array:sizeof), %instrs)
 }
+%func { int_lt_with_emit, 2, 0,
+	%seg:push(%arg, 0)
+	outur
+	outc 60 ; '<'
+	%seg:push(%arg, 1)
+	%print_spaced(outur)
+	%call(uint_lt)
+}
+%func { debug_reduce_init, 1, 0,
+	%stack:push(2) ; 2 ^ (x+4)
+	%stack:push(4)
+	%seg:push(%arg, 0)
+	%stack:apply_op(a)
+	%call(power)
+	%stack:pop()
+}
 
 %void_func {main, 0, !op(t, %array:sizeof, 2),
 	; force array initialization
@@ -129,6 +145,34 @@
 
 	%seg:push_addr(%local, 0)
 	%call(array_print)
+
+	%seg:push_addr(%local, 0)
+	%stack:push(proc_int_lt_with_emit)
+	%call(array_sort)
+	outc 10
+
+	%seg:push_addr(%local, 0)
+	%call(array_print)
+
+	; init(1) = 32, sum with rest
+	%seg:push_addr(%local, 0)
+	%stack:push(proc_debug_reduce_init)
+	%stack:push(proc_int_add)
+	%call(reduce)
+	%print_endl(
+		%stack:pop()
+		outur ; 69
+	)
+
+	; multiply elems together
+	%seg:push_addr(%local, 0)
+	%stack:push(0)
+	%stack:push(proc_int_mult)
+	%call(reduce)
+	%print_endl(
+		%stack:pop()
+		outur ; 36288
+	)
 
 	; test empty[0]
 	outc 69

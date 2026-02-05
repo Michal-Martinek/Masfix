@@ -102,3 +102,4 @@
 %defineIntOpAsFunc(int_lt,  lltm)
 %defineIntOpAsFunc(uint_lt, lblm)
 %defineIntOpAsFunc(int_add, ldam)
+%defineIntOpAsFunc(int_mult,ldtm)

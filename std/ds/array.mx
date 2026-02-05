@@ -174,6 +174,72 @@
 			)
 		}
 	}
+
+	; this, init_acc(), accumulate() -> accumulator
+	; init_acc: func_ptr: elem -> new_accumulator
+	; accumulate: func_ptr: accumulator, elem -> new_accumulator
+	; reduces array from left by first initializing accumulator (single value or ptr) with init_acc()
+	;   - uses this[0] if init_acc == null
+	; then reduces the array with accumulate(accumulator, elem)
+	%method{ reduce, 3, 1,
+		; locals: acc (duplicated above the for loop)
+		%call(assert_nonempty)
+		%stack:push(0) ; this[0]
+		%call(index_impl)
+		%stack:drop()  ; init_acc -> local acc
+		%seg:push(%dest, 0)
+		%if { %seg:arg(1, lmne 0),
+			ldm         ; if (init_acc != null):
+			%call_ptr() ;   acc = init_acc(this[0])
+		}
+		%seg:load(%this, %size)  ; for 1...size
+		%for_full{1, 1,
+			%stack:dup()         ; dest = this[idx]
+			%call(index_impl)
+			%seg:push(%local, 0) ; accumulator
+			%seg:push(%dest, 0)  ; elem
+			%seg:load(%arg, 2)   ; accumulate()
+			%call_ptr()
+			%seg:pop(%local, 0)  ; acc = accumulate()
+		}
+		%seg:load(%local, 0) ; return acc
+	}
+
+	; this, func_lt (elem, elem -> bool) -> void
+	; sort array inplace in ascending order
+	%void_method{ array_sort, 2, 1, ; inner idx to second in pair
+		;; insertion sort
+		%foreach { ; IDX inserting element
+			%stack:top()
+			%seg:store(%local, 0)
+			%while { ; for (idx = IDX; idx > 0; idx--)
+				%seg:local(0, lmab 0)
+			,
+				ldm    ; this[idx--]
+				strs 1
+				%stack:pushr()
+				%call(index_impl)
+				%seg:push(%dest, %minus1) ; idx-1
+				%seg:push(%dest, 0) ; idx
+				%seg:load(%arg, 1)
+				%call_ptr()
+
+				%if_else {
+					%stack:pop()
+					leq 0
+				, ; swap
+					%seg:load(%dest, 0)
+					movs 1
+					swap
+					mova 1
+					strr
+				,
+					%loop_break_offset(1)
+				}
+			}
+		}
+	}
+
 	; this ->
 	%void_method{ array_print, 1, 1,
 		; locals: first | for_stop, for_idx
