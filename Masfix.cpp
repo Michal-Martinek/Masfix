@@ -985,7 +985,9 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	checkReturnOnFail(scope.hasNext(), errMissing, loc);
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
-	return check(outToken.type == type, "Unexpected token type", outToken); // TODO more specific err message here
+	return check(outToken.type == type, "Expected " +
+		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
+		+ " token type, got", outToken);
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
 	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");

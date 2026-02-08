@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3223
+:stderr 3355
 tests\complex-define-value.mx:93:14 ERROR: Unclosed token list '()'
 tests\complex-define-value.mx:10:9 ERROR: Define value expected
 tests\complex-define-value.mx:11:9 ERROR: Define value expected
@@ -8,27 +8,27 @@ tests\complex-define-value.mx:13:9 ERROR: Define value expected
 tests\complex-define-value.mx:15:13 ERROR: Unexpected continued field '()'
 tests\complex-define-value.mx:16:14 ERROR: Define value expected
 tests\complex-define-value.mx:17:14 ERROR: Define value expected
-tests\complex-define-value.mx:19:2 ERROR: Unexpected token type 'value'
-tests\complex-define-value.mx:21:15 ERROR: Unexpected token type '_'
-tests\complex-define-value.mx:22:15 ERROR: Unexpected token type '_'
+tests\complex-define-value.mx:19:2 ERROR: Expected numeric token type, got 'value'
+tests\complex-define-value.mx:21:15 ERROR: Expected numeric token type, got '_'
+tests\complex-define-value.mx:22:15 ERROR: Expected numeric token type, got '_'
 tests\complex-define-value.mx:25:15 ERROR: Missing directive name
-tests\complex-define-value.mx:28:15 ERROR: Unexpected token type '()'
+tests\complex-define-value.mx:28:15 ERROR: Expected numeric token type, got '()'
 tests\complex-define-value.mx:29:16 ERROR: Missing directive name
-tests\complex-define-value.mx:30:15 ERROR: Unexpected token type '_'
-tests\complex-define-value.mx:31:15 ERROR: Unexpected token type 'aa'
-tests\complex-define-value.mx:33:2 ERROR: Unexpected token type 'bb'
+tests\complex-define-value.mx:30:15 ERROR: Expected numeric token type, got '_'
+tests\complex-define-value.mx:31:15 ERROR: Expected numeric token type, got 'aa'
+tests\complex-define-value.mx:33:2 ERROR: Expected numeric token type, got 'bb'
 tests\complex-define-value.mx:35:14 ERROR: Define value expected
-tests\complex-define-value.mx:40:15 ERROR: Unexpected token type '%namefrom'
-tests\complex-define-value.mx:46:14 ERROR: Unexpected token type '%'
+tests\complex-define-value.mx:40:15 ERROR: Expected numeric token type, got '%namefrom'
+tests\complex-define-value.mx:46:14 ERROR: Expected numeric token type, got '%'
 tests\complex-define-value.mx:47:15 ERROR: Definition not allowed inside arglist
 tests\complex-define-value.mx:48:15 ERROR: Definition not allowed inside arglist
 tests\complex-define-value.mx:50:2 ERROR: Definition not allowed inside arglist
 tests\complex-define-value.mx:7:2 ERROR: Unknown instruction 'name_of_field_data_0'
 tests\complex-define-value.mx:52:9 ERROR: Define redefinition 'wrd1'
-tests\complex-define-value.mx:58:15 ERROR: Unexpected token type '%pop'
-tests\complex-define-value.mx:60:15 ERROR: Unexpected token type 'a'
+tests\complex-define-value.mx:58:15 ERROR: Expected numeric token type, got '%pop'
+tests\complex-define-value.mx:60:15 ERROR: Expected numeric token type, got 'a'
 tests\complex-define-value.mx:61:19 ERROR: Unexpected macro use
-tests\complex-define-value.mx:63:2 ERROR: Unexpected token type '%pop'
+tests\complex-define-value.mx:63:2 ERROR: Expected numeric token type, got '%pop'
 tests\complex-define-value.mx:71:15 ERROR: Unexpected token after value '_'
 tests\complex-define-value.mx:72:16 ERROR: Unexpected token after value '_'
 tests\complex-define-value.mx:73:16 ERROR: Unexpected token after value '()'

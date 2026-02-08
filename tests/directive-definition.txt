@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 8641
+:stderr 8771
 tests\directive-definition.mx:4:1 ERROR: Missing directive name
 tests\directive-definition.mx:5:1 ERROR: Missing directive name
 tests\directive-definition.mx:7:2 ERROR: Invalid directive name '%'
@@ -34,14 +34,14 @@ tests\directive-definition.mx:40:3 ERROR: Invalid directive name 'using%'
 tests\directive-definition.mx:41:2 ERROR: Invalid directive name 'using*'
 tests\directive-definition.mx:42:9 ERROR: Unexpected continued token '()'
 tests\directive-definition.mx:45:8 ERROR: Invalid macro name '%define'
-tests\directive-definition.mx:46:12 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:46:12 ERROR: Expected list token type, got '%'
 tests\directive-definition.mx:47:5 ERROR: Excesive expansion argument
 tests\directive-definition.mx:48:9 ERROR: Invalid define name '%macro'
-tests\directive-definition.mx:49:20 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:49:20 ERROR: Expected numeric token type, got '%'
 tests\directive-definition.mx:50:2 ERROR: Undeclared identifier 'hidden_mac'
 tests\directive-definition.mx:51:8 ERROR: Invalid namespace name '%macro'
 tests\directive-definition.mx:52:9 ERROR: Invalid define name '%using'
-tests\directive-definition.mx:56:16 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:56:16 ERROR: Expected list token type, got '%'
 tests\directive-definition.mx:58:13 ERROR: Directive must not continue
 tests\directive-definition.mx:59:15 ERROR: Unexpected directive here 'define'
 tests\directive-definition.mx:60:17 ERROR: Unexpected directive here 'macro'
@@ -72,15 +72,15 @@ tests\directive-definition.mx:106:17 ERROR: Unexpected token after directive '25
 tests\directive-definition.mx:108:17 ERROR: Unexpected token after directive '28'
 tests\directive-definition.mx:109:16 ERROR: Unexpected token after directive '_'
 tests\directive-definition.mx:110:9 ERROR: Define value expected
-tests\directive-definition.mx:112:14 ERROR: Unexpected token type 'abc'
+tests\directive-definition.mx:112:14 ERROR: Expected numeric token type, got 'abc'
 tests\directive-definition.mx:113:3 ERROR: Undeclared identifier 'def8'
 tests\directive-definition.mx:114:18 ERROR: Unexpected token after directive 'ld'
 tests\directive-definition.mx:115:13 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:117:3 ERROR: Undeclared identifier 'b'
-tests\directive-definition.mx:118:14 ERROR: Unexpected token type '#'
-tests\directive-definition.mx:120:14 ERROR: Unexpected token type ':'
-tests\directive-definition.mx:121:14 ERROR: Unexpected token type 'here'
-tests\directive-definition.mx:123:18 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:118:14 ERROR: Expected numeric token type, got '#'
+tests\directive-definition.mx:120:14 ERROR: Expected numeric token type, got ':'
+tests\directive-definition.mx:121:14 ERROR: Expected numeric token type, got 'here'
+tests\directive-definition.mx:123:18 ERROR: Expected numeric token type, got '%'
 tests\directive-definition.mx:126:8 ERROR: Macro arglist expected
 tests\directive-definition.mx:134:8 ERROR: Macro arglist expected
 tests\directive-definition.mx:136:19 ERROR: Missing macro arg name
@@ -98,7 +98,7 @@ tests\directive-definition.mx:157:20 ERROR: Invalid macro arg name '%define'
 tests\directive-definition.mx:158:23 ERROR: Macro argument redefinition 'x'
 tests\directive-definition.mx:159:29 ERROR: Macro argument redefinition 'x'
 tests\directive-definition.mx:160:20 ERROR: Macro redefinition 'badArgName6'
-tests\directive-definition.mx:164:1 ERROR: Unexpected token type '%'
+tests\directive-definition.mx:164:1 ERROR: Expected list token type, got '%'
 tests\directive-definition.mx:167:3 ERROR: Undeclared identifier 'afterNobody'
 tests\directive-definition.mx:178:20 ERROR: No separators expected in macro body
 tests\directive-definition.mx:185:3 ERROR: Unexpected token after directive '9'
@@ -106,11 +106,11 @@ tests\directive-definition.mx:189:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:191:3 ERROR: Undeclared identifier 'here'
 tests\directive-definition.mx:193:3 ERROR: Unexpected token after directive '%'
 tests\directive-definition.mx:196:3 ERROR: Undeclared identifier 'm'
-tests\directive-definition.mx:203:18 ERROR: Unexpected token type ':'
-tests\directive-definition.mx:204:17 ERROR: Unexpected token type '%'
-tests\directive-definition.mx:205:16 ERROR: Unexpected token type ','
-tests\directive-definition.mx:206:17 ERROR: Unexpected token type ':'
-tests\directive-definition.mx:207:17 ERROR: Unexpected token type '8'
+tests\directive-definition.mx:203:18 ERROR: Expected list token type, got ':'
+tests\directive-definition.mx:204:17 ERROR: Expected list token type, got '%'
+tests\directive-definition.mx:205:16 ERROR: Expected list token type, got ','
+tests\directive-definition.mx:206:17 ERROR: Expected list token type, got ':'
+tests\directive-definition.mx:207:17 ERROR: Expected list token type, got '8'
 tests\directive-definition.mx:212:2 ERROR: Missing define name
 tests\directive-definition.mx:76:2 ERROR: Unexpected token '64'
 tests\directive-definition.mx:105:2 ERROR: Unexpected token '22'
