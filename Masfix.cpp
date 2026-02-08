@@ -520,8 +520,12 @@ Flags flags;
 #define checkReturnOnFail(cond, ...) returnOnFalse(check(cond, __VA_ARGS__));
 
 bool FLAG_strictErrors = false;
+bool FLAG_enableWarnings = true;
+bool FLAG_enableNotes = true;
 bool SupressErrors = false;
+
 #define returnOnErrSupress() if (SupressErrors) return false;
+#define returnOnWarningSupress() if (SupressErrors || !FLAG_enableWarnings) return false;
 
 vector<string> errors;
 void raiseErrors() { // TODO sort errors based on line and file
@@ -542,6 +546,7 @@ void addError(string message, bool strict=true) {
 }
 
 void _raiseNote(string message) {
+	if (!FLAG_enableNotes) return;
 	string err = "    - NOTE: " + message + "\n";
 	addError(err, false);
 }
@@ -561,7 +566,7 @@ bool raiseError(string message, Instr instr, string note="", bool strict=false) 
 	return false;
 }
 bool raiseWarning(string message, Instr instr) {
-	returnOnErrSupress();
+	returnOnWarningSupress();
 	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) "\n";
 	addError(err, false);
 	return false;
@@ -574,8 +579,7 @@ bool raiseError(string message, Loc loc, string note="", bool strict=false) {
 	return false;
 }
 bool raiseWarning(string message, Loc loc, string note="") {
-	// TODO supress warnigs
-	returnOnErrSupress();
+	returnOnWarningSupress();
 	string err = loc.toStr() + " WARNING: " + message + "\n";
 	addError(err, false);
 	if (note.size()) _raiseNote(note);
@@ -2112,14 +2116,16 @@ void printUsage() {
 	cout << "usage: Masfix [flags] <masfix-file-path>\n"
 			"	flags:\n"
 			"		-v / --verbose   - additional compilation messages\n"
-			"		-S / --strict    - disables multiple errors\n"
+			"		-S / --strict    - disable multiple errors\n"
+			"		-W / --no-warns  - disable warnings\n"
+			"		-N / --no-notes  - disable notes\n"
 			"		-i / --include   - additional include paths\n"
 			"	mode:\n"
 			"		-r / --run       - run executable after compilation\n"
 			"		-I / --interpret - interpret instead of compile\n"
 			"	side effects:\n"
 			"		-A / --keep-asm  - keep assembly file\n"
-			"		-D / --dump      - dumps prepocessed code into file\n";
+			"		-D / --dump      - (obsolete) dump prepocessed code into file\n";
 }
 void checkUsage(bool cond, string message) {
 	if (!cond) {
@@ -2180,6 +2186,10 @@ Flags processLineArgs(int argc, char *argv[]) {
 			flags.keepAsm = true;
 		} else if (arg == "-S" || arg == "--strict") {
 			FLAG_strictErrors = true;
+		} else if (arg == "-W" || arg == "--no-warns") {
+			FLAG_enableWarnings = false;
+		} else if (arg == "-N" || arg == "--no-notes") {
+			FLAG_enableNotes = false;
 		} else if (arg == "-D" || arg == "-d" || arg == "--dump") {
 			flags.dump = true;
 		} else {
