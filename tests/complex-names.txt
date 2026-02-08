@@ -1,12 +1,13 @@
 :returncode 1
 
-:stderr 2673
+:stderr 2723
 tests\complex-names.mx:41:4 ERROR: Directive must not continue
 tests\complex-names.mx:42:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Expected label field
 tests\complex-names.mx:6:3 ERROR: Expected label field
 tests\complex-names.mx:10:7 ERROR: Unexpected token '()'
 tests\complex-names.mx:11:1 ERROR: Label redefinition 'name2'
+    - NOTE: Defined at tests\complex-names.mx:9:1
 tests\complex-names.mx:14:1 ERROR: Invalid label name 'ab$cd'
 tests\complex-names.mx:15:1 ERROR: Invalid label name '__-__'
 tests\complex-names.mx:16:1 ERROR: Invalid label name '()'

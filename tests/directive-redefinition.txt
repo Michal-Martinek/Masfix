@@ -1,20 +1,33 @@
 :returncode 1
 
-:stderr 4632
+:stderr 5828
 tests\directive-redefinition.mx:6:8 ERROR: Define redefinition 'prep1'
+    - NOTE: Defined at tests\directive-redefinition.mx:4:1
 tests\directive-redefinition.mx:8:8 ERROR: Macro redefinition 'prep2'
+    - NOTE: Defined at tests\directive-redefinition.mx:7:1
 tests\directive-redefinition.mx:10:13 ERROR: Define redefinition 'prep1'
+    - NOTE: Defined at tests\directive-redefinition.mx:4:1
 tests\directive-redefinition.mx:11:13 ERROR: Macro redefinition 'prep2'
+    - NOTE: Defined at tests\directive-redefinition.mx:7:1
 tests\directive-redefinition.mx:14:20 ERROR: Macro redefinition 'arg3'
+    - NOTE: Defined at tests\directive-redefinition.mx:12:1
 tests\directive-redefinition.mx:15:14 ERROR: Macro redefinition 'prep2'
+    - NOTE: Defined at tests\directive-redefinition.mx:7:1
 tests\directive-redefinition.mx:16:14 ERROR: Define redefinition 'prep1'
+    - NOTE: Defined at tests\directive-redefinition.mx:4:1
 tests\directive-redefinition.mx:18:25 ERROR: Macro argument redefinition 'hutu'
 tests\directive-redefinition.mx:21:12 ERROR: Define redefinition 'prep1'
+    - NOTE: Defined at tests\directive-redefinition.mx:4:1
 tests\directive-redefinition.mx:24:9 ERROR: Define redefinition 'prep1'
+    - NOTE: Defined at tests\directive-redefinition.mx:4:1
 tests\directive-redefinition.mx:25:9 ERROR: Macro redefinition 'arg5'
+    - NOTE: Defined at tests\directive-redefinition.mx:18:1
 tests\directive-redefinition.mx:26:9 ERROR: Macro redefinition 'prep3'
+    - NOTE: Defined at tests\directive-redefinition.mx:15:1
 tests\directive-redefinition.mx:28:9 ERROR: Macro redefinition 'prep4'
+    - NOTE: Defined at tests\directive-redefinition.mx:16:1
 tests\directive-redefinition.mx:35:12 ERROR: Macro redefinition 'lvp2'
+    - NOTE: Defined at tests\directive-redefinition.mx:34:1
 tests\directive-redefinition.mx:60:30 ERROR: Name shadows a builtin directive 'macro'
 tests\directive-redefinition.mx:61:19 ERROR: Name shadows a builtin directive 'using'
 tests\directive-redefinition.mx:64:9 ERROR: Name shadows a builtin directive 'macro'
@@ -26,6 +39,7 @@ tests\directive-redefinition.mx:73:8 ERROR: Name shadows a builtin directive 'us
 tests\directive-redefinition.mx:77:12 ERROR: Name shadows a builtin directive 'define'
 tests\directive-redefinition.mx:78:12 ERROR: Name shadows a builtin directive 'namespace'
 tests\directive-redefinition.mx:79:12 ERROR: Macro redefinition '__main'
+    - NOTE: Defined at tests\directive-redefinition.mx:75:1
 tests\directive-redefinition.mx:83:12 ERROR: Name shadows a builtin directive 'using'
 tests\directive-redefinition.mx:95:9 ERROR: Name shadows an instruction 'mov'
 tests\directive-redefinition.mx:96:9 ERROR: Name shadows an instruction 'lgt'
@@ -35,12 +49,17 @@ tests\directive-redefinition.mx:104:13 ERROR: Name shadows an instruction 'outcp
 tests\directive-redefinition.mx:105:20 ERROR: Name shadows an instruction 'ldam'
 tests\directive-redefinition.mx:107:12 ERROR: Name shadows an instruction 'inc'
 tests\directive-redefinition.mx:124:10 ERROR: Macro redefinition 'mac'
+    - NOTE: Defined at tests\directive-redefinition.mx:114:2
 tests\directive-redefinition.mx:125:9 ERROR: Define redefinition 'def'
+    - NOTE: Defined at tests\directive-redefinition.mx:112:2
 tests\directive-redefinition.mx:127:36 ERROR: Undeclared identifier 'def2'
 tests\directive-redefinition.mx:157:10 ERROR: Define redefinition 'a'
+    - NOTE: Defined at tests\directive-redefinition.mx:150:2
 tests\directive-redefinition.mx:159:13 ERROR: Namespace redefinition 'N'
+    - NOTE: Defined at tests\directive-redefinition.mx:151:2
 tests\directive-redefinition.mx:168:21 ERROR: Namespace not found 'M'
 tests\directive-redefinition.mx:52:1 ERROR: Label redefinition 'begin'
+    - NOTE: Defined at tests\directive-redefinition.mx:1:1
 tests\directive-redefinition.mx:54:1 ERROR: Name shadows a builtin directive 'define'
 tests\directive-redefinition.mx:55:1 ERROR: Name shadows a builtin directive 'macro'
 tests\directive-redefinition.mx:56:1 ERROR: Name shadows a builtin directive 'namespace'
@@ -51,6 +70,7 @@ tests\directive-redefinition.mx:89:1 ERROR: Name shadows an instruction 'seq'
 tests\directive-redefinition.mx:90:1 ERROR: Name shadows an instruction 'swap'
 tests\directive-redefinition.mx:93:1 ERROR: Name shadows an instruction 'inc'
 tests\directive-redefinition.mx:120:3 ERROR: Label redefinition 'namespace_lab'
+    - NOTE: Defined at tests\directive-redefinition.mx:115:2
 tests\directive-redefinition.mx:163:1 ERROR: Unexpected token '7'
 tests\directive-redefinition.mx:165:1 ERROR: Unexpected token '9'
 tests\directive-redefinition.mx:167:1 ERROR: Unexpected token '2'

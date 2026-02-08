@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2949
+:stderr 3172
 tests\nested-definitions.mx:25:3 ERROR: Undeclared identifier 'const_inner'
 tests\nested-definitions.mx:27:3 ERROR: Undeclared identifier 'mac_inner'
 tests\nested-definitions.mx:35:2 ERROR: Missing directive name
@@ -19,10 +19,14 @@ tests\nested-definitions.mx:42:4 ERROR: Undeclared identifier 'closure'
 tests\nested-definitions.mx:81:2 ERROR: Definition not allowed inside macro
 tests\nested-definitions.mx:82:2 ERROR: Directive not allowed inside macro
 tests\nested-definitions.mx:92:10 ERROR: Macro redefinition 'mm'
+    - NOTE: Defined at tests\nested-definitions.mx:89:2
 tests\nested-definitions.mx:95:9 ERROR: Macro redefinition 'mm'
+    - NOTE: Defined at tests\nested-definitions.mx:89:2
 tests\nested-definitions.mx:91:11 ERROR: Define redefinition 'a'
+    - NOTE: Defined at tests\nested-definitions.mx:87:1
 tests\nested-definitions.mx:99:4 ERROR: Excesive expansion argument
 tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_mid'
+    - NOTE: Defined at tests\nested-definitions.mx:8:1
 tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_inner'
 tests\nested-definitions.mx:18:3 ERROR: Label redefinition 'mac_inner'
 tests\nested-definitions.mx:44:3 ERROR: Unexpected token '7'

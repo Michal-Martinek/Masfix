@@ -959,16 +959,20 @@ bool isValidIdentifier(string name, string errInvalid, Loc& loc) {
 	checkReturnOnFail(name.size() > 0 && find_if_not(name.begin(), name.end(), _validIdentChar) == name.end(), errInvalid, loc)
 	return check(isalpha(name.at(0)) || name.at(0) == '_', errInvalid, loc);
 }
+string noteWhereDefined(Loc& loc, Loc& definedLoc) {
+	if (loc.row == definedLoc.row) return "";
+	return "Defined at " + definedLoc.toStr();
+}
 bool checkIdentRedefinitions(Scope& scope, string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
 	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
 	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
 	if (label) {
-		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc, noteWhereDefined(loc, parseCtx.strToLabel[name].loc));
 	} else {
 		assert(currNamespace);
-		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc);
-		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc);
-		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->defines[name].loc));
+		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->macros[name].loc));
+		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc, noteWhereDefined(loc, IdToNamespace[currNamespace->innerNamespaces[name]].loc));
 		int namespaceId = scope.currNamespaceId();
 		if (lookupNamespaceAbove(name, namespaceId, loc, true)) {
 			raiseWarning("Definition shadowing existing namespace" errorQuoted(name), loc);

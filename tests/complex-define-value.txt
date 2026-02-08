@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 3355
+:stderr 3413
 tests\complex-define-value.mx:93:14 ERROR: Unclosed token list '()'
 tests\complex-define-value.mx:10:9 ERROR: Define value expected
 tests\complex-define-value.mx:11:9 ERROR: Define value expected
@@ -25,6 +25,7 @@ tests\complex-define-value.mx:48:15 ERROR: Definition not allowed inside arglist
 tests\complex-define-value.mx:50:2 ERROR: Definition not allowed inside arglist
 tests\complex-define-value.mx:7:2 ERROR: Unknown instruction 'name_of_field_data_0'
 tests\complex-define-value.mx:52:9 ERROR: Define redefinition 'wrd1'
+    - NOTE: Defined at tests\complex-define-value.mx:51:1
 tests\complex-define-value.mx:58:15 ERROR: Expected numeric token type, got '%pop'
 tests\complex-define-value.mx:60:15 ERROR: Expected numeric token type, got 'a'
 tests\complex-define-value.mx:61:19 ERROR: Unexpected macro use
