@@ -1,12 +1,18 @@
 :returncode 1
 
-:stderr 1198
+:stderr 1552
 tests\token-lists.mx:10:4 ERROR: Unmatched token list delimiters '}'
+    - NOTE: Current tlist start: tests\token-lists.mx:10:3
 tests\token-lists.mx:10:5 ERROR: Unmatched token list delimiters ']'
+    - NOTE: Current tlist start: tests\token-lists.mx:10:3
 tests\token-lists.mx:13:2 ERROR: Unmatched token list delimiters ')'
+    - NOTE: Current tlist start: tests\token-lists.mx:13:1
 tests\token-lists.mx:14:3 ERROR: Unmatched token list delimiters ']'
+    - NOTE: Current tlist start: tests\token-lists.mx:14:2
 tests\token-lists.mx:15:4 ERROR: Unmatched token list delimiters '}'
+    - NOTE: Current tlist start: tests\token-lists.mx:15:3
 tests\token-lists.mx:15:6 ERROR: Unmatched token list delimiters ']'
+    - NOTE: Current tlist start: tests\token-lists.mx:15:2
 tests\token-lists.mx:16:2 ERROR: Unclosed token list '()'
 tests\token-lists.mx:16:1 ERROR: Unclosed token list '{}'
 tests\token-lists.mx:15:2 ERROR: Unclosed token list '{}'

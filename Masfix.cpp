@@ -772,7 +772,9 @@ public:
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
 		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
-		checkReturnOnFail(closeChar == tlists.top().get().tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, closeChar)), loc);
+		Token &tlist = tlists.top().get();
+		checkReturnOnFail(closeChar == tlist.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, closeChar)), loc,
+				"Current tlist start: " + tlist.loc.toStr());
 		closeList();
 		return true;
 	}
