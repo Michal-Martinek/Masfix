@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2009
+:stderr 2147
 tests\label-def.mx:6:2 ERROR: Missing label name
 tests\label-def.mx:8:1 ERROR: Missing label name
 tests\label-def.mx:9:2 ERROR: Missing label name
@@ -16,8 +16,11 @@ tests\label-def.mx:29:1 ERROR: Invalid label name ':'
 tests\label-def.mx:30:1 ERROR: Invalid label name 'label:'
 tests\label-def.mx:33:1 ERROR: Label definitions BEGIN with ':'
 tests\label-def.mx:36:1 ERROR: Label redefinition '_lab1'
+    - NOTE: Defined at tests\label-def.mx:13:1
 tests\label-def.mx:37:1 ERROR: Label redefinition 'end'
+    - NOTE: Defined at tests\label-def.mx:1:1
 tests\label-def.mx:38:1 ERROR: Label redefinition 'begin'
+    - NOTE: Defined at tests\label-def.mx:1:1
 tests\label-def.mx:39:1 ERROR: Invalid label name '58'
 tests\label-def.mx:44:10 ERROR: Max one label per line
 tests\label-def.mx:45:10 ERROR: Max one label per line
@@ -35,6 +38,6 @@ tests\label-def.mx:27:5 ERROR: Missing condition 'b'
 tests\label-def.mx:31:1 ERROR: Unknown suffix 'label'
 tests\label-def.mx:32:1 ERROR: Unknown instruction 'wabel'
 tests\label-def.mx:45:19 ERROR: Unknown suffix 'str$'
-tests\label-def.mx:49:8 ERROR: Only simple immediates for now 'ld n + 2'
+tests\label-def.mx:49:8 ERROR: Only single immediate allowed 'ld n + 2'
 
 

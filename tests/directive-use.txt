@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 7262
+:stderr 8495
 tests\directive-use.mx:14:2 ERROR: Undeclared identifier 'undefd'
 tests\directive-use.mx:19:5 ERROR: Undeclared identifier 'defined_'
 tests\directive-use.mx:20:8 ERROR: Undeclared identifier 'defined_'
@@ -15,9 +15,13 @@ tests\directive-use.mx:38:5 ERROR: Unexpected macro use
 tests\directive-use.mx:39:14 ERROR: Unexpected macro use
 tests\directive-use.mx:45:1 ERROR: Expansion arglist expected
 tests\directive-use.mx:46:7 ERROR: Missing expansion arguments
+    - NOTE: Expected arguments: print(num)
 tests\directive-use.mx:48:9 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: print(num)
 tests\directive-use.mx:50:7 ERROR: Missing expansion arguments
+    - NOTE: Expected arguments: jnn(a, b, c)
 tests\directive-use.mx:52:12 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: jnn(a, b, c)
 tests\directive-use.mx:55:8 ERROR: Definition not allowed inside arglist
 tests\directive-use.mx:56:9 ERROR: Definition not allowed inside arglist
 tests\directive-use.mx:58:2 ERROR: Definition not allowed inside arglist
@@ -32,25 +36,45 @@ tests\directive-use.mx:103:3 ERROR: Undeclared identifier 'upper'
 tests\directive-use.mx:115:9 ERROR: Excesive expansion argument
 tests\directive-use.mx:116:9 ERROR: Excesive expansion argument
 tests\directive-use.mx:117:8 ERROR: Missing expansion arguments
+    - NOTE: Expected arguments: oneArg(a)
 tests\directive-use.mx:118:9 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: oneArg(a)
 tests\directive-use.mx:120:10 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: oneArg(a)
 tests\directive-use.mx:121:10 ERROR: Excesive expansion argument
-tests\directive-use.mx:122:9 ERROR: Argument expected
-tests\directive-use.mx:122:9 ERROR: Argument expected
+    - NOTE: Expected arguments: oneArg(a)
+tests\directive-use.mx:122:9 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: twoArg(a, b)
+tests\directive-use.mx:122:9 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:123:8 ERROR: Missing expansion arguments
-tests\directive-use.mx:124:10 ERROR: Argument expected
+    - NOTE: Expected arguments: twoArg(a, b)
+tests\directive-use.mx:124:10 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:126:12 ERROR: Excesive expansion argument
-tests\directive-use.mx:127:9 ERROR: Argument expected
-tests\directive-use.mx:128:9 ERROR: Argument expected
+    - NOTE: Expected arguments: twoArg(a, b)
+tests\directive-use.mx:127:9 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: twoArg(a, b)
+tests\directive-use.mx:128:9 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:128:13 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: twoArg(a, b)
 tests\directive-use.mx:129:13 ERROR: Excesive expansion argument
-tests\directive-use.mx:130:15 ERROR: Argument expected
-tests\directive-use.mx:131:11 ERROR: Argument expected
-tests\directive-use.mx:131:12 ERROR: Argument expected
-tests\directive-use.mx:132:14 ERROR: Argument expected
+    - NOTE: Expected arguments: twoArg(a, b)
+tests\directive-use.mx:130:15 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: threeArg(a, b, c)
+tests\directive-use.mx:131:11 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: threeArg(a, b, c)
+tests\directive-use.mx:131:12 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: threeArg(a, b, c)
+tests\directive-use.mx:132:14 ERROR: Empty argument field not allowed
+    - NOTE: Expected arguments: threeArg(a, b, c)
 tests\directive-use.mx:132:18 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: threeArg(a, b, c)
 tests\directive-use.mx:139:20 ERROR: Excesive expansion argument
+    - NOTE: Expected arguments: tooManyArgsUsed(a)
 tests\directive-use.mx:145:20 ERROR: Missing expansion arguments
+    - NOTE: Expected arguments: notEnoughArgsUsed(a, b)
 tests\directive-use.mx:188:11 ERROR: Unexpected ctime forcing '!'
 tests\directive-use.mx:190:8 ERROR: Unexpected ctime forcing '!'
 tests\directive-use.mx:191:12 ERROR: Unexpected ctime forcing '!'
@@ -65,8 +89,8 @@ tests\directive-use.mx:183:8 ERROR: Unexpected token '420'
 tests\directive-use.mx:160:14 ERROR: Simple immediate field expected
 tests\directive-use.mx:183:8 ERROR: Unexpected token '420'
 tests\directive-use.mx:13:1 ERROR: Invalid instruction immediate 'mov defined3'
-tests\directive-use.mx:17:1 ERROR: Only simple immediates for now 'ld 8 3'
-tests\directive-use.mx:18:1 ERROR: Only simple immediates for now 'ld 1 9'
+tests\directive-use.mx:17:1 ERROR: Only single immediate allowed 'ld 8 3'
+tests\directive-use.mx:18:1 ERROR: Only single immediate allowed 'ld 1 9'
 tests\directive-use.mx:19:1 ERROR: Target value expected 'ld'
 tests\directive-use.mx:21:1 ERROR: Target value expected 'ld'
 tests\directive-use.mx:36:1 ERROR: Target value expected 'mov'
@@ -74,12 +98,12 @@ tests\directive-use.mx:7:21 ERROR: Invalid instruction immediate 'ld insides'
 tests\directive-use.mx:38:1 ERROR: Target value expected 'str'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu _'
 tests\directive-use.mx:42:21 ERROR: Invalid instruction immediate 'outu labelInside1'
-tests\directive-use.mx:93:2 ERROR: Only simple immediates for now 'outu _ 5'
-tests\directive-use.mx:94:2 ERROR: Only simple immediates for now 'outu _ 18'
-tests\directive-use.mx:88:2 ERROR: Only simple immediates for now 'outu _ 9'
-tests\directive-use.mx:89:2 ERROR: Only simple immediates for now 'outu _ 68'
-tests\directive-use.mx:88:2 ERROR: Only simple immediates for now 'outu _ 485'
-tests\directive-use.mx:89:2 ERROR: Only simple immediates for now 'outu _ 128'
+tests\directive-use.mx:93:2 ERROR: Only single immediate allowed 'outu _ 5'
+tests\directive-use.mx:94:2 ERROR: Only single immediate allowed 'outu _ 18'
+tests\directive-use.mx:88:2 ERROR: Only single immediate allowed 'outu _ 9'
+tests\directive-use.mx:89:2 ERROR: Only single immediate allowed 'outu _ 68'
+tests\directive-use.mx:88:2 ERROR: Only single immediate allowed 'outu _ 485'
+tests\directive-use.mx:89:2 ERROR: Only single immediate allowed 'outu _ 128'
 tests\directive-use.mx:135:21 ERROR: Unknown instruction 'debug 1'
 tests\directive-use.mx:135:21 ERROR: Unknown instruction 'debug 1'
 tests\directive-use.mx:136:23 ERROR: Unknown instruction 'debug 1 2'

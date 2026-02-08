@@ -1,0 +1,19 @@
+:returncode 1
+
+:stderr 982
+tests\namespace-shadowing.mx:5:13 WARNING: Definition shadowing existing namespace 'vav'
+tests\namespace-shadowing.mx:6:13 ERROR: Namespace redefinition 'vav'
+    - NOTE: Defined at tests\namespace-shadowing.mx:5:2
+tests\namespace-shadowing.mx:9:13 WARNING: Definition shadowing existing namespace 'vav'
+tests\namespace-shadowing.mx:10:9 ERROR: Namespace redefinition 'vav'
+    - NOTE: Defined at tests\namespace-shadowing.mx:9:2
+tests\namespace-shadowing.mx:14:9 WARNING: Definition shadowing existing namespace 'vav'
+tests\namespace-shadowing.mx:15:10 ERROR: Macro redefinition 'vav'
+    - NOTE: Defined at tests\namespace-shadowing.mx:14:2
+tests\namespace-shadowing.mx:18:10 WARNING: Definition shadowing existing namespace 'vav'
+tests\namespace-shadowing.mx:19:9 ERROR: Define redefinition 'vav'
+    - NOTE: Defined at tests\namespace-shadowing.mx:18:2
+tests\namespace-shadowing.mx:20:13 ERROR: Define redefinition 'vav'
+    - NOTE: Defined at tests\namespace-shadowing.mx:18:2
+
+

@@ -1,11 +1,11 @@
 :returncode 1
 
-:stderr 2208
+:stderr 2238
 tests\includes\includes.mx:3:2 ERROR: Undeclared identifier 'inclde'
 tests\includes\includes.mx:4:2 ERROR: Missing included path string
-tests\includes\includes.mx:5:10 ERROR: Unexpected token type '78'
-tests\includes\includes.mx:6:10 ERROR: Unexpected token type 'main'
-tests\includes\includes.mx:7:10 ERROR: Unexpected token type '''
+tests\includes\includes.mx:5:10 ERROR: Expected string token type, got '78'
+tests\includes\includes.mx:6:10 ERROR: Expected string token type, got 'main'
+tests\includes\includes.mx:7:10 ERROR: Expected string token type, got '''
 tests\includes\includes.mx:8:10 ERROR: Input file "" can't be included
 tests\includes\includes.mx:9:10 ERROR: Input file "\r\n\\" can't be included
 tests\includes\includes.mx:10:10 ERROR: Input file "\$/\-" can't be included
