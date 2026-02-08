@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 5308
+:stderr 5374
 tests\namespace-accessors.mx:3:1 ERROR: Missing directive name
 tests\namespace-accessors.mx:4:2 ERROR: Invalid directive name '^'
 tests\namespace-accessors.mx:5:1 ERROR: Missing directive name
@@ -8,15 +8,15 @@ tests\namespace-accessors.mx:6:6 ERROR: Missing directive name
 tests\namespace-accessors.mx:7:9 ERROR: Missing directive name
 tests\namespace-accessors.mx:8:2 ERROR: Undeclared identifier 'again'
 tests\namespace-accessors.mx:11:7 ERROR: Missing directive name
-tests\namespace-accessors.mx:12:8 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:12:8 ERROR: Definition has unexpected accessor 'somting'
 tests\namespace-accessors.mx:13:7 ERROR: Missing directive name
 tests\namespace-accessors.mx:14:11 ERROR: Missing directive name
 tests\namespace-accessors.mx:15:12 ERROR: Missing directive name
-tests\namespace-accessors.mx:16:12 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:16:12 ERROR: Definition has unexpected accessor 'ss'
 tests\namespace-accessors.mx:17:14 ERROR: Missing directive name
 tests\namespace-accessors.mx:18:11 ERROR: Missing directive name
 tests\namespace-accessors.mx:29:6 ERROR: Undeclared identifier 'macro'
-tests\namespace-accessors.mx:30:8 ERROR: Unexpected accessor
+tests\namespace-accessors.mx:30:8 ERROR: Definition has unexpected accessor 'Foo'
 tests\namespace-accessors.mx:31:2 ERROR: Namespace not found 'mac'
 tests\namespace-accessors.mx:33:2 ERROR: Undeclared identifier 'foo'
 tests\namespace-accessors.mx:34:5 ERROR: Missing directive name

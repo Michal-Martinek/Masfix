@@ -1306,7 +1306,7 @@ bool processBuiltinUse(string directive, Scope& scope, Loc loc) {
 	return check(!scope.hasNext() || scope->firstOnLine, "Unexpected token after directive", scope.currToken());
 }
 bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, list<string> prefixes, list<Loc> locs, Token& percentToken) {
-	checkReturnOnFail(!prefixes.size(), "Unexpected accessor", *(++locs.begin()));
+	checkReturnOnFail(!prefixes.size(), dirType + " has unexpected accessor" + errorQuoted(prefixes.front()), *(++locs.begin()));
 	checkReturnOnFail(percentToken.data != "!", "Unexpected ctime forcing", percentToken);
 	checkReturnOnFail(!scope.hasNext() || !scope->continued, "Unexpected continued token", scope.currToken());
 	if (dirType != "macro arg") {
