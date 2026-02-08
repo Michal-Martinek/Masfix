@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 4150
+:stderr 4138
 tests\scoping-situations.mx:16:11 ERROR: Undeclared identifier 'top_top_def'
 tests\scoping-situations.mx:17:5 ERROR: Invalid directive name '*a'
 tests\scoping-situations.mx:23:9 ERROR: Undeclared identifier 'deep_def'
@@ -54,8 +54,8 @@ tests\scoping-situations.mx:107:9 ERROR: Namespace not found 'local_inner'
 tests\scoping-situations.mx:109:9 ERROR: Undeclared identifier 'local_inner_def'
 tests\scoping-situations.mx:113:42 ERROR: Namespace not found 'top_inner'
 tests\scoping-situations.mx:116:2 ERROR: Invalid directive name '**reuse_test'
-tests\scoping-situations.mx:120:9 ERROR: Namespace already imported 'top_inner'
-tests\scoping-situations.mx:121:9 ERROR: Namespace already imported 'deep'
-tests\scoping-situations.mx:123:24 ERROR: Namespace already imported 'deeper'
+tests\scoping-situations.mx:120:9 ERROR: Namespace already used 'top_inner'
+tests\scoping-situations.mx:121:9 ERROR: Namespace already used 'deep'
+tests\scoping-situations.mx:123:24 ERROR: Namespace already used 'deeper'
 
 

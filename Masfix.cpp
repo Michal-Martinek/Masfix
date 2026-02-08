@@ -1274,7 +1274,7 @@ bool processUsing(Loc loc, Scope& scope) {
 		firstName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" errorQuoted(firstName), locs.front());
 	}
-	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already imported" errorQuoted(firstName), locs.back());
+	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already used" errorQuoted(firstName), locs.back());
 	return true;
 }
 fs::path processIncludePath(string str, Scope& scope) {
