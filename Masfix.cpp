@@ -36,6 +36,7 @@ enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tstring,
+	Tchar,
 
 	Tspecial,
 	Tcolon,
@@ -612,7 +613,7 @@ private:
 	/// handles the ending of a single token list
 	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 12, "Exhaustive closeList definition");
+		static_assert(TokenCount == 13, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -667,7 +668,7 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
-		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
+		static_assert(TokenCount == 13, "Exhaustive Scope::next definition");
 		++itrs.top();
 		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
@@ -1003,13 +1004,14 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 		+ " token type, got", outToken);
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
-	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 13, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
 	set<TokenTypes> allowedTypes = {Tnumeric, Talpha, Tspecial};
 	if (eatAnything >= 1) allowedTypes.insert(Tcolon);
 	if (eatAnything >= 2) allowedTypes.insert(Tstring);
+	if (eatAnything >= 2) allowedTypes.insert(Tchar);
 	if (eatAnything >= 3) allowedTypes.insert(Tlist);
 	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
 		name += scope.eatenToken().toStr(allowQuotes);
@@ -1166,7 +1168,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, string identPurpose="directive") {
-	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 13, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1332,7 +1334,7 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 	return true;
 }
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 13, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
 	returnOnFalse(complexDirectiveName(scope, directiveName, prefixes, locs, loc));
 	if (DefiningDirectivesSet.count(directiveName)) {
