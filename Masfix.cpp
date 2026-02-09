@@ -902,7 +902,6 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
 		continued = false; firstOnLine = true;
-		line = line.substr(0, line.find(';'));
 		int col = 1;
 		while (line.size()) {
 			char first = line.at(0);
@@ -914,6 +913,9 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 			keepContinued = true;
 			if (isspace(first)) {
 				continued = false;
+				continue;
+			} else if (first == ';') {
+				line = "";
 				continue;
 			}
 			if (isdigit(first)) {
