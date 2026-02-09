@@ -415,7 +415,7 @@ struct Instr {
 
 	string opcodeStr;
 	Loc opcodeLoc;
-	vector<string> immFields;
+	list<Token> immediates;
 
 	bool needsReparsing = false; // references smth which might change
 
@@ -424,7 +424,7 @@ struct Instr {
 		this->opcodeStr = opcodeStr;
 		this->opcodeLoc = opcodeLoc;
 	}
-	bool hasImm() { return immFields.size() != 0; }
+	bool hasImm() { return !immediates.empty(); }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
@@ -432,9 +432,9 @@ struct Instr {
 
 	string toStr() {
 		string out = opcodeStr;
-		for (string s : immFields) {
+		for (Token& token : immediates) {
 			out.push_back(' ');
-			out.append(s);
+			out.append(token.toStr());
 		}
 		return out;
 	}
@@ -1405,9 +1405,11 @@ bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
 	checkReturnOnFail(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc);
 	instr.opcodeStr = name;
 	while (scope.hasNext() && !scope->firstOnLine) {
-		string immFrag;
-		returnOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate", false));
-		instr.immFields.push_back(immFrag);
+		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
+		if (scope->type == Tnumeric || scope->type == Tstring) immToken.type = scope->type;
+		// TODO add scope->type == Tchar ||
+		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false));
+		instr.immediates.push_back(immToken);
 	}
 	return true;
 }
@@ -1523,17 +1525,22 @@ bool verifyNotInstrOpcode(string name) {
 	SupressErrors = false;
 	return ans;
 }
+bool parseNumericalImmediate(string s, Instr& instr) {
+	// TODO check token types
+	checkReturnOnFail(isdigit(s.at(0)), "Invalid instruction immediate", instr);
+	instr.immediate = stoi(s);
+	checkReturnOnFail(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
+	return true;
+}
 bool parseInstrImmediate(Instr& instr) {
-	checkReturnOnFail(instr.immFields.size() == 1, "Only single immediate allowed", instr);
-	string immVal = instr.immFields[0];
+	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
+	string immVal = instr.immediates.front().data;
 	if (parseCtx.strToLabel.count(immVal) > 0) {
 		instr.immediate = parseCtx.strToLabel[immVal].addr;
 		if (immVal == "end") instr.needsReparsing = true;
 		return true;
 	}
-	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(immVal);
-	checkReturnOnFail(to_string(instr.immediate) == immVal, "Invalid instruction immediate", instr);
+	returnOnFalse(parseNumericalImmediate(immVal, instr));
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 bool parseInstrFields(Instr& instr) {
