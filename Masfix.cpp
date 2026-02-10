@@ -202,7 +202,7 @@ struct Loc {
 };
 struct Token {
 	TokenTypes type=TokenCount;
-	string data;
+	string data; // contains only data - no quotes
 	list<Token> tlist;
 
 	Loc loc;
@@ -268,7 +268,8 @@ struct Token {
 		assert(type == Tlist);
 		return data.at(0) + 2 - (data.at(0) == '(');
 	}
-	string toStr() {
+	// quoted: quote strings & chars?
+	string toStr(bool quoted=false) {
 		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
@@ -276,10 +277,9 @@ struct Token {
 			out.push_back(tlistCloseChar());
 		} else if (type == TIexpansion) {
 			out = "%" + out;
+		} else if (type == Tstring && quoted) {
+			return '"' + data + '"';
 		}
-		// } else if (type == Tstring && quotedStr) {
-		// 	return '"' + data + '"';
-		// }
 		return out;
 	}
 	bool isSeparated() {

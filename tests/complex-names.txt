@@ -28,7 +28,7 @@ tests\complex-names.mx:43:3 ERROR: Simple instr field expected
 tests\complex-names.mx:47:3 ERROR: Expected instr field
 tests\complex-names.mx:48:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:50:2 ERROR: Simple instr field expected
-tests\complex-names.mx:59:1 ERROR: Unexpected token 'ld'
+tests\complex-names.mx:59:1 ERROR: Unexpected token "ld"
 tests\complex-names.mx:60:1 ERROR: Unexpected token '()'
 tests\complex-names.mx:67:20 ERROR: Expected immediate field
 tests\complex-names.mx:68:20 ERROR: Simple immediate field expected

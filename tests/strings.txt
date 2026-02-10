@@ -8,14 +8,14 @@ tests\strings.mx:8:9 ERROR: Expected string termination
 tests\strings.mx:9:13 ERROR: Expected string termination
 tests\strings.mx:10:21 ERROR: Invalid directive name 'no-where-is-it'
 tests\strings.mx:14:3 ERROR: Missing define name
-tests\strings.mx:2:1 ERROR: Unexpected token ''
-tests\strings.mx:3:1 ERROR: Unexpected token ' '
-tests\strings.mx:4:1 ERROR: Unexpected token 'Hello, world!'
+tests\strings.mx:2:1 ERROR: Unexpected token ""
+tests\strings.mx:3:1 ERROR: Unexpected token " "
+tests\strings.mx:4:1 ERROR: Unexpected token "Hello, world!"
 tests\strings.mx:9:1 ERROR: Label definitions BEGIN with ':'
-tests\strings.mx:10:1 ERROR: Unexpected token 'got the loc bro?'
-tests\strings.mx:11:1 ERROR: Unexpected token '( } ) '!'
+tests\strings.mx:10:1 ERROR: Unexpected token "got the loc bro?"
+tests\strings.mx:11:1 ERROR: Unexpected token "( } ) '!"
 tests\strings.mx:13:1 ERROR: Unexpected token '()'
-tests\strings.mx:17:9 ERROR: Unexpected token 'Emmet'
+tests\strings.mx:17:9 ERROR: Unexpected token "Emmet"
 tests\strings.mx:19:1 ERROR: Unexpected token '()'
 tests\strings.mx:22:1 ERROR: Invalid label name 'whos there'
 tests\strings.mx:26:1 ERROR: Missing immediate field name
