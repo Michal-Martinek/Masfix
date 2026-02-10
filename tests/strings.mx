@@ -30,3 +30,7 @@ help ("mouse")( "	is") ("inside" " him") "*$@#+"
 
 outu "str" "lit"
 :"label"
+
+%define u 7
+%("u")
+%("define") ("value") ("8")

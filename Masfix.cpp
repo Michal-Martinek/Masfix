@@ -1052,7 +1052,7 @@ string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) 
 // preprocess -------------------------------------------------------------------------
 bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors=false);
 bool preprocess(Scope& scope);
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine);
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine, bool allowQuotes=false);
 
 bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
@@ -1374,7 +1374,7 @@ bool preprocess(Scope& scope) {
 	return errorLess;
 }
 // token stream parsing -----------------------------------
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine) {
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine, bool allowQuotes) {
 	string fragment; Loc fragLoc = loc;
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
 	do {
@@ -1389,7 +1389,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 			scope.eatenToken();
 			ident.append(fragment);
 		} else {
-			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2, true));
+			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2, allowQuotes));
 			canStartLine = false;
 			ident.append(fragment);
 		}
@@ -1400,14 +1400,14 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 }
 bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
 	string name = "";
-	returnOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true));
+	returnOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true, true));
 	checkReturnOnFail(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc);
 	instr.opcodeStr = name;
 	while (scope.hasNext() && !scope->firstOnLine) {
 		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
 		if (scope->type == Tnumeric || scope->type == Tstring) immToken.type = scope->type;
 		// TODO add scope->type == Tchar ||
-		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false));
+		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false, true));
 		instr.immediates.push_back(immToken);
 	}
 	return true;
@@ -1436,7 +1436,7 @@ void parseTokenStream(Scope& scope) {
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
 			scope.eatenToken();
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label", false));
+			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label", false, true));
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
