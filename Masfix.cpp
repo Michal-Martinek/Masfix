@@ -273,7 +273,6 @@ struct Token {
 		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
-			if (isSeparated()) out.push_back(',');
 			out.push_back(tlistCloseChar());
 		} else if (type == TIexpansion) {
 			out = "%" + out;
