@@ -420,7 +420,7 @@ struct Instr {
 	bool needsReparsing = false; // references smth which might change
 
 	Instr() {}
-	Instr(string opcodeStr,	Loc opcodeLoc) {
+	Instr(Loc opcodeLoc) {
 		this->opcodeStr = opcodeStr;
 		this->opcodeLoc = opcodeLoc;
 	}
@@ -1399,6 +1399,18 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" + errorQuoted(ident), loc));
 	return checkIdentRedefinitions(scope, ident, loc, purpose == "label", &scope.topNamespace());
 }
+bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
+	string name = "";
+	returnOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true));
+	checkReturnOnFail(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc);
+	instr.opcodeStr = name;
+	while (scope.hasNext() && !scope->firstOnLine) {
+		string immFrag;
+		returnOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate", false));
+		instr.immFields.push_back(immFrag);
+	}
+	return true;
+}
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
 	// TODO disable in ctime
@@ -1414,7 +1426,6 @@ void parseTokenStream(Scope& scope) {
 	Loc loc;
 	bool labelOnLine;
 	bool errorLess; // ignored
-outer_loop_continue:
 	while (scope.advanceIteration()) {
 		if (scope.getCurrModule() != parseCtx.lastModule) {
 			parseCtx.lastModule = scope.getCurrModule();
@@ -1430,15 +1441,8 @@ outer_loop_continue:
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
 			dump(':' + name);
 		} else if (top.type == Talpha) {
-			// NOTE ignores whole instr on any err in parsing
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true));
-			eatLineOnFalse(check(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc)); // note for bad label definition
-			Instr instr(name, loc);
-			while (scope.hasNext() && !scope->firstOnLine) {
-				string immFrag;
-				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate", false), goto outer_loop_continue);
-				instr.immFields.push_back(immFrag);
-			}
+			Instr instr(loc);
+			eatLineOnFalse(parseInstrTS(scope, loc, instr));
 			dump(instr.toStr());
 			parseCtx.instrs.push_back(instr);
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
