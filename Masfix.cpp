@@ -509,7 +509,6 @@ struct Flags {
 Flags flags;
 
 // checks --------------------------------------------------------------------
-#define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
 
 #define continueOnFalse(cond) if (!(cond)) { errorLess = false; continue; }
@@ -526,6 +525,11 @@ bool SupressErrors = false;
 
 #define returnOnErrSupress() if (SupressErrors) return false;
 #define returnOnWarningSupress() if (SupressErrors || !FLAG_enableWarnings) return false;
+
+string errorQuoted(string s) {
+	if (s.at(0) == '\'' || s.at(0) == '"') return ' ' + s;
+	return " '" + s + "'";
+}
 
 vector<string> errors;
 void raiseErrors() { // TODO sort errors based on line and file
@@ -553,21 +557,21 @@ void _raiseNote(string message) {
 
 bool raiseError(string message, Token token, string note="", bool strict=false) {
 	returnOnErrSupress();
-	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr(true)) + "\n";
 	addError(err, strict);
 	if (note.size()) _raiseNote(note);
 	return false;
 }
 bool raiseError(string message, Instr instr, string note="", bool strict=false) {
 	returnOnErrSupress();
-	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) + "\n";
 	addError(err, strict);
 	if (note.size()) _raiseNote(note);
 	return false;
 }
 bool raiseWarning(string message, Instr instr) {
 	returnOnWarningSupress();
-	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) "\n";
+	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) + "\n";
 	addError(err, false);
 	return false;
 }
@@ -775,9 +779,9 @@ public:
 		return tlists.size() && insideTlistOfType(Tlist);
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
-		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
+		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" + errorQuoted(string(1, closeChar)), loc);
 		Token &tlist = tlists.top().get();
-		checkReturnOnFail(closeChar == tlist.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, closeChar)), loc,
+		checkReturnOnFail(closeChar == tlist.tlistCloseChar(), "Unmatched token list delimiters" + errorQuoted(string(1, closeChar)), loc,
 				"Current tlist start: " + tlist.loc.toStr());
 		closeList();
 		return true;
@@ -970,18 +974,18 @@ string noteWhereDefined(Loc& loc, Loc& definedLoc) {
 	return "Defined at " + definedLoc.toStr();
 }
 bool checkIdentRedefinitions(Scope& scope, string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
-	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
-	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
+	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" + errorQuoted(name), loc);
+	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" + errorQuoted(name), loc)
 	if (label) {
-		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc, noteWhereDefined(loc, parseCtx.strToLabel[name].loc));
+		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, parseCtx.strToLabel[name].loc));
 	} else {
 		assert(currNamespace);
-		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->defines[name].loc));
-		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->macros[name].loc));
-		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc, noteWhereDefined(loc, IdToNamespace[currNamespace->innerNamespaces[name]].loc));
+		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->defines[name].loc));
+		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->macros[name].loc));
+		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, IdToNamespace[currNamespace->innerNamespaces[name]].loc));
 		int namespaceId = scope.currNamespaceId();
 		if (lookupNamespaceAbove(name, namespaceId, loc, true)) {
-			raiseWarning("Definition shadowing existing namespace" errorQuoted(name), loc);
+			raiseWarning("Definition shadowing existing namespace" + errorQuoted(name), loc);
 		};
 	}
 	return true;
@@ -1020,7 +1024,7 @@ bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bo
 }
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
 	returnOnFalse(eatIdentifier(scope, name, loc, identPurpose, false, eatAnything)); \
-	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
+	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" + errorQuoted(name), loc)); \
 	if (definition) returnOnFalse(checkIdentRedefinitions(scope, name, loc, false, &scope.topNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
 
@@ -1060,7 +1064,7 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 		}
 		first = false;
 		directiveEatIdentifier("macro arg", true, 1);
-		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" + errorQuoted(name), loc);
 		mac.addArg(name, loc); // TODO macArg.loc not checked nor used
 	}
 	return true;
@@ -1242,7 +1246,7 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool
 		if (!currNamespace->isUpperAccesible) break;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
-	check(supressErrors, "Namespace not found" errorQuoted(directiveName), loc);
+	check(supressErrors, "Namespace not found" + errorQuoted(directiveName), loc);
 	return false;
 }
 bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
@@ -1256,8 +1260,8 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		// NOTE shouldn't allow expansion body leakages bcs '%' token is never on same line
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
-	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
-	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
+	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" + errorQuoted(directiveName), lastLoc);
+	return check(false, "Undeclared identifier" + errorQuoted(directiveName), lastLoc);
 }
 bool lookupName(Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
@@ -1268,7 +1272,7 @@ bool lookupName(Token& percentToken, string directiveName, list<string>& prefixe
 		lookupFinalAbove(directiveName, namespaceId, namespaceSeen);
 	}
 	while (prefixes.size()) {
-		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" errorQuoted(directiveName), locs.front());
+		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" + errorQuoted(directiveName), locs.front());
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
 	return processUseDirective(directiveName, percentToken, locs.front(), namespaceId, namespaceSeen, scope);
@@ -1282,9 +1286,9 @@ bool processUsing(Loc loc, Scope& scope) {
 	returnOnFalse(lookupNamespaceAbove(firstName, namespaceId, locs.front()));
 	while (prefixes.size()) {
 		firstName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
-		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" errorQuoted(firstName), locs.front());
+		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" + errorQuoted(firstName), locs.front());
 	}
-	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already used" errorQuoted(firstName), locs.back());
+	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already used" + errorQuoted(firstName), locs.back());
 	return true;
 }
 fs::path processIncludePath(string str, Scope& scope) {
@@ -1324,7 +1328,7 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 		if (directiveName != "define" && directiveName != "macro") {
 			checkReturnOnFail(!scope.insideMacro(), dirType + " not allowed inside macro", percentToken.loc);
 		}
-		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" + errorQuoted(directiveName), percentToken.loc);
 	}
 	return true;
 }
@@ -1392,7 +1396,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 		}
 	} while (scope.hasNext() && scope->continued);
 	if (purpose == "instr" || purpose == "immediate" || purpose == "directive") return true;
-	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
+	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" + errorQuoted(ident), loc));
 	return checkIdentRedefinitions(scope, ident, loc, purpose == "label", &scope.topNamespace());
 }
 
@@ -2156,8 +2160,8 @@ fs::path _masfixFolder = fs::exists(__FILE__) ?
 fs::path checkPathArg(string arg, bool file) {
 	fs::path p = fs::weakly_canonical(arg);
 	if (!fs::exists(p)) p = _masfixFolder/p;
-	checkUsage(fs::exists(p), "Invalid argument or file not found" errorQuoted(arg));
-	if (file) checkUsage(fs::is_regular_file(p), "File expected" errorQuoted(arg));
+	checkUsage(fs::exists(p), "Invalid argument or file not found" + errorQuoted(arg));
+	if (file) checkUsage(fs::is_regular_file(p), "File expected" + errorQuoted(arg));
 	else if (fs::is_regular_file(p)) p = p.parent_path();
 	return p;
 }
@@ -2195,7 +2199,7 @@ Flags processLineArgs(int argc, char *argv[]) {
 		} else if (arg == "-D" || arg == "-d" || arg == "--dump") {
 			flags.dump = true;
 		} else {
-			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
+			checkUsage(arg.at(0) != '-', "Unknown argument" + errorQuoted(arg));
 			flags.inputPath = checkPathArg(arg, true);
 		}
 	}
@@ -2204,12 +2208,12 @@ Flags processLineArgs(int argc, char *argv[]) {
 }
 ifstream openInputFile(fs::path path) {
 	ifstream ifs(path);
-	checkCond(ifs.good(), "The input file" errorQuoted(path.string()) " couldn't be opened");
+	checkCond(ifs.good(), "The input file" + errorQuoted(path.string()) + " couldn't be opened");
 	return ifs;
 }
 ofstream openOutputFile(fs::path path) {
 	ofstream ofs(path);
-	checkCond(ofs.good(), "The output file" errorQuoted(path.string()) " couldn't be opened");
+	checkCond(ofs.good(), "The output file" + errorQuoted(path.string()) + " couldn't be opened");
 	return ofs;
 }
 int runCmdEchoed(vector<string> args, Flags& flags, bool exitOnErr=true) {
