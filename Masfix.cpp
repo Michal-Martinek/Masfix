@@ -1003,7 +1003,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
 		+ " token type, got", outToken);
 }
-void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
+void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
 	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
@@ -1013,13 +1013,13 @@ void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, i
 	if (eatAnything >= 2) allowedTypes.insert(Tstring);
 	if (eatAnything >= 3) allowedTypes.insert(Tlist);
 	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
-		name += scope.eatenToken().toStr();
+		name += scope.eatenToken().toStr(allowQuotes);
 		first = false;
 	}
 }
-bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
+bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0, bool allowQuotes=false) {
 	Loc prevLoc = loc;
-	eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	eatTokenRun(scope, name, loc, canStartLine, eatAnything, allowQuotes);
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
@@ -1390,7 +1390,7 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 			scope.eatenToken();
 			ident.append(fragment);
 		} else {
-			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
+			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2, true));
 			canStartLine = false;
 			ident.append(fragment);
 		}

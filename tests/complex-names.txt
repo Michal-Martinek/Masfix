@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2723
+:stderr 2729
 tests\complex-names.mx:41:4 ERROR: Directive must not continue
 tests\complex-names.mx:42:5 ERROR: Directive must not continue
 tests\complex-names.mx:5:2 ERROR: Expected label field
@@ -43,7 +43,7 @@ tests\complex-names.mx:56:1 ERROR: Excessive immediate 'bmeqm 15'
 tests\complex-names.mx:61:1 ERROR: Unknown instruction 'dll'
 tests\complex-names.mx:62:1 ERROR: Unknown condition 'l lvm'
 tests\complex-names.mx:65:1 ERROR: Unknown instruction 'debug 1 234'
-tests\complex-names.mx:66:1 ERROR: Unknown instruction 'debug 01  23 4 5'
-tests\complex-names.mx:69:1 ERROR: Unknown condition 'stst a b'
+tests\complex-names.mx:66:1 ERROR: Unknown instruction 'debug 01  23 "4" 5'
+tests\complex-names.mx:69:1 ERROR: Unknown condition 'stst "a" "b"'
 
 

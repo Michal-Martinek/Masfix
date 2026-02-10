@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2390
+:stderr 2298
 tests\ctime-use.mx:13:1 ERROR: Missing directive name
 tests\ctime-use.mx:14:2 ERROR: Invalid directive name '!'
 tests\ctime-use.mx:15:1 ERROR: Unexpected ctime forcing '!'
@@ -21,14 +21,12 @@ tests\ctime-use.mx:60:45 ERROR: Undeclared identifier 'oo'
 tests\ctime-use.mx:19:1 ERROR: Unexpected token '2'
 tests\ctime-use.mx:30:1 ERROR: Missing label name
 tests\ctime-use.mx:31:1 ERROR: Invalid label name '2'
-tests\ctime-use.mx:34:1 ERROR: Invalid label name '!m(z)'
+tests\ctime-use.mx:34:1 ERROR: Invalid label name "!m(z)"
 tests\ctime-use.mx:35:1 ERROR: Invalid label name '0'
 tests\ctime-use.mx:36:1 ERROR: Invalid label name '2'
 tests\ctime-use.mx:37:1 ERROR: Invalid label name '!m(z)'
-tests\ctime-use.mx:38:1 ERROR: Label redefinition 'l'
-    - NOTE: Defined at tests\ctime-use.mx:32:1
-tests\ctime-use.mx:39:1 ERROR: Label redefinition 'l'
-    - NOTE: Defined at tests\ctime-use.mx:32:1
+tests\ctime-use.mx:38:1 ERROR: Invalid label name "l"
+tests\ctime-use.mx:39:1 ERROR: Invalid label name "l"
 tests\ctime-use.mx:40:1 ERROR: Label redefinition 'l'
     - NOTE: Defined at tests\ctime-use.mx:32:1
 tests\ctime-use.mx:44:1 ERROR: Unexpected token '2'
@@ -36,7 +34,7 @@ tests\ctime-use.mx:20:1 ERROR: Unknown instruction 'two 5 5'
 tests\ctime-use.mx:23:1 ERROR: Unknown instruction 'ctime 3 ld 4'
 tests\ctime-use.mx:25:1 ERROR: Unknown instruction 'oui0'
 tests\ctime-use.mx:27:1 ERROR: Invalid instruction immediate 'jmp labNO'
-tests\ctime-use.mx:45:1 ERROR: Only single immediate allowed 'ld s 2'
+tests\ctime-use.mx:45:1 ERROR: Only single immediate allowed 'ld "s" 2'
 tests\ctime-use.mx:46:1 ERROR: Invalid instruction immediate 'ld t'
 tests\ctime-use.mx:47:1 ERROR: Unknown instruction 'debug i 3'
 tests\ctime-use.mx:52:13 ERROR: Excessive immediate 'strr 0'
