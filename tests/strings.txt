@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2656
+:stderr 2655
 tests\strings.mx:1:1 ERROR: Expected string or character termination
 tests\strings.mx:5:1 ERROR: Expected string or character termination
 tests\strings.mx:6:13 ERROR: Expected string or character termination
@@ -27,6 +27,7 @@ tests\strings.mx:13:1 ERROR: Unexpected token '()'
 tests\strings.mx:17:9 ERROR: Unexpected token "Emmet"
 tests\strings.mx:19:1 ERROR: Unexpected token '()'
 tests\strings.mx:22:1 ERROR: Invalid label name 'whos there'
+tests\strings.mx:26:1 ERROR: Missing immediate field name
 tests\strings.mx:29:24 ERROR: Simple immediate field expected
 tests\strings.mx:32:1 ERROR: Invalid label name "label"
 tests\strings.mx:35:1 ERROR: Unexpected token '7'
@@ -34,17 +35,16 @@ tests\strings.mx:39:1 ERROR: Unexpected token "e"
 tests\strings.mx:40:1 ERROR: Unexpected token "e"
 tests\strings.mx:41:1 ERROR: Unexpected token "e"
 tests\strings.mx:42:1 ERROR: Unexpected token "!"
+tests\strings.mx:43:1 ERROR: Missing immediate field name
 tests\strings.mx:45:3 ERROR: Unexpected token ""
 tests\strings.mx:6:1 ERROR: Unknown instruction 'nuefounland'
 tests\strings.mx:8:1 ERROR: Unknown instruction 'Where'
 tests\strings.mx:24:1 ERROR: Unknown instruction 'a "\n"'
 tests\strings.mx:25:1 ERROR: Missing condition 'b s "trin" g'
-tests\strings.mx:26:1 ERROR: Unknown instruction 'debug ""'
 tests\strings.mx:27:1 ERROR: Unknown instruction 'debug aa "sd" $a " " "ld" " 	 " "\t"'
 tests\strings.mx:28:1 ERROR: Unknown instruction 'NASA`s  deepspace "banger" Juice'
 tests\strings.mx:31:1 ERROR: Only single immediate allowed 'outu "str" "lit"'
 tests\strings.mx:38:1 ERROR: Target value expected 'outc'
-tests\strings.mx:43:1 ERROR: Unknown instruction 'go ""'
 tests\strings.mx:44:1 ERROR: Unknown instruction 'go "lou"'
 
 

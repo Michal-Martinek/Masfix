@@ -203,7 +203,7 @@ struct Loc {
 };
 struct Token {
 	TokenTypes type=TokenCount;
-	string data; // contains only data - no quotes
+	string data; // contains only data - no quotes, quotes added when mentioning in error
 	list<Token> tlist;
 
 	Loc loc;
@@ -436,7 +436,7 @@ struct Instr {
 		string out = opcodeStr;
 		for (Token& token : immediates) {
 			out.push_back(' ');
-			out.append(token.toStr());
+			out.append(token.toStr(true));
 		}
 		return out;
 	}
@@ -977,7 +977,6 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 						line = "";
 						continue;
 					}
-					// NOTE save with escape sequences?
 					if (first == '\'') {
 						checkContinueOnFail(run.size() == 1 || (run.size() == 2 && run[0] == '\\'), "Invalid character value", loc);
 					}
@@ -1443,7 +1442,7 @@ bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
 	while (scope.hasNext() && !scope->firstOnLine) {
 		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
 		if (scope->type == Tnumeric || scope->type == Tchar || scope->type == Tstring) immToken.type = scope->type;
-		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false, true));
+		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false));
 		instr.immediates.push_back(immToken);
 	}
 	return true;
@@ -1560,22 +1559,32 @@ bool verifyNotInstrOpcode(string name) {
 	SupressErrors = false;
 	return ans;
 }
-bool parseNumericalImmediate(string s, Instr& instr) {
-	// TODO check token types
-	checkReturnOnFail(isdigit(s.at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(s);
-	checkReturnOnFail(to_string(instr.immediate) == s, "Invalid instruction immediate", instr);
+bool parseNumericalImmediate(Token& imm, Instr& instr) {
+	if (imm.type == Tnumeric) {
+		checkReturnOnFail(isdigit(imm.data.at(0)), "Invalid instruction immediate", instr);
+		instr.immediate = stoi(imm.data);
+		checkReturnOnFail(to_string(instr.immediate) == imm.data, "Invalid instruction immediate", instr);
+	} else if (imm.type == Tchar) {
+		assert(imm.data.size() == 1 || (imm.data.size() == 2 && escapeSequences.count(imm.data.at(1))));
+		char val = imm.data.size() == 2 ? escapeSequences.at(imm.data.at(1)) : imm.data.at(0);
+		instr.immediate = val;
+	} else {
+		unreachable();
+	}
 	return true;
 }
 bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
-	string immVal = instr.immediates.front().data;
-	if (parseCtx.strToLabel.count(immVal) > 0) {
-		instr.immediate = parseCtx.strToLabel[immVal].addr;
-		if (immVal == "end") instr.needsReparsing = true;
-		return true;
+	Token& imm = instr.immediates.front();
+	if (imm.type == Talpha) {
+		checkReturnOnFail(parseCtx.strToLabel.count(imm.data) > 0, "Invalid instruction immediate", instr);
+		instr.immediate = parseCtx.strToLabel[imm.data].addr;
+		if (imm.data == "end") instr.needsReparsing = true;
+	} else if (imm.type == Tnumeric || imm.type == Tchar) {
+		returnOnFalse(parseNumericalImmediate(imm, instr));
+	} else {
+		checkReturnOnFail(false, "Invalid instruction immediate", instr);
 	}
-	returnOnFalse(parseNumericalImmediate(immVal, instr));
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 bool parseInstrFields(Instr& instr) {

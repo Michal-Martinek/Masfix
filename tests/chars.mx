@@ -44,18 +44,21 @@ lll ' ' ' '
 
 ; complex fields
 %(def('i')ne) ["LMA\0"]
-%(def('i')ne) [("LMAO")] ('^')
+%(def('i')ne) [("LMAO")] ('^') # TODO
+%(def('i')ne) [("LMAO")] (65)
 out('u') '\n'
 
 %macro testValues(defineName) {
-	outc '"'
+	; OMG I am so HIGH ~~
 	outu '8'
-	outu 8
 	outc '\''
+	outu  8
+	outc '"'
+	outc '\t'
+	outc  8 ; probably some bullshit
+	outc '\n'
 	outc '8'
-	outc 8
-	outc '\n'
-	outc !(%defineName)
-	outc '\n'
+	outc %(%defineName)
+	out('c') '\n'
 }
-; !testValues("LMAO") TODO
+ld !testValues("LMAO")
