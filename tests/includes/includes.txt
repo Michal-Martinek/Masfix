@@ -1,18 +1,18 @@
 :returncode 1
 
-:stderr 2500
+:stderr 2506
 tests\includes\includes.mx:7:10 ERROR: Invalid character value
-tests\includes\includes.mx:9:10 ERROR: Invalid character value
+tests\includes\includes.mx:12:10 ERROR: Invalid escape sequence '\$'
 tests\includes\includes.mx:3:2 ERROR: Undeclared identifier 'inclde'
 tests\includes\includes.mx:4:2 ERROR: Missing included path string
 tests\includes\includes.mx:5:10 ERROR: Expected string token type, got '78'
 tests\includes\includes.mx:6:10 ERROR: Expected string token type, got 'main'
 tests\includes\includes.mx:7:2 ERROR: Missing included path string
 tests\includes\includes.mx:8:10 ERROR: Expected string token type, got 'c'
-tests\includes\includes.mx:9:2 ERROR: Missing included path string
+tests\includes\includes.mx:9:10 ERROR: Expected string token type, got '\n'
 tests\includes\includes.mx:10:10 ERROR: Input file "" can't be included
 tests\includes\includes.mx:11:10 ERROR: Input file "\r\n\\" can't be included
-tests\includes\includes.mx:12:10 ERROR: Input file "\$/\-" can't be included
+tests\includes\includes.mx:12:2 ERROR: Missing included path string
 tests\includes\includes.mx:13:10 ERROR: Input file "includ" can't be included
 tests\includes\includee.mx:11:15 ERROR: Undeclared identifier 'befIncl'
 tests\includes\includee.mx:12:2 ERROR: Undeclared identifier 'afterIncl'

@@ -49,7 +49,7 @@
 %include "procedures"
 %include "fibonacci"
 %include "examples/fibonacci_asm_only.mx"
-%include "tests\includes\includee"
+%include "tests\\includes\\includee"
 %include "tests/include_expansion"
 
 %hidden

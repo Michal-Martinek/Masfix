@@ -898,10 +898,28 @@ string getCharRun(string s) {
 	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
-bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
+const map<char, char> escapeSequences = {
+	{'n','\n'},
+	{'t','\t'},
+	{'r','\r'},
+	{'\\','\\'},
+	{'"','"'},
+	{'\'','\''},
+	{'0','\0'},
+};
+bool chopStrlit(char first, string& line, string& run, int& col, Loc loc, bool escape=false) {
 	run = "";
 	for (size_t i = 0; i < line.size(); ++i) {
-		if (line[i] == first) {
+		if (line[i] == '\\') {
+			checkReturnOnFail(++i < line.size() && escapeSequences.count(line.at(i)), "Invalid escape sequence" + errorQuoted(line.substr(i-1, 2)), loc);
+			if (escape) {
+				run.push_back(escapeSequences.at(line[i]));
+			} else {
+				run.push_back('\\');
+				run.push_back(line[i]);
+			}
+			col += 2;
+		} else if (line[i] == first) {
 			line = line.substr(++i);
 			col ++;
 			return true;
@@ -910,7 +928,6 @@ bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 			col ++;
 		}
 	}
-	line = "";
 	return check(false, "Expected string or character termination", loc);
 }
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
@@ -956,11 +973,14 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					addToken(Tseparator);
 					keepContinued = false;
 				} else if (first == '"' || first == '\'') {
-					continueOnFalse(chopStrlit(first, line, run, col, loc));
-					if (first == '\'') {
-						checkContinueOnFail(run.size() == 1, "Invalid character value", loc);
+					if (!chopStrlit(first, line, run, col, loc)) {
+						line = "";
+						continue;
 					}
-					// TODO reset on error
+					// NOTE save with escape sequences?
+					if (first == '\'') {
+						checkContinueOnFail(run.size() == 1 || (run.size() == 2 && run[0] == '\\'), "Invalid character value", loc);
+					}
 					continued = false; keepContinued = false;
 					addToken(first == '"' ? Tstring : Tchar);
 				} else {
