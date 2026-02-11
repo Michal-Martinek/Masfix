@@ -1577,7 +1577,10 @@ bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
 	if (imm.type == Talpha) {
-		checkReturnOnFail(parseCtx.strToLabel.count(imm.data) > 0, "Invalid instruction immediate", instr);
+		if (!parseCtx.strToLabel.count(imm.data)) {
+			checkReturnOnFail(_validIdentChar(imm.data.at(0)), "Invalid instruction immediate", instr);
+			return check(false, "Undefined label", instr);
+		}
 		instr.immediate = parseCtx.strToLabel[imm.data].addr;
 		if (imm.data == "end") instr.needsReparsing = true;
 	} else if (imm.type == Tnumeric || imm.type == Tchar) {

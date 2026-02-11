@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2868
+:stderr 2854
 tests\instr-parse.mx:2:1 ERROR: Unknown instruction 'fuhr'
 tests\instr-parse.mx:3:1 ERROR: Missing condition 'lu'
 tests\instr-parse.mx:4:2 ERROR: Missing condition 'li 85'
@@ -21,7 +21,7 @@ tests\instr-parse.mx:22:1 ERROR: Excessive immediate 'strr 8'
 tests\instr-parse.mx:24:1 ERROR: Missing register for second operation 'strsa'
 tests\instr-parse.mx:26:1 ERROR: Missing register for second operation 'straa'
 tests\instr-parse.mx:27:1 ERROR: Excessive immediate 'strar 5'
-tests\instr-parse.mx:28:1 ERROR: Invalid instruction immediate 'strar a'
+tests\instr-parse.mx:28:1 ERROR: Undefined label 'strar a'
 tests\instr-parse.mx:29:1 ERROR: Excessive immediate 'strar 10'
 tests\instr-parse.mx:31:1 ERROR: Target value expected 'mov'
 tests\instr-parse.mx:33:1 ERROR: Target value expected 'ld'
