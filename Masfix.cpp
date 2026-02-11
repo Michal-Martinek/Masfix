@@ -279,6 +279,8 @@ struct Token {
 			out = "%" + out;
 		} else if (type == Tstring && quoted) {
 			return '"' + data + '"';
+		} else if (type == Tchar && quoted) {
+			return '\'' + data + '\'';
 		}
 		return out;
 	}
@@ -896,12 +898,25 @@ string getCharRun(string s) {
 	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
+bool chopStrlit(char first, string& line, string& run, Loc loc) {
+	run = "";
+	for (size_t i = 0; i < line.size(); ++i) {
+		if (line[i] == first) {
+			line = line.substr(++i);
+			return true;
+		} else {
+			run.push_back(line[i]);
+			++ loc.col;
+		}
+	}
+	return check(false, "Expected string or character termination", loc);
+}
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
 					scope.next(scope.currToken());
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 12, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 13, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
@@ -938,16 +953,15 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					continued = false;
 					addToken(Tseparator);
 					keepContinued = false;
-				} else if (first == '"') {
-					size_t quotePos = line.find('"');
-					if (!check(quotePos != string::npos, "Expected string termination", loc)) {
-						line = ""; continue;
+				} else if (first == '"' || first == '\'') {
+					continueOnFalse(chopStrlit(first, line, run, loc));
+					if (first == '\'') {
+						checkContinueOnFail(run.size() == 1, "Invalid character value", loc);
 					}
-					run = line.substr(0, quotePos);
-					col +=++ quotePos;
+					// TODO reset on error
+					col += run.size();
 					continued = false; keepContinued = false;
-					addToken(Tstring);
-					line = line.substr(quotePos);
+					addToken(first == '"' ? Tstring : Tchar);
 				} else {
 					addToken(Tspecial);
 				}
@@ -1000,7 +1014,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Expected " +
-		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
+		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tchar ? "char" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
 		+ " token type, got", outToken);
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
@@ -1407,8 +1421,7 @@ bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
 	instr.opcodeStr = name;
 	while (scope.hasNext() && !scope->firstOnLine) {
 		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
-		if (scope->type == Tnumeric || scope->type == Tstring) immToken.type = scope->type;
-		// TODO add scope->type == Tchar ||
+		if (scope->type == Tnumeric || scope->type == Tchar || scope->type == Tstring) immToken.type = scope->type;
 		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false, true));
 		instr.immediates.push_back(immToken);
 	}
