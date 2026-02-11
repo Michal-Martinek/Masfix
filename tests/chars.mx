@@ -1,0 +1,61 @@
+
+';'
+'%'
+"%"
+'!'
+"!"
+'$'
+"$"
+','
+","
+':'
+":"
+'('
+"("
+
+"
+'
+''
+""
+' '
+'"'
+'\
+'\'
+'\\
+'\\'
+'\0'
+"\r\n\0"
+
+'\''
+'\"'
+'"'
+"\""
+"'"
+"\'"
+"""
+'''
+lll ' ' ' '
+
+';';comment
+;';';comment
+';;comment
+\;
+"\;
+
+; complex fields
+%(def('i')ne) ["LMA\0"]
+%(def('i')ne) [("LMAO")] ('^')
+out('u') '\n'
+
+%macro testValues(defineName) {
+	outc '"'
+	outu '8'
+	outu 8
+	outc '\''
+	outc '8'
+	outc 8
+	outc '\n'
+	outc !(%defineName)
+	outc '\n'
+}
+; !testValues("LMAO") TODO
