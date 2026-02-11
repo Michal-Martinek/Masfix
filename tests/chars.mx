@@ -44,8 +44,8 @@ lll ' ' ' '
 
 ; complex fields
 %(def('i')ne) ["LMA\0"]
-%(def('i')ne) [("LMAO")] ('^') # TODO
-%(def('i')ne) [("LMAO")] (65)
+%(def('i')ne) [("LMAO")] ('^')
+%define escaped '\r'
 out('u') '\n'
 
 %macro testValues(defineName) {
@@ -59,6 +59,7 @@ out('u') '\n'
 	outc '\n'
 	outc '8'
 	outc %(%defineName)
+	outu %("escaped")
 	out('c') '\n'
 }
 ld !testValues("LMAO")

@@ -1,11 +1,11 @@
 :returncode 1
 
-:stdout 11
+:stdout 13
 56'8"	
-8A
+8^13
 
 
-:stderr 2214
+:stderr 2149
 tests\chars.mx:16:1 ERROR: Expected string or character termination
 tests\chars.mx:17:1 ERROR: Expected string or character termination
 tests\chars.mx:18:1 ERROR: Invalid character value
@@ -18,7 +18,6 @@ tests\chars.mx:36:3 ERROR: Expected string or character termination
 tests\chars.mx:41:1 ERROR: Expected string or character termination
 tests\chars.mx:43:1 ERROR: Invalid escape sequence '\;'
 tests\chars.mx:46:15 ERROR: Invalid define name 'LMA\0'
-tests\chars.mx:47:27 ERROR: Expected numeric token type, got '^'
 tests\chars.mx:2:1 ERROR: Unexpected token ';'
 tests\chars.mx:3:1 ERROR: Unexpected token '%'
 tests\chars.mx:4:1 ERROR: Unexpected token "%"

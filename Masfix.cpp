@@ -907,17 +907,17 @@ const map<char, char> escapeSequences = {
 	{'\'','\''},
 	{'0','\0'},
 };
-bool chopStrlit(char first, string& line, string& run, int& col, Loc loc, bool escape=false) {
+char escapeCharToken(Token& t) {
+	assert(t.data.size() == 1 || (t.data.size() == 2 && escapeSequences.count(t.data.at(1))));
+	return t.data.size() == 2 ? escapeSequences.at(t.data.at(1)) : t.data.at(0);
+}
+bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 	run = "";
 	for (size_t i = 0; i < line.size(); ++i) {
 		if (line[i] == '\\') {
 			checkReturnOnFail(++i < line.size() && escapeSequences.count(line.at(i)), "Invalid escape sequence" + errorQuoted(line.substr(i-1, 2)), loc);
-			if (escape) {
-				run.push_back(escapeSequences.at(line[i]));
-			} else {
-				run.push_back('\\');
-				run.push_back(line[i]);
-			}
+			run.push_back('\\');
+			run.push_back(line[i]);
 			col += 2;
 		} else if (line[i] == first) {
 			line = line.substr(++i);
@@ -1104,6 +1104,16 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	}
 	return true;
 }
+bool eatDefineValue(Scope& scope, Token& outToken, Loc& loc, bool sameLine) {
+	TokenTypes type = scope.hasNext() && scope->type == Tchar ? Tchar : Tnumeric;
+	returnOnFalse(eatToken(scope, loc, outToken, type, "Define value expected", sameLine));
+	if (type == Tchar) {
+		outToken = Token::fromCtx(Tnumeric, to_string((int)escapeCharToken(outToken)), outToken);
+		assert(to_string(stoi(outToken.data)) == outToken.data); // check good int
+		assert(stoi(outToken.data) <= WORD_MAX_VAL);
+	}
+	return true;
+}
 bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 	Token numeric;
 	if (scope.hasNext() && scope->type == Tlist && !scope->firstOnLine) {
@@ -1111,12 +1121,12 @@ bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 		checkReturnOnFail(!token.continued, "Unexpected continued field", token);
 		processArglistWrapper( bool retval = preprocess(scope); );
 		processArglistWrapper(
-			retval = eatToken(scope, loc, numeric, Tnumeric, "Define value expected", false);
+			retval = eatDefineValue(scope, numeric, loc, false);
 			retval = retval && check(!scope.hasNext(), "Unexpected token after value", scope.currToken());
 		);
 		scope.eatenToken(); // tlist
 	} else {
-		returnOnFalse(eatToken(scope, loc, numeric, Tnumeric, "Define value expected", true));
+		returnOnFalse(eatDefineValue(scope, numeric, loc, true));
 	}
 	scope.topNamespace().defines[name] = Define(name, percentLoc, numeric.data);
 	return true;
@@ -1565,9 +1575,7 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 		instr.immediate = stoi(imm.data);
 		checkReturnOnFail(to_string(instr.immediate) == imm.data, "Invalid instruction immediate", instr);
 	} else if (imm.type == Tchar) {
-		assert(imm.data.size() == 1 || (imm.data.size() == 2 && escapeSequences.count(imm.data.at(1))));
-		char val = imm.data.size() == 2 ? escapeSequences.at(imm.data.at(1)) : imm.data.at(0);
-		instr.immediate = val;
+		instr.immediate = escapeCharToken(imm);
 	} else {
 		unreachable();
 	}
