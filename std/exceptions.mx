@@ -3,16 +3,16 @@
 %define ERR_ASSERT 0
 
 %macro error(code) {
-	outc 10
-	outc 69
-	outc 82
-	outc 82
-	outc 79
-	outc 82
-	outc 58
-	outc 32
+	outc '\n'
+	outc 'E'
+	outc 'R'
+	outc 'R'
+	outc 'O'
+	outc 'R'
+	outc ':'
+	outc ' '
 	outu %code
-	outc 10
+	outc '\n'
 	jmp end
 }
 

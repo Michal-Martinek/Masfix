@@ -1,14 +1,14 @@
 ; input prompt
-outc 72
-outc 111
-outc 119
-outc 32
-outc 109
-outc 97
-outc 110
-outc 121
-outc 63
-outc 32
+outc 'H'
+outc 'o'
+outc 'w'
+outc ' '
+outc 'm'
+outc 'a'
+outc 'n'
+outc 'y'
+outc '?'
+outc ' '
 
 inu ; input
 inl
@@ -30,7 +30,7 @@ strr
 ; print a
 mov 0
 outum
-outc 10
+outc '\n'
 
 ; (a, b) = (b, a + b)
 ldm

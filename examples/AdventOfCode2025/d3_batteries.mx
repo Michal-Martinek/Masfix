@@ -119,11 +119,11 @@
 		%banksSum(strar)
 	}
 	%print_endl(
-		outc 10
-		outc 83
-		outc 117
-		outc 109
-		outc 32
+		outc '\n'
+		outc 'S'
+		outc 'u'
+		outc 'm'
+		outc ' '
 		%banksSum(outum)
 	)
 }

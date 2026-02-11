@@ -244,11 +244,11 @@
 	%void_method{ array_print, 1, 1,
 		; locals: first | for_stop, for_idx
 		%seg:local(0, str 1)
-		outc 91
+		outc '['
 		%foreach {
 			%if_else { %seg:local(0, lmeq 0),
-				outc 44
-				outc 32
+				outc ','
+				outc ' '
 			,
 				str 0
 			}
@@ -258,8 +258,8 @@
 				outum
 			)
 		}
-		outc 93
-		outc 10
+		outc ']'
+		outc '\n'
 	}
 
 
