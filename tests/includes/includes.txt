@@ -1,35 +1,39 @@
 :returncode 1
 
-:stderr 2236
+:stderr 2500
+tests\includes\includes.mx:7:10 ERROR: Invalid character value
+tests\includes\includes.mx:9:10 ERROR: Invalid character value
 tests\includes\includes.mx:3:2 ERROR: Undeclared identifier 'inclde'
 tests\includes\includes.mx:4:2 ERROR: Missing included path string
 tests\includes\includes.mx:5:10 ERROR: Expected string token type, got '78'
 tests\includes\includes.mx:6:10 ERROR: Expected string token type, got 'main'
-tests\includes\includes.mx:7:10 ERROR: Expected string token type, got '
-tests\includes\includes.mx:8:10 ERROR: Input file "" can't be included
-tests\includes\includes.mx:9:10 ERROR: Input file "\r\n\\" can't be included
-tests\includes\includes.mx:10:10 ERROR: Input file "\$/\-" can't be included
-tests\includes\includes.mx:11:10 ERROR: Input file "includ" can't be included
+tests\includes\includes.mx:7:2 ERROR: Missing included path string
+tests\includes\includes.mx:8:10 ERROR: Expected string token type, got 'c'
+tests\includes\includes.mx:9:2 ERROR: Missing included path string
+tests\includes\includes.mx:10:10 ERROR: Input file "" can't be included
+tests\includes\includes.mx:11:10 ERROR: Input file "\r\n\\" can't be included
+tests\includes\includes.mx:12:10 ERROR: Input file "\$/\-" can't be included
+tests\includes\includes.mx:13:10 ERROR: Input file "includ" can't be included
 tests\includes\includee.mx:11:15 ERROR: Undeclared identifier 'befIncl'
 tests\includes\includee.mx:12:2 ERROR: Undeclared identifier 'afterIncl'
 tests\includes\includee.mx:16:2 ERROR: Undeclared identifier 'afterIncl'
 tests\includes\includee.mx:18:10 ERROR: Input file "a ted uz: sere me tuze inkluze..." can't be included
 tests\includes\includee.mx:15:1 ERROR: Unknown instruction 'reachable? 5'
-tests\includes\includes.mx:19:13 ERROR: Undeclared identifier 'defd'
-tests\includes\includes.mx:24:3 ERROR: Namespace not found 'includee'
+tests\includes\includes.mx:21:13 ERROR: Undeclared identifier 'defd'
 tests\includes\includes.mx:26:3 ERROR: Namespace not found 'includee'
-tests\includes\includes.mx:27:3 ERROR: Undeclared identifier 'defd'
-tests\includes\includes.mx:28:7 ERROR: Undeclared identifier 'defd'
-tests\includes\includes.mx:38:10 ERROR: Input file "include" can't be included
-tests\includes\includes.mx:39:2 ERROR: Invalid directive name '%'
-tests\includes\includes.mx:42:10 ERROR: Input file "includes.txt" can't be included
-tests\includes\includes.mx:48:10 ERROR: Input file "fibonacci" can't be included
-tests\includes\includes.mx:51:10 ERROR: Input file "tests/include_expansion" can't be included
-tests\includes\includes.mx:53:2 ERROR: Undeclared identifier 'hidden'
-tests\includes\includes.mx:31:2 ERROR: Unexpected token '9'
-tests\includes\includes.mx:18:3 ERROR: Unknown instruction 'debug 9'
-tests\includes\includes.mx:32:2 ERROR: Unknown instruction 'print 65'
-tests\includes\includes.mx:54:1 ERROR: Unknown instruction 'now-gonna-includeeznuts'
+tests\includes\includes.mx:28:3 ERROR: Namespace not found 'includee'
+tests\includes\includes.mx:29:3 ERROR: Undeclared identifier 'defd'
+tests\includes\includes.mx:30:7 ERROR: Undeclared identifier 'defd'
+tests\includes\includes.mx:40:10 ERROR: Input file "include" can't be included
+tests\includes\includes.mx:41:2 ERROR: Invalid directive name '%'
+tests\includes\includes.mx:44:10 ERROR: Input file "includes.txt" can't be included
+tests\includes\includes.mx:50:10 ERROR: Input file "fibonacci" can't be included
+tests\includes\includes.mx:53:10 ERROR: Input file "tests/include_expansion" can't be included
+tests\includes\includes.mx:55:2 ERROR: Undeclared identifier 'hidden'
+tests\includes\includes.mx:33:2 ERROR: Unexpected token '9'
+tests\includes\includes.mx:20:3 ERROR: Unknown instruction 'debug 9'
+tests\includes\includes.mx:34:2 ERROR: Unknown instruction 'print 65'
+tests\includes\includes.mx:56:1 ERROR: Unknown instruction 'now-gonna-includeeznuts'
 tests\includes\includee.mx:7:2 ERROR: Unknown instruction 'print 65'
 
 

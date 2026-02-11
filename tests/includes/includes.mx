@@ -5,6 +5,8 @@
 %include 78
 %include main
 %include ''
+%include 'c'
+%include '\n'
 %include ""
 %include "\r\n\\"
 %include "\$/\-"

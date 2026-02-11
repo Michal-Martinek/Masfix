@@ -25,7 +25,7 @@ a "\n"
 b s"trin"g
 debug ""
 debug aa "sd"$a" " "ld" " 	 " "\t"
-NASA's (" deep" )(	"space")"banger"Juice
+NASA`s (" deep" )(	"space")"banger"Juice
 help ("mouse")( "	is") ("inside" " him") "*$@#+"
 
 outu "str" "lit"
@@ -34,3 +34,12 @@ outu "str" "lit"
 %define u 7
 %("u")
 %("define") ("value") ("8")
+
+outc 'ii'!boob
+"e" ()
+"e"!
+"e" !
+"!"!
+go "" !
+go "lou" !
+  ""!

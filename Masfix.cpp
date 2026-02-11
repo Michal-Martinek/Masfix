@@ -898,17 +898,19 @@ string getCharRun(string s) {
 	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
-bool chopStrlit(char first, string& line, string& run, Loc loc) {
+bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 	run = "";
 	for (size_t i = 0; i < line.size(); ++i) {
 		if (line[i] == first) {
 			line = line.substr(++i);
+			col ++;
 			return true;
 		} else {
 			run.push_back(line[i]);
-			++ loc.col;
+			col ++;
 		}
 	}
+	line = "";
 	return check(false, "Expected string or character termination", loc);
 }
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
@@ -954,12 +956,11 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					addToken(Tseparator);
 					keepContinued = false;
 				} else if (first == '"' || first == '\'') {
-					continueOnFalse(chopStrlit(first, line, run, loc));
+					continueOnFalse(chopStrlit(first, line, run, col, loc));
 					if (first == '\'') {
 						checkContinueOnFail(run.size() == 1, "Invalid character value", loc);
 					}
 					// TODO reset on error
-					col += run.size();
 					continued = false; keepContinued = false;
 					addToken(first == '"' ? Tstring : Tchar);
 				} else {
