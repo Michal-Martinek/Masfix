@@ -3,19 +3,19 @@
 
 %macro print_spaced(instr) {
 	%instr
-	outc 32
+	outc ' '
 }
 %macro print_endl(instr) {
 	%instr
-	outc 10
+	outc '\n'
 }
 %macro print_separator() {
-	outc 44
-	outc 32
+	outc ','
+	outc ' '
 }
 %macro print_key_val(keyChar, val) {
 	outc %keyChar
-	outc 61
+	outc '='
 	outu(%val)
 	%print_separator()
 }
@@ -26,7 +26,7 @@
 	%if {
 		ld> 15 ; negative?
 	,
-		outc 45
+		outc '-'
 		ld 0
 		ldsm
 		strr
@@ -56,18 +56,19 @@
 
 ; VM / runtime delim
 %macro print_delim(vm) {
-	outc 45
-	outc 32
+	outc '-'
+	outc ' '
 	%if_else(ld %vm,
-		outc 86
-		outc 77,
-		outc 82
-		outc 85
-		outc 78
+		outc 'V'
+		outc 'M'
+	,
+		outc 'R'
+		outc 'U'
+		outc 'N'
 	)
-	outc 32
-	outc 45
-	outc 10
+	outc ' '
+	outc '-'
+	outc '\n'
 }
 %macro vm_runtime_delim() {
 	ld !print_delim(1)

@@ -1,13 +1,13 @@
 :returncode 1
 
-:stderr 1367
+:stderr 1339
 tests\op-parse.mx:2:1 ERROR: Target value expected 'str|'
 tests\op-parse.mx:4:1 ERROR: Target value expected 'str^'
 tests\op-parse.mx:6:1 ERROR: Excessive immediate 'str|r 5'
 tests\op-parse.mx:7:1 ERROR: Missing register for second operation 'str^&'
 tests\op-parse.mx:8:1 ERROR: Target value expected 'strt'
 tests\op-parse.mx:10:1 ERROR: Missing immediate 'strrt'
-tests\op-parse.mx:11:1 ERROR: Invalid instruction immediate 'str t'
+tests\op-parse.mx:11:1 ERROR: Undefined label 'str t'
 tests\op-parse.mx:12:1 ERROR: Unknown suffix 'str$ 5'
 tests\op-parse.mx:14:1 ERROR: Missing condition 'b|'
 tests\op-parse.mx:15:1 ERROR: This instruction cannot have a modifier 'beq|'
@@ -20,6 +20,6 @@ tests\op-parse.mx:23:1 ERROR: This instruction cannot have a modifier 'lgt^&'
 tests\op-parse.mx:25:1 ERROR: This instruction cannot have a modifier 'bgeth'
 tests\op-parse.mx:26:1 ERROR: This instruction cannot have a modifier 'slttr'
 tests\op-parse.mx:27:1 ERROR: Missing immediate 'sgert'
-tests\op-parse.mx:28:1 ERROR: Invalid instruction immediate 'sge t'
+tests\op-parse.mx:28:1 ERROR: Undefined label 'sge t'
 
 

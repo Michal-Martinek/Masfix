@@ -31,7 +31,7 @@
 %macro emitMemdumpAddr() {
 	outc 10
 	outuh
-	outc 58
+	outc ':'
 }
 
 ; from, count -> void (stdout)
@@ -88,7 +88,7 @@
 %macro dumpStackOverrun(overrun) {
 	%_dumpStack2Top()
 	; show overrun
-	outc 124 ; separator
+	outc '|' ; separator
 	%load(%SEG_DEBUG_GLOBALS)
 	lda 1
 	%stack:pushr() ; from original SP
@@ -101,9 +101,9 @@
 %macro seeFuncFrame() {
 	; TODO factor to function
 	%toggleDebugMode()
-	outc 10
-	outc 70
-	outc 58
+	outc '\n'
+	outc 'F'
+	outc ':'
 	
 	%load(!op(a, %SEG_DEBUG_GLOBALS, %G_ARGS_PTR)) ; memdump normal args
 	%stack:pushr()
@@ -114,7 +114,7 @@
 	%stack:pushr()
 	%if_else { ldm ,
 		%call(memdump)
-		outc 124
+		outc '|'
 	,
 		%stack:dropN(2)
 	}

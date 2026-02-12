@@ -36,6 +36,7 @@ enum TokenTypes {
 	Tnumeric,
 	Talpha,
 	Tstring,
+	Tchar,
 
 	Tspecial,
 	Tcolon,
@@ -202,7 +203,7 @@ struct Loc {
 };
 struct Token {
 	TokenTypes type=TokenCount;
-	string data;
+	string data; // contains only data - no quotes, quotes added when mentioning in error
 	list<Token> tlist;
 
 	Loc loc;
@@ -268,18 +269,19 @@ struct Token {
 		assert(type == Tlist);
 		return data.at(0) + 2 - (data.at(0) == '(');
 	}
-	string toStr() {
+	// quoted: quote strings & chars?
+	string toStr(bool quoted=false) {
 		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
-			if (isSeparated()) out.push_back(',');
 			out.push_back(tlistCloseChar());
 		} else if (type == TIexpansion) {
 			out = "%" + out;
+		} else if (type == Tstring && quoted) {
+			return '"' + data + '"';
+		} else if (type == Tchar && quoted) {
+			return '\'' + data + '\'';
 		}
-		// } else if (type == Tstring && quotedStr) {
-		// 	return '"' + data + '"';
-		// }
 		return out;
 	}
 	bool isSeparated() {
@@ -415,16 +417,16 @@ struct Instr {
 
 	string opcodeStr;
 	Loc opcodeLoc;
-	vector<string> immFields;
+	list<Token> immediates;
 
 	bool needsReparsing = false; // references smth which might change
 
 	Instr() {}
-	Instr(string opcodeStr,	Loc opcodeLoc) {
+	Instr(Loc opcodeLoc) {
 		this->opcodeStr = opcodeStr;
 		this->opcodeLoc = opcodeLoc;
 	}
-	bool hasImm() { return immFields.size() != 0; }
+	bool hasImm() { return !immediates.empty(); }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
 	bool hasReg()  { return suffixes.reg != Rno; }
@@ -432,9 +434,9 @@ struct Instr {
 
 	string toStr() {
 		string out = opcodeStr;
-		for (string s : immFields) {
+		for (Token& token : immediates) {
 			out.push_back(' ');
-			out.append(s);
+			out.append(token.toStr(true));
 		}
 		return out;
 	}
@@ -509,7 +511,6 @@ struct Flags {
 Flags flags;
 
 // checks --------------------------------------------------------------------
-#define errorQuoted(s) " '" + (s) + "'"
 #define unreachable() assert(("Unreachable", false));
 
 #define continueOnFalse(cond) if (!(cond)) { errorLess = false; continue; }
@@ -526,6 +527,11 @@ bool SupressErrors = false;
 
 #define returnOnErrSupress() if (SupressErrors) return false;
 #define returnOnWarningSupress() if (SupressErrors || !FLAG_enableWarnings) return false;
+
+string errorQuoted(string s) {
+	if (s.at(0) == '\'' || s.at(0) == '"') return ' ' + s;
+	return " '" + s + "'";
+}
 
 vector<string> errors;
 void raiseErrors() { // TODO sort errors based on line and file
@@ -553,21 +559,21 @@ void _raiseNote(string message) {
 
 bool raiseError(string message, Token token, string note="", bool strict=false) {
 	returnOnErrSupress();
-	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr()) "\n";
+	string err = token.loc.toStr() + " ERROR: " + message + errorQuoted(token.toStr(true)) + "\n";
 	addError(err, strict);
 	if (note.size()) _raiseNote(note);
 	return false;
 }
 bool raiseError(string message, Instr instr, string note="", bool strict=false) {
 	returnOnErrSupress();
-	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) "\n";
+	string err = instr.opcodeLoc.toStr() + " ERROR: " + message + errorQuoted(instr.toStr()) + "\n";
 	addError(err, strict);
 	if (note.size()) _raiseNote(note);
 	return false;
 }
 bool raiseWarning(string message, Instr instr) {
 	returnOnWarningSupress();
-	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) "\n";
+	string err = instr.opcodeLoc.toStr() + " WARNING: " + message + errorQuoted(instr.toStr()) + "\n";
 	addError(err, false);
 	return false;
 }
@@ -609,7 +615,7 @@ private:
 	/// handles the ending of a single token list
 	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 12, "Exhaustive closeList definition");
+		static_assert(TokenCount == 13, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -664,7 +670,7 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
-		static_assert(TokenCount == 12, "Exhaustive Scope::next definition");
+		static_assert(TokenCount == 13, "Exhaustive Scope::next definition");
 		++itrs.top();
 		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
@@ -775,9 +781,9 @@ public:
 		return tlists.size() && insideTlistOfType(Tlist);
 	}
 	bool tokenizeCloseList(char closeChar, Loc& loc) {
-		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" errorQuoted(string(1, closeChar)), loc);
+		checkReturnOnFail(tokenizeHasTlist(), "Unexpected token list termination" + errorQuoted(string(1, closeChar)), loc);
 		Token &tlist = tlists.top().get();
-		checkReturnOnFail(closeChar == tlist.tlistCloseChar(), "Unmatched token list delimiters" errorQuoted(string(1, closeChar)), loc,
+		checkReturnOnFail(closeChar == tlist.tlistCloseChar(), "Unmatched token list delimiters" + errorQuoted(string(1, closeChar)), loc,
 				"Current tlist start: " + tlist.loc.toStr());
 		closeList();
 		return true;
@@ -892,17 +898,48 @@ string getCharRun(string s) {
 	} while (i < s.size() && !!isdigit(s.at(i)) == num && !!isalpha(s.at(i)) == alpha && !!isspace(s.at(i)) == space);
 	return out;
 }
+const map<char, char> escapeSequences = {
+	{'n','\n'},
+	{'t','\t'},
+	{'r','\r'},
+	{'\\','\\'},
+	{'"','"'},
+	{'\'','\''},
+	{'0','\0'},
+};
+char escapeCharToken(Token& t) {
+	assert(t.data.size() == 1 || (t.data.size() == 2 && escapeSequences.count(t.data.at(1))));
+	return t.data.size() == 2 ? escapeSequences.at(t.data.at(1)) : t.data.at(0);
+}
+bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
+	run = "";
+	for (size_t i = 0; i < line.size(); ++i) {
+		if (line[i] == '\\') {
+			checkReturnOnFail(++i < line.size() && escapeSequences.count(line.at(i)), "Invalid escape sequence" + errorQuoted(line.substr(i-1, 2)), loc);
+			run.push_back('\\');
+			run.push_back(line[i]);
+			col += 2;
+		} else if (line[i] == first) {
+			line = line.substr(++i);
+			col ++;
+			return true;
+		} else {
+			run.push_back(line[i]);
+			col ++;
+		}
+	}
+	return check(false, "Expected string or character termination", loc);
+}
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
 					scope.next(scope.currToken());
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 12, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 13, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
 		continued = false; firstOnLine = true;
-		line = line.substr(0, line.find(';'));
 		int col = 1;
 		while (line.size()) {
 			char first = line.at(0);
@@ -914,6 +951,9 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 			keepContinued = true;
 			if (isspace(first)) {
 				continued = false;
+				continue;
+			} else if (first == ';') {
+				line = "";
 				continue;
 			}
 			if (isdigit(first)) {
@@ -932,16 +972,16 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 					continued = false;
 					addToken(Tseparator);
 					keepContinued = false;
-				} else if (first == '"') {
-					size_t quotePos = line.find('"');
-					if (!check(quotePos != string::npos, "Expected string termination", loc)) {
-						line = ""; continue;
+				} else if (first == '"' || first == '\'') {
+					if (!chopStrlit(first, line, run, col, loc)) {
+						line = "";
+						continue;
 					}
-					run = line.substr(0, quotePos);
-					col +=++ quotePos;
+					if (first == '\'') {
+						checkContinueOnFail(run.size() == 1 || (run.size() == 2 && run[0] == '\\'), "Invalid character value", loc);
+					}
 					continued = false; keepContinued = false;
-					addToken(Tstring);
-					line = line.substr(quotePos);
+					addToken(first == '"' ? Tstring : Tchar);
 				} else {
 					addToken(Tspecial);
 				}
@@ -968,18 +1008,18 @@ string noteWhereDefined(Loc& loc, Loc& definedLoc) {
 	return "Defined at " + definedLoc.toStr();
 }
 bool checkIdentRedefinitions(Scope& scope, string name, Loc& loc, bool label, Namespace* currNamespace=nullptr) {
-	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" errorQuoted(name), loc);
-	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" errorQuoted(name), loc)
+	checkReturnOnFail(verifyNotInstrOpcode(name), "Name shadows an instruction" + errorQuoted(name), loc);
+	checkReturnOnFail(!DefiningDirectivesSet.count(name) && !BuiltinDirectivesSet.count(name), "Name shadows a builtin directive" + errorQuoted(name), loc)
 	if (label) {
-		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" errorQuoted(name), loc, noteWhereDefined(loc, parseCtx.strToLabel[name].loc));
+		checkReturnOnFail(parseCtx.strToLabel.count(name) == 0, "Label redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, parseCtx.strToLabel[name].loc));
 	} else {
 		assert(currNamespace);
-		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->defines[name].loc));
-		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->macros[name].loc));
-		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" errorQuoted(name), loc, noteWhereDefined(loc, IdToNamespace[currNamespace->innerNamespaces[name]].loc));
+		checkReturnOnFail(currNamespace->defines.count(name) == 0, "Define redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->defines[name].loc));
+		checkReturnOnFail(currNamespace->macros.count(name) == 0, "Macro redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, currNamespace->macros[name].loc));
+		checkReturnOnFail(currNamespace->innerNamespaces.count(name) == 0, "Namespace redefinition" + errorQuoted(name), loc, noteWhereDefined(loc, IdToNamespace[currNamespace->innerNamespaces[name]].loc));
 		int namespaceId = scope.currNamespaceId();
 		if (lookupNamespaceAbove(name, namespaceId, loc, true)) {
-			raiseWarning("Definition shadowing existing namespace" errorQuoted(name), loc);
+			raiseWarning("Definition shadowing existing namespace" + errorQuoted(name), loc);
 		};
 	}
 	return true;
@@ -994,31 +1034,32 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 	if (sameLine) checkReturnOnFail(!scope->firstOnLine, errMissing, loc);
 	outToken = scope.eatenToken(); loc = outToken.loc;
 	return check(outToken.type == type, "Expected " +
-		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
+		string(type == Tnumeric ? "numeric" : type == Talpha ? "alpha" : type == Tstring ? "string" : type == Tchar ? "char" : type == Tspecial ? "special" : type == Tlist ? "list" : "another")
 		+ " token type, got", outToken);
 }
-void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0) {
-	static_assert(TokenCount == 12, "Exhaustive eatTokenRun definition");
+void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
+	static_assert(TokenCount == 13, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
 	set<TokenTypes> allowedTypes = {Tnumeric, Talpha, Tspecial};
 	if (eatAnything >= 1) allowedTypes.insert(Tcolon);
 	if (eatAnything >= 2) allowedTypes.insert(Tstring);
+	if (eatAnything >= 2) allowedTypes.insert(Tchar);
 	if (eatAnything >= 3) allowedTypes.insert(Tlist);
 	while (scope.hasNext() && (!scope->firstOnLine || (canStartLine && first)) && (first || scope->continued) && allowedTypes.count(scope->type)) {
-		name += scope.eatenToken().toStr();
+		name += scope.eatenToken().toStr(allowQuotes);
 		first = false;
 	}
 }
-bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0) {
+bool eatIdentifier(Scope& scope, string& name, Loc& loc, string identPurpose, bool canStartLine=false, int eatAnything=0, bool allowQuotes=false) {
 	Loc prevLoc = loc;
-	eatTokenRun(scope, name, loc, canStartLine, eatAnything);
+	eatTokenRun(scope, name, loc, canStartLine, eatAnything, allowQuotes);
 	return check(name != "", "Missing " + identPurpose + " name", prevLoc);
 }
 #define directiveEatIdentifier(identPurpose, definition, eatAnything) \
 	returnOnFalse(eatIdentifier(scope, name, loc, identPurpose, false, eatAnything)); \
-	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" errorQuoted(name), loc)); \
+	returnOnFalse(isValidIdentifier(name, "Invalid " + string(identPurpose) + " name" + errorQuoted(name), loc)); \
 	if (definition) returnOnFalse(checkIdentRedefinitions(scope, name, loc, false, &scope.topNamespace()));
 #define directiveEatToken(type, missingErr, sameLine) returnOnFalse(eatToken(scope, loc, token, type, missingErr, sameLine));
 
@@ -1047,7 +1088,7 @@ string tokenizeNewModule(fs::path abspath, Scope& scope, bool mainModule=false) 
 // preprocess -------------------------------------------------------------------------
 bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors=false);
 bool preprocess(Scope& scope);
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine);
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine, bool allowQuotes=false);
 
 bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 	string name; bool first = true;
@@ -1058,8 +1099,18 @@ bool arglistFromTlist(Scope& scope, Loc& loc, Macro& mac) {
 		}
 		first = false;
 		directiveEatIdentifier("macro arg", true, 1);
-		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" errorQuoted(name), loc);
+		checkReturnOnFail(mac.nameToArgIdx.count(name) == 0, "Macro argument redefinition" + errorQuoted(name), loc);
 		mac.addArg(name, loc); // TODO macArg.loc not checked nor used
+	}
+	return true;
+}
+bool eatDefineValue(Scope& scope, Token& outToken, Loc& loc, bool sameLine) {
+	TokenTypes type = scope.hasNext() && scope->type == Tchar ? Tchar : Tnumeric;
+	returnOnFalse(eatToken(scope, loc, outToken, type, "Define value expected", sameLine));
+	if (type == Tchar) {
+		outToken = Token::fromCtx(Tnumeric, to_string((int)escapeCharToken(outToken)), outToken);
+		assert(to_string(stoi(outToken.data)) == outToken.data); // check good int
+		assert(stoi(outToken.data) <= WORD_MAX_VAL);
 	}
 	return true;
 }
@@ -1070,12 +1121,12 @@ bool processDefineDef(Scope& scope, string name, Loc loc, Loc percentLoc) {
 		checkReturnOnFail(!token.continued, "Unexpected continued field", token);
 		processArglistWrapper( bool retval = preprocess(scope); );
 		processArglistWrapper(
-			retval = eatToken(scope, loc, numeric, Tnumeric, "Define value expected", false);
+			retval = eatDefineValue(scope, numeric, loc, false);
 			retval = retval && check(!scope.hasNext(), "Unexpected token after value", scope.currToken());
 		);
 		scope.eatenToken(); // tlist
 	} else {
-		returnOnFalse(eatToken(scope, loc, numeric, Tnumeric, "Define value expected", true));
+		returnOnFalse(eatDefineValue(scope, numeric, loc, true));
 	}
 	scope.topNamespace().defines[name] = Define(name, percentLoc, numeric.data);
 	return true;
@@ -1161,7 +1212,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, string identPurpose="directive") {
-	static_assert(TokenCount == 12, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 13, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1240,7 +1291,7 @@ bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool
 		if (!currNamespace->isUpperAccesible) break;
 		namespaceId = currNamespace->upperNamespaceId;
 	}
-	check(supressErrors, "Namespace not found" errorQuoted(directiveName), loc);
+	check(supressErrors, "Namespace not found" + errorQuoted(directiveName), loc);
 	return false;
 }
 bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc, int namespaceId, bool namespaceSeen, Scope& scope) {
@@ -1254,8 +1305,8 @@ bool processUseDirective(string directiveName, Token& percentToken, Loc lastLoc,
 		// NOTE shouldn't allow expansion body leakages bcs '%' token is never on same line
 		return expandMacroUse(scope, namespaceId, directiveName, percentToken);
 	}
-	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" errorQuoted(directiveName), lastLoc);
-	return check(false, "Undeclared identifier" errorQuoted(directiveName), lastLoc);
+	checkReturnOnFail(!namespaceSeen && !namespaceDefined(directiveName, namespaceId, true), "Namespace used as directive" + errorQuoted(directiveName), lastLoc);
+	return check(false, "Undeclared identifier" + errorQuoted(directiveName), lastLoc);
 }
 bool lookupName(Token& percentToken, string directiveName, list<string>& prefixes, list<Loc>& locs, Scope& scope) {
 	int namespaceId = scope.currNamespaceId(); bool namespaceSeen = false;
@@ -1266,7 +1317,7 @@ bool lookupName(Token& percentToken, string directiveName, list<string>& prefixe
 		lookupFinalAbove(directiveName, namespaceId, namespaceSeen);
 	}
 	while (prefixes.size()) {
-		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" errorQuoted(directiveName), locs.front());
+		checkReturnOnFail(namespaceDefined(directiveName, namespaceId), "Namespace not found" + errorQuoted(directiveName), locs.front());
 		directiveName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
 	}
 	return processUseDirective(directiveName, percentToken, locs.front(), namespaceId, namespaceSeen, scope);
@@ -1280,9 +1331,9 @@ bool processUsing(Loc loc, Scope& scope) {
 	returnOnFalse(lookupNamespaceAbove(firstName, namespaceId, locs.front()));
 	while (prefixes.size()) {
 		firstName = prefixes.front(); prefixes.pop_front(); locs.pop_front();
-		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" errorQuoted(firstName), locs.front());
+		checkReturnOnFail(namespaceDefined(firstName, namespaceId), "Namespace not found" + errorQuoted(firstName), locs.front());
 	}
-	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already used" errorQuoted(firstName), locs.back());
+	check(scope.currNamespace().usedNamespaces.insert(namespaceId).second, "Namespace already used" + errorQuoted(firstName), locs.back());
 	return true;
 }
 fs::path processIncludePath(string str, Scope& scope) {
@@ -1322,12 +1373,12 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 		if (directiveName != "define" && directiveName != "macro") {
 			checkReturnOnFail(!scope.insideMacro(), dirType + " not allowed inside macro", percentToken.loc);
 		}
-		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" errorQuoted(directiveName), percentToken.loc);
+		checkReturnOnFail(percentToken.firstOnLine, "Unexpected directive here" + errorQuoted(directiveName), percentToken.loc);
 	}
 	return true;
 }
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 12, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 13, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
 	returnOnFalse(complexDirectiveName(scope, directiveName, prefixes, locs, loc));
 	if (DefiningDirectivesSet.count(directiveName)) {
@@ -1369,7 +1420,7 @@ bool preprocess(Scope& scope) {
 	return errorLess;
 }
 // token stream parsing -----------------------------------
-bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine) {
+bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, bool canStartLine, bool allowQuotes) {
 	string fragment; Loc fragLoc = loc;
 	checkReturnOnFail(scope.hasNext() && (!scope->firstOnLine || canStartLine), "Missing " + purpose + " name", loc);
 	do {
@@ -1384,14 +1435,27 @@ bool eatComplexIdentifier(Scope& scope, Loc loc, string& ident, string purpose, 
 			scope.eatenToken();
 			ident.append(fragment);
 		} else {
-			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2));
+			returnOnFalse(eatIdentifier(scope, fragment, fragLoc, purpose + " field", canStartLine, 2, allowQuotes));
 			canStartLine = false;
 			ident.append(fragment);
 		}
 	} while (scope.hasNext() && scope->continued);
 	if (purpose == "instr" || purpose == "immediate" || purpose == "directive") return true;
-	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" errorQuoted(ident), loc));
+	returnOnFalse(isValidIdentifier(ident, "Invalid " + purpose + " name" + errorQuoted(ident), loc));
 	return checkIdentRedefinitions(scope, ident, loc, purpose == "label", &scope.topNamespace());
+}
+bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
+	string name = "";
+	returnOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true, true));
+	checkReturnOnFail(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc);
+	instr.opcodeStr = name;
+	while (scope.hasNext() && !scope->firstOnLine) {
+		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
+		if (scope->type == Tnumeric || scope->type == Tchar || scope->type == Tstring) immToken.type = scope->type;
+		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false));
+		instr.immediates.push_back(immToken);
+	}
+	return true;
 }
 
 bool dumpImpl(optional<ofstream>& dumpFile, int indent, string s) {
@@ -1408,7 +1472,6 @@ void parseTokenStream(Scope& scope) {
 	Loc loc;
 	bool labelOnLine;
 	bool errorLess; // ignored
-outer_loop_continue:
 	while (scope.advanceIteration()) {
 		if (scope.getCurrModule() != parseCtx.lastModule) {
 			parseCtx.lastModule = scope.getCurrModule();
@@ -1418,21 +1481,14 @@ outer_loop_continue:
 		labelOnLine = labelOnLine && !top.firstOnLine;
 		if (top.type == Tcolon) {
 			scope.eatenToken();
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label", false));
+			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "label", false, true));
 			checkContinueOnFail(!labelOnLine, "Max one label per line", loc);
 			labelOnLine = true;
 			parseCtx.strToLabel.insert(pair(name, Label(name, parseCtx.instrs.size(), loc)));
 			dump(':' + name);
 		} else if (top.type == Talpha) {
-			// NOTE ignores whole instr on any err in parsing
-			eatLineOnFalse(eatComplexIdentifier(scope, loc, name, "instr", true));
-			eatLineOnFalse(check(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc)); // note for bad label definition
-			Instr instr(name, loc);
-			while (scope.hasNext() && !scope->firstOnLine) {
-				string immFrag;
-				eatLineOnFalse(eatComplexIdentifier(scope, loc, immFrag, "immediate", false), goto outer_loop_continue);
-				instr.immFields.push_back(immFrag);
-			}
+			Instr instr(loc);
+			eatLineOnFalse(parseInstrTS(scope, loc, instr));
 			dump(instr.toStr());
 			parseCtx.instrs.push_back(instr);
 		} else if (top.type == TIexpansion || top.type == TInamespace) {
@@ -1513,17 +1569,33 @@ bool verifyNotInstrOpcode(string name) {
 	SupressErrors = false;
 	return ans;
 }
-bool parseInstrImmediate(Instr& instr) {
-	checkReturnOnFail(instr.immFields.size() == 1, "Only single immediate allowed", instr);
-	string immVal = instr.immFields[0];
-	if (parseCtx.strToLabel.count(immVal) > 0) {
-		instr.immediate = parseCtx.strToLabel[immVal].addr;
-		if (immVal == "end") instr.needsReparsing = true;
-		return true;
+bool parseNumericalImmediate(Token& imm, Instr& instr) {
+	if (imm.type == Tnumeric) {
+		checkReturnOnFail(isdigit(imm.data.at(0)), "Invalid instruction immediate", instr);
+		instr.immediate = stoi(imm.data);
+		checkReturnOnFail(to_string(instr.immediate) == imm.data, "Invalid instruction immediate", instr);
+	} else if (imm.type == Tchar) {
+		instr.immediate = escapeCharToken(imm);
+	} else {
+		unreachable();
 	}
-	checkReturnOnFail(isdigit(immVal.at(0)), "Invalid instruction immediate", instr);
-	instr.immediate = stoi(immVal);
-	checkReturnOnFail(to_string(instr.immediate) == immVal, "Invalid instruction immediate", instr);
+	return true;
+}
+bool parseInstrImmediate(Instr& instr) {
+	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
+	Token& imm = instr.immediates.front();
+	if (imm.type == Talpha) {
+		if (!parseCtx.strToLabel.count(imm.data)) {
+			checkReturnOnFail(_validIdentChar(imm.data.at(0)), "Invalid instruction immediate", instr);
+			return check(false, "Undefined label", instr);
+		}
+		instr.immediate = parseCtx.strToLabel[imm.data].addr;
+		if (imm.data == "end") instr.needsReparsing = true;
+	} else if (imm.type == Tnumeric || imm.type == Tchar) {
+		returnOnFalse(parseNumericalImmediate(imm, instr));
+	} else {
+		checkReturnOnFail(false, "Invalid instruction immediate", instr);
+	}
 	return check(0 <= instr.immediate && instr.immediate <= WORD_MAX_VAL, "Value of the immediate is out of bounds", instr);
 }
 bool parseInstrFields(Instr& instr) {
@@ -2154,8 +2226,8 @@ fs::path _masfixFolder = fs::exists(__FILE__) ?
 fs::path checkPathArg(string arg, bool file) {
 	fs::path p = fs::weakly_canonical(arg);
 	if (!fs::exists(p)) p = _masfixFolder/p;
-	checkUsage(fs::exists(p), "Invalid argument or file not found" errorQuoted(arg));
-	if (file) checkUsage(fs::is_regular_file(p), "File expected" errorQuoted(arg));
+	checkUsage(fs::exists(p), "Invalid argument or file not found" + errorQuoted(arg));
+	if (file) checkUsage(fs::is_regular_file(p), "File expected" + errorQuoted(arg));
 	else if (fs::is_regular_file(p)) p = p.parent_path();
 	return p;
 }
@@ -2193,7 +2265,7 @@ Flags processLineArgs(int argc, char *argv[]) {
 		} else if (arg == "-D" || arg == "-d" || arg == "--dump") {
 			flags.dump = true;
 		} else {
-			checkUsage(arg.at(0) != '-', "Unknown argument" errorQuoted(arg));
+			checkUsage(arg.at(0) != '-', "Unknown argument" + errorQuoted(arg));
 			flags.inputPath = checkPathArg(arg, true);
 		}
 	}
@@ -2202,12 +2274,12 @@ Flags processLineArgs(int argc, char *argv[]) {
 }
 ifstream openInputFile(fs::path path) {
 	ifstream ifs(path);
-	checkCond(ifs.good(), "The input file" errorQuoted(path.string()) " couldn't be opened");
+	checkCond(ifs.good(), "The input file" + errorQuoted(path.string()) + " couldn't be opened");
 	return ifs;
 }
 ofstream openOutputFile(fs::path path) {
 	ofstream ofs(path);
-	checkCond(ofs.good(), "The output file" errorQuoted(path.string()) " couldn't be opened");
+	checkCond(ofs.good(), "The output file" + errorQuoted(path.string()) + " couldn't be opened");
 	return ofs;
 }
 int runCmdEchoed(vector<string> args, Flags& flags, bool exitOnErr=true) {

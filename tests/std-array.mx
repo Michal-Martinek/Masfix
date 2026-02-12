@@ -15,7 +15,7 @@
 %func { int_lt_with_emit, 2, 0,
 	%seg:push(%arg, 0)
 	outur
-	outc 60 ; '<'
+	outc '<'
 	%seg:push(%arg, 1)
 	%print_spaced(outur)
 	%call(uint_lt)
@@ -175,7 +175,7 @@
 	)
 
 	; test empty[0]
-	outc 69
+	outc 'E'
 	%seg:push_addr(%local, %array:sizeof)
 	%stack:push(0)
 	%call(index)

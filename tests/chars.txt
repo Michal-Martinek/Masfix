@@ -1,0 +1,51 @@
+:returncode 1
+
+:stdout 13
+56'8"	
+8^13
+
+
+:stderr 2149
+tests\chars.mx:16:1 ERROR: Expected string or character termination
+tests\chars.mx:17:1 ERROR: Expected string or character termination
+tests\chars.mx:18:1 ERROR: Invalid character value
+tests\chars.mx:22:1 ERROR: Invalid escape sequence '\'
+tests\chars.mx:23:1 ERROR: Expected string or character termination
+tests\chars.mx:24:1 ERROR: Expected string or character termination
+tests\chars.mx:35:3 ERROR: Expected string or character termination
+tests\chars.mx:36:1 ERROR: Invalid character value
+tests\chars.mx:36:3 ERROR: Expected string or character termination
+tests\chars.mx:41:1 ERROR: Expected string or character termination
+tests\chars.mx:43:1 ERROR: Invalid escape sequence '\;'
+tests\chars.mx:46:15 ERROR: Invalid define name 'LMA\0'
+tests\chars.mx:2:1 ERROR: Unexpected token ';'
+tests\chars.mx:3:1 ERROR: Unexpected token '%'
+tests\chars.mx:4:1 ERROR: Unexpected token "%"
+tests\chars.mx:5:1 ERROR: Unexpected token '!'
+tests\chars.mx:6:1 ERROR: Unexpected token "!"
+tests\chars.mx:7:1 ERROR: Unexpected token '$'
+tests\chars.mx:8:1 ERROR: Unexpected token "$"
+tests\chars.mx:9:1 ERROR: Unexpected token ','
+tests\chars.mx:10:1 ERROR: Unexpected token ","
+tests\chars.mx:11:1 ERROR: Unexpected token ':'
+tests\chars.mx:12:1 ERROR: Unexpected token ":"
+tests\chars.mx:13:1 ERROR: Unexpected token '('
+tests\chars.mx:14:1 ERROR: Unexpected token "("
+tests\chars.mx:19:1 ERROR: Unexpected token ""
+tests\chars.mx:20:1 ERROR: Unexpected token ' '
+tests\chars.mx:21:1 ERROR: Unexpected token '"'
+tests\chars.mx:25:1 ERROR: Unexpected token '\\'
+tests\chars.mx:26:1 ERROR: Unexpected token '\0'
+tests\chars.mx:27:1 ERROR: Unexpected token "\r\n\0"
+tests\chars.mx:29:1 ERROR: Unexpected token '\''
+tests\chars.mx:30:1 ERROR: Unexpected token '\"'
+tests\chars.mx:31:1 ERROR: Unexpected token '"'
+tests\chars.mx:32:1 ERROR: Unexpected token "\""
+tests\chars.mx:33:1 ERROR: Unexpected token "'"
+tests\chars.mx:34:1 ERROR: Unexpected token "\'"
+tests\chars.mx:35:1 ERROR: Unexpected token ""
+tests\chars.mx:39:1 ERROR: Unexpected token ';'
+tests\chars.mx:42:1 ERROR: Unexpected token '\'
+tests\chars.mx:37:1 ERROR: Unknown condition 'lll ' ' ' ''
+
+

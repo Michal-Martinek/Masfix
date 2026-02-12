@@ -6,21 +6,21 @@
 
 ; false while cond
 %while {ld 0,
-	outc 65
+	outc 'E'
 }
 %do_while {ld 0,
-	outc 66
+	outc 'B'
 }
-outc 10
+outc '\n'
 
 ; generalized for
 ld 107
 %for_full(7, 10,
 	%stack:top()
 	outum
-	outc 32
+	outc ' '
 )
-outc 10
+outc '\n'
 
 %store(%MEMORY_LAYOUT:SEG_TEMP, 7)
 %do_while {
@@ -35,7 +35,7 @@ outc 10
 :no_continue
 	outum
 }
-outc 10
+outc '\n'
 
 ; for loop
 ld 10
@@ -44,5 +44,5 @@ ld 10
 	outum
 	ld< 3 ; should be irrelevant
 }
-outc 10
+outc '\n'
 %dumpStackOverrun(7)

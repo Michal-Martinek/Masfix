@@ -18,13 +18,13 @@
 	outu %numerator
 	outc %char_u
 	outu %denominator
-	outc 61
+	outc '='
 	%callOp(%op, %numerator, %denominator)
 	outur
 }
 %macro testDivRem(numerator, denominator) {
 	%testOp(divide, 47, %numerator, %denominator)
-	outc 37
+	outc '%'
 	mov %MEMORY_LAYOUT:SEG_TEMP
 	ldt %denominator
 	str %numerator
@@ -76,14 +76,14 @@ outc 10
 ; which power to break -> status
 %func {test2Powers, 1, 2,
 	; locals: maxPwr, currPwr
-	%print_spaced(outc 105) ; collumn headers
+	%print_spaced(outc 'i') ; collumn headers
 	%print_spaced(
 		outu 2
-		outc 94
-		outc 105
+		outc '^'
+		outc 'i'
 	)
-	outc 47
-	outc 10
+	outc '/'
+	outc '\n'
 
 	ld 14
 	%callPwrStrLocal(2, 0) ; maxPwr = 2 ** 14
@@ -119,18 +119,18 @@ outc 10
 			%stack:drop()
 			lnem ; maxPwr >> idx != divide(maxPwr, currPwr)
 		,
-			outc 32
-			outc 69 ; emit error
-			outc 64
+			outc ' '
+			outc 'E' ; emit error
+			outc '@'
 			%stack:top()
 			%print_endl(outum) ; idx
 			%return_imm(test2Powers, 69) ; return when values mismatch
 		}
-		outc 10
+		outc '\n'
 	}
 	%print_spaced(
-		outc 79 ; OK
-		outc 75
+		outc 'O'
+		outc 'K'
 	)
 	%stack:reserve(5) ; test correct stack alignment on function exit
 	ld 0 ; retval
@@ -152,7 +152,7 @@ outc 10
 	; ld %label
 	; lds test_start
 	; outur
-	outc 45
+	outc '-'
 	mov %retaddrLocation
 	strs test_start
 	str 1234 ; --
@@ -178,8 +178,8 @@ outc 10
 	outc 10
 
 	%print_endl(
-		outc 76
-		outc 115
+		outc 'L'
+		outc 's'
 	)
 	%showLabelOffset(module_end, 17)
 	%showLabelOffset(test_return, 23)
@@ -193,8 +193,8 @@ outc 10
 	%stack:push(%value)
 	%print_spaced( outum )
 	%print_spaced(
-		outc 45
-		outc 62
+		outc '-'
+		outc '>'
 	)
 	%call(round_up_to_2_power)
 	%print_endl(
