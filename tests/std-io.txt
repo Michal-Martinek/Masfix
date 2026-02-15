@@ -1,0 +1,13 @@
+:returncode 0
+
+:stdout 41
+" String -- line, 89, !%$ "
+^AAA auto$
+66
+
+:stdin 37
+ String -- line, 89, !%$ 
+AAA auto
+B
+
+

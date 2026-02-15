@@ -1,5 +1,7 @@
 %include "control"
 %include "memory"
+%include "procedures"
+%include "strings"
 
 %macro print_spaced(instr) {
 	%instr
@@ -51,6 +53,20 @@
 		ipc
 		lrge 32
 	}
+}
+
+; str ->
+; read line (line end stripped) to string instance at str
+%void_func{ read_line, 1, 0,
+	%while {
+		%char:stdin_valid_char()
+	,
+		%seg:push(%arg, 0)
+		inc
+		%stack:pushr()
+		%call(push_back)
+	}
+	inl
 }
 
 

@@ -1,0 +1,29 @@
+%include "procedures"
+%include "math"
+%include "strings"
+%include "io"
+
+%void_func{ main, 0, !op(t, 2, %string:sizeof),
+	%seg:local(0, %string:init())
+	%seg:push_addr(%local, 0)
+	%call(read_line)
+
+	%seg:push_addr(%local, 0)
+	%string:repr()
+	outc '\n'
+
+	%seg:local(%string:sizeof, %string:init())
+	%seg:push_addr(%local, %string:sizeof)
+	%call(read_line)
+
+	outc '^'
+	%seg:push_addr(%local, %string:sizeof)
+	%call(string_print)
+	%print_endl(
+		outc '$'
+	)
+
+	inc
+	outur
+}
+%call(main)

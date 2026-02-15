@@ -1,0 +1,35 @@
+%include "structs"
+%include "procedures"
+%include "array"
+
+; char array with one word per character
+%namespace string {
+	%struct:begin()
+	%struct:field(values, %array:sizeof)
+
+	; h @ string
+	; initializes to empty state
+	%macro init() {
+		%array:init()
+	}
+	; h @ string
+	%macro deinit() {
+		%array:deinit()
+	}
+
+	; this -> (stdout)
+	%void_method{ string_print, 1, 0,
+		%array:foreach {
+			outcm
+		}
+	}
+	; this -> (stdout)
+	; prints string contents with quotes
+	%macro repr() {
+		outc '"'
+		%call(string_print)
+		outc '"'
+	}
+
+	%struct:end()
+}
