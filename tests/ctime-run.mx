@@ -73,9 +73,8 @@ outc !add(9)
 outu !add(!add(4))
 %add(!add(3))
 
-%endl()
-:_(!add(7)) ; NOTE output changes with label addr
-outu _(!ldEmit(8))
+:_(!add(7))
+ld _(!ldEmit(8))
 
 
 %macro seeAsmLength(mac) {
