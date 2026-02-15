@@ -1,0 +1,50 @@
+:returncode 1
+
+:stderr 3240
+tests\strings-tokenization.mx:1:1 ERROR: Expected string or character termination
+tests\strings-tokenization.mx:5:1 ERROR: Expected string or character termination
+tests\strings-tokenization.mx:6:13 ERROR: Expected string or character termination
+tests\strings-tokenization.mx:8:6 ERROR: Expected string or character termination
+tests\strings-tokenization.mx:9:13 ERROR: Expected string or character termination
+tests\strings-tokenization.mx:38:6 ERROR: Invalid character value
+tests\strings-tokenization.mx:10:21 ERROR: Invalid directive name 'no-where-is-it'
+tests\strings-tokenization.mx:14:3 ERROR: Missing define name
+tests\strings-tokenization.mx:36:24 ERROR: Expected numeric token type, got "8"
+tests\strings-tokenization.mx:38:11 ERROR: Undeclared identifier 'boob'
+tests\strings-tokenization.mx:40:4 ERROR: Missing directive name
+tests\strings-tokenization.mx:41:5 ERROR: Missing directive name
+tests\strings-tokenization.mx:42:4 ERROR: Missing directive name
+tests\strings-tokenization.mx:43:7 ERROR: Missing directive name
+tests\strings-tokenization.mx:44:10 ERROR: Missing directive name
+tests\strings-tokenization.mx:45:5 ERROR: Missing directive name
+tests\strings-tokenization.mx:2:1 ERROR: Unexpected token ""
+tests\strings-tokenization.mx:3:1 ERROR: Unexpected token " "
+tests\strings-tokenization.mx:4:1 ERROR: Unexpected token "Hello, world!"
+tests\strings-tokenization.mx:9:1 ERROR: Label definitions BEGIN with ':'
+tests\strings-tokenization.mx:10:1 ERROR: Unexpected token "got the loc bro?"
+tests\strings-tokenization.mx:11:1 ERROR: Unexpected token "( } ) '!"
+tests\strings-tokenization.mx:13:1 ERROR: Unexpected token '()'
+tests\strings-tokenization.mx:17:9 ERROR: Unexpected token "Emmet"
+tests\strings-tokenization.mx:19:1 ERROR: Unexpected token '()'
+tests\strings-tokenization.mx:22:1 ERROR: Invalid label name 'whos there'
+tests\strings-tokenization.mx:26:1 ERROR: Missing immediate field name
+tests\strings-tokenization.mx:29:24 ERROR: Simple immediate field expected
+tests\strings-tokenization.mx:32:1 ERROR: Invalid label name "label"
+tests\strings-tokenization.mx:35:1 ERROR: Unexpected token '7'
+tests\strings-tokenization.mx:39:1 ERROR: Unexpected token "e"
+tests\strings-tokenization.mx:40:1 ERROR: Unexpected token "e"
+tests\strings-tokenization.mx:41:1 ERROR: Unexpected token "e"
+tests\strings-tokenization.mx:42:1 ERROR: Unexpected token "!"
+tests\strings-tokenization.mx:43:1 ERROR: Missing immediate field name
+tests\strings-tokenization.mx:45:3 ERROR: Unexpected token ""
+tests\strings-tokenization.mx:6:1 ERROR: Unknown instruction 'nuefounland'
+tests\strings-tokenization.mx:8:1 ERROR: Unknown instruction 'Where'
+tests\strings-tokenization.mx:24:1 ERROR: Unknown instruction 'a "\n"'
+tests\strings-tokenization.mx:25:1 ERROR: Missing condition 'b s "trin" g'
+tests\strings-tokenization.mx:27:1 ERROR: Unknown instruction 'debug aa "sd" $a " " "ld" " 	 " "\t"'
+tests\strings-tokenization.mx:28:1 ERROR: Unknown instruction 'NASA`s  deepspace "banger" Juice'
+tests\strings-tokenization.mx:31:1 ERROR: Only single immediate allowed 'outu "str" "lit"'
+tests\strings-tokenization.mx:38:1 ERROR: Target value expected 'outc'
+tests\strings-tokenization.mx:44:1 ERROR: Unknown instruction 'go "lou"'
+
+
