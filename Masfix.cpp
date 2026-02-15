@@ -2238,6 +2238,7 @@ void populateIncludePaths(Flags& flags) {
 	flags.includeFolders.insert(flags.includeFolders.end(), fs::current_path());
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"core");
+	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"ds");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder);
 }
 Flags processLineArgs(int argc, char *argv[]) {
