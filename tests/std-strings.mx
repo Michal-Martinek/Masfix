@@ -1,0 +1,85 @@
+%include "memory"
+%include "procedures"
+%include "io"
+%include "strings"
+%include "debug"
+
+%macro addChar(localIdx, ch) {
+	%seg:push(%local, %localIdx)
+	%stack:push(%ch)
+	%call(push_back)
+}
+%macro reprString(localIdx) {
+	%seg:push(%local, %localIdx)
+	%string:repr()
+}
+%macro stripString(localIdx) {
+	%seg:push(%local, %localIdx)
+	%call(strip)
+}
+%macro clearString(localIdx) {
+	%seg:push(%local, %localIdx)
+	%call(clear)
+}
+%macro testStrip(addCharsInstrs) {
+	%addCharsInstrs
+	%reprString(0)
+	outc ' '
+	outc '-'
+	outc '>'
+	outc ' '
+	%stripString(0)
+	%reprString(0)
+	outc 10
+	%clearString(0)
+}
+
+%void_func { main, 0, 3,
+;; locals: 3x *string
+	; construct 3 strings
+	%stack:dropN(3)
+	%string:constructor()
+	%string:constructor()
+	%string:constructor()
+
+	%testStrip( ld 0 ) ; empty string
+	%testStrip{
+		%addChar(0, ' ')
+	}
+	outc '^'
+	%testStrip{
+		%addChar(0, '\n')
+	}
+	%testStrip{
+		%addChar(0, ' ')
+		%addChar(0, '\t')
+	}
+	%testStrip{
+		%addChar(0, 'A')
+		%addChar(0, '7')
+		%addChar(0, ' ')
+	}
+	%testStrip{
+		%addChar(0, ' ')
+		%addChar(0, '5')
+		%addChar(0, '!')
+		%addChar(0, '$')
+	}
+	%testStrip{
+		%addChar(0, '\t')
+		%addChar(0, ' ')
+		%addChar(0, 'T')
+		%addChar(0, ' ')
+		%addChar(0, ' ')
+		%addChar(0, 'P')
+		%addChar(0, ' ')
+		%addChar(0, 'R')
+		%addChar(0, ' ')
+		%addChar(0, ' ')
+	}
+	; %seg:push(%local, 0)
+	; %call(read_line)
+	
+}
+
+%call(main)

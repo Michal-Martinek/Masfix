@@ -1,6 +1,9 @@
+%include "memory"
 %include "structs"
 %include "procedures"
 %include "array"
+%include "io"
+%include "control"
 
 ; char array with one word per character
 %namespace string {
@@ -16,6 +19,40 @@
 	%macro deinit() {
 		%array:deinit()
 	}
+
+	; this ->
+	; strip leading & trailing whitespace
+	%void_method{ strip, 1, 0,
+		%while {
+			%if { ; this.size == 0: return
+				%seg:load(%this, %array:size)
+				leq 0
+			,
+				%returnFunc(strip)
+			}
+			%stack:push(0) ; is_whitespace(this[0])
+			%call(index_impl)
+			%seg:load(%dest, 0)
+			%char:is_whitespace()
+		,
+			%seg:push(%arg, 0) ; pop front
+			%stack:push(0)
+			%call(pop_index)
+			%stack:drop()
+		}
+		%while {
+			%seg:push(%arg, 0) ; is_whitespace(this[-1])
+			%call(last)
+			%stack:pop()
+			%char:is_whitespace()
+		,
+			%seg:push(%arg, 0) ; this.pop_back()
+			%call(pop_back)
+			%stack:drop()
+		}
+	}
+
+	; split
 
 	; this -> (stdout)
 	%void_method{ string_print, 1, 0,
