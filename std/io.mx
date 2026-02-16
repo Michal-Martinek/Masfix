@@ -1,7 +1,6 @@
 %include "control"
 %include "memory"
 %include "procedures"
-%include "strings"
 
 %macro print_spaced(instr) {
 	%instr
@@ -47,6 +46,11 @@
 	%macro to_uint() {
 		lds 48
 	}
+	; r -> r
+	%macro is_whitespace() {
+		lrle ' '
+	}
+
 	; is first char in stdin >= ' '?
 	; char not eaten
 	%macro stdin_valid_char() {
@@ -90,3 +94,5 @@
 	ld !print_delim(1)
 	%print_delim(0)
 }
+
+%include "strings"
