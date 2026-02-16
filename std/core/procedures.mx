@@ -168,6 +168,11 @@
 		mov %name
 		movma %idx
 	}
+	; move to segment
+	%macro movptr(name, idx) {
+		%move(%name, %idx)
+		movm
+	}
 	; load segment value
 	%macro load(name, idx) {
 		%move(%name, %idx)

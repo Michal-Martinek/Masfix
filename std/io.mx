@@ -59,9 +59,16 @@
 	}
 }
 
+%include "exceptions"
+%include "array"
+
 ; str ->
 ; read line (line end stripped) to string instance at str
 %void_func{ read_line, 1, 0,
+	%assert(
+		%seg:movptr(%arg, 0)
+		%array:empty()
+	)
 	%while {
 		%char:stdin_valid_char()
 	,

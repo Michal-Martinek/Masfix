@@ -41,6 +41,12 @@
 		%seg:push(%arg, 1)
 		%call(at_least_capacity)
 	}
+
+	; @this -> bool
+	%macro empty() {
+		%do_at(size, lmeq 0)
+	}
+
 	; this ->
 	; clears array
 	%void_method{ clear, 1, 0,
@@ -292,6 +298,12 @@
 		%proc{ assert_nonempty,
 			%assert( ; this.size > 0
 				%seg:this(%size, lmab 0)
+			)
+		}
+		; this ->
+		%proc{ assert_empty,
+			%assert( ; this.size == 0
+				%seg:this(%size, lmeq 0)
 			)
 		}
 		; this, idx: uint ->
