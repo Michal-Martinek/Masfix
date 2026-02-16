@@ -57,6 +57,15 @@
 		%call(index_impl)
 		%seg:load(%dest, 0)
 	}
+	; this -> item (G_DEST)
+	; index last element
+	%method{ last, 1, 0,
+		%call(assert_nonempty)
+		%seg:push(%this, %size)
+		strs 1
+		%call(index_impl)
+		%seg:load(%dest, 0)
+	}
 
 	; this, value ->
 	; append value at end of array

@@ -190,18 +190,24 @@
 	%call(find)
 	%print_endl(
 		%stack:pop()
-		outur ; not found
+		outur ; 0
 	)
 	%seg:push_addr(%local, 0)
-	%stack:push(9)
+	%stack:push(7)
 	outum
 	outc '@'
 	%call(find)
 	%print_endl(
 		%stack:pop()
-		outur ; not found
+		outur ; 4
 	)
 
+	%seg:push_addr(%local, 0)
+	%call(last)
+	%print_endl(
+		%stack:pop()
+		outur
+	)
 
 	; test empty[0]
 	outc 'E'
