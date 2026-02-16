@@ -48,14 +48,14 @@
 		%seg:this(0, %init())
 	}
 
-	; this, index -> item: ptr (G_DEST)
+	; this, index -> item (G_DEST)
 	; safely indexes array
 	%method{ index, 2, 0,
 		%seg:push(%arg, 1)
 		%stack:dup()
 		%call(assert_good_idx)
 		%call(index_impl)
-		%load(%MEMORY_LAYOUT:G_DEST)
+		%seg:load(%dest, 0)
 	}
 
 	; this, value ->
@@ -100,8 +100,9 @@
 		%seg:push_addr(%this, 0) ; from = this[index] (DEST)
 		%seg:push(%arg, 1)
 		%call(index)
-		%stack:dup()             ; to = this[index+1]
-		stra 1
+		%stack:drop()
+		%seg:push_addr(%dest, 0) ; from ^
+		%seg:push_addr(%dest, 1) ; to = this[index+1]
 		%seg:this(%size,         ; count = orig_size - index
 			ldms 1 ; orig_size = new_size - 1
 			%stack:pushr()
@@ -120,8 +121,7 @@
 		%seg:push(%arg, 1)
 		%call(index)
 		%stack:pop() ; return this[index] (DESTROYS this arg)
-		movm
-		ldm
+		%seg:load(%dest, 0)
 		%save_retval()
 		%seg:push_addr(%dest, 1) ; from = this[index+1]
 		%seg:push_addr(%dest, 0) ; to = this[index]

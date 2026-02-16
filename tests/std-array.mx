@@ -59,7 +59,6 @@
 	%call(index)
 	%print_endl(
 		%stack:pop()
-		movm
 		outum
 	)
 	; arr0.reserve(6) - reserves 8
