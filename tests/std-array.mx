@@ -174,6 +174,36 @@
 		outur ; 36288
 	)
 
+	; find value
+	%seg:push_addr(%local, 0)
+	%stack:push(2)
+	outum
+	outc '@'
+	%call(find)
+	%print_endl(
+		%stack:pop()
+		outur ; not found
+	)
+	%seg:push_addr(%local, 0)
+	%stack:push(1)
+	outum
+	outc '@'
+	%call(find)
+	%print_endl(
+		%stack:pop()
+		outur ; not found
+	)
+	%seg:push_addr(%local, 0)
+	%stack:push(9)
+	outum
+	outc '@'
+	%call(find)
+	%print_endl(
+		%stack:pop()
+		outur ; not found
+	)
+
+
 	; test empty[0]
 	outc 'E'
 	%seg:push_addr(%local, %array:sizeof)

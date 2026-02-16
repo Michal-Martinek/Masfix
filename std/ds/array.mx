@@ -175,6 +175,19 @@
 		}
 	}
 
+	; this, value -> index
+	; find first occurence of value, if not found returs uint_max
+	%method{ find, 2, 0,
+		%foreach {
+			ldm
+			%if { %seg:arg(1, leqm), ; value == this[idx]
+				%stack:pop() ; idx
+				%returnr(find)
+			}
+		}
+		ld %uint_max
+	}
+
 	; this, init_acc(), accumulate() -> accumulator
 	; init_acc: func_ptr: elem -> new_accumulator
 	; accumulate: func_ptr: accumulator, elem -> new_accumulator
