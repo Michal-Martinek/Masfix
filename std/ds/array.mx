@@ -313,7 +313,7 @@
 			%seg:load(%this, %size)
 			%assert(
 				%stack:drop()
-				lmltr
+				lmblr
 			)
 		}
 
@@ -351,7 +351,7 @@
 		%proc{ at_least_capacity,
 			%stack:swap2() ; retaddr, min_capacity @r
 			%if_else { ; this.capacity < min_capacity
-				%seg:this(%capacity, lmltr)
+				%seg:this(%capacity, lmblr)
 			, ; reallocate
 				%call(round_up_to_2_power) ; round_up(min_capacity)
 				; instead add 4 before rounding?
