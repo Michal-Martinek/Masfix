@@ -2,7 +2,11 @@
 %include "procedures"
 %include "io"
 %include "strings"
+%include "math"
+%include "control"
 %include "debug"
+
+%define MANUAL_TEST 0 ; TOGGLE to default on read_line
 
 %macro addChar(localIdx, ch) {
 	%seg:push(%local, %localIdx)
@@ -77,9 +81,66 @@
 		%addChar(0, ' ')
 		%addChar(0, ' ')
 	}
-	; %seg:push(%local, 0)
-	; %call(read_line)
+
+	; test split ----------------
+	%clearString(0)
+
+	%if_else {ld %MANUAL_TEST, ; TOGGLE for testing
+		%addChar(0, 'A')
+		%addChar(0, 'B')
+		%addChar(0, ' ')
+		%addChar(0, 'D')
+		%addChar(0, 'E')
+		%addChar(0, 'F')
+		%addChar(0, 'G')
+	,
+		%seg:push(%local, 0)
+		%call(read_line)
+	}
+
+	%reprString(0)
+	%seeFuncFrame()
+
+	%seg:push(%local, 0) ; split(0, 1, ' ') -> AB, DEFG
+	%seg:push(%local, 1)
+	%stack:push(' ')
+	%call(split)
+
+	%seg:push(%local, 1) ; split(1, 2, 'X') -> nonexistent char -> nop
+	%seg:push(%local, 2)
+	%stack:push('X')
+	%call(split)
+
+	%seg:push(%local, 1) ; split(1, 2, 'D') -> split at start
+	%seg:push(%local, 2)
+	%stack:push('D')
+	%call(split)
 	
+	%reprString(0)
+	%reprString(1)
+	%reprString(2)
+
+	%seg:push(%local, 0)
+	str& !op(s, %uint_max, 7)
+	%stack:push(15)
+	%call(memdump)
+
+	%clearString(2)
+
+	%seg:push(%local, 1) ; split(1, 2, 'W') -> split empty str -> both empty
+	%seg:push(%local, 2)
+	%stack:push('W')
+	%call(split)
+
+	%seg:push(%local, 0) ; split(0, 1, 'B') -> strip last char
+	%seg:push(%local, 1)
+	%stack:push('B')
+	%call(split)
+
+	outc '\n'
+	%reprString(0)
+	%reprString(1)
+
 }
 
 %call(main)

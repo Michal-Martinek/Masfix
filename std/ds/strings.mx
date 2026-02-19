@@ -3,6 +3,8 @@
 %include "procedures"
 %include "array"
 %include "io"
+%include "exceptions"
+%include "math"
 %include "control"
 
 ; char array with one word per character
@@ -52,7 +54,44 @@
 		}
 	}
 
-	; split
+	; this, tail: string, delim: char ->
+	; split str at first occurence of char
+	; this becomes part before delim
+	; tail gets rest after delim
+	; delimeter is discarded
+	%void_method{ split, 3, 2,
+		; locals: delim_idx, tail_size
+		%assert(
+			%seg:movptr(%arg, 1)
+			%array:empty() ; breaks THIS !
+		)
+		%seg:push(%arg, 0) ; delim_idx = this.find(delim)
+		%seg:push(%arg, 2)
+		%call(find)
+		%seg:pop(%local, 0)
+		%if { lmeq %uint_max, ; delim not in this
+			%returnFunc(split)
+		}
+		%seg:load(%this, %array:size) ; tail_size = this.size - (delim_idx + 1)
+		%seg:local(0, ldsma 1)
+		%seg:store(%local, 1)
+		%seg:push(%arg, 1)   ; tail.reserve(tail_size)
+		%seg:push(%local, 1)
+		%call(reserve) ; !! THIS -> tail !!
+		%seg:load(%local, 1) ; tail.size = tail_size
+		%seg:store(%this, %array:size)
+		; memcopy(this[delim_idx]+1, tail.data, tail_size)
+		%seg:push(%arg, 0)   ; this[delim_idx]
+		%seg:push(%local, 0)
+		%call(index) ; reset THIS to this !!
+		%seg:push_addr(%dest, 1)
+		%seg:movptr(%arg, 1) ; tail.data
+		%stack:pushm()
+		%seg:push(%local, 1) ; tail_size
+		%call(memcopy)
+		%seg:load(%local, 0) ; this.size = delim_idx
+		%seg:store(%this, %array:size)
+	}
 
 	; this -> (stdout)
 	%void_method{ string_print, 1, 0,
