@@ -140,7 +140,30 @@
 	outc '\n'
 	%reprString(0)
 	%reprString(1)
+	outc '\n'
 
+	;; replace ---------------
+	%clearString(0)
+	%if_else {ld %MANUAL_TEST,
+		%addChar(0, '$')
+		%addChar(0, '6')
+		%addChar(0, '7')
+		%addChar(0, '$')
+		%addChar(0, '{')
+		%addChar(0, '$')
+		%addChar(0, 'Z')
+		%addChar(0, '}')
+		%addChar(0, '$')
+	,
+		%seg:push(%local, 0)
+		%call(read_line)
+	}
+	%seg:push(%local, 0)
+	%stack:push('$')
+	%stack:push('#')
+	%call(replace)
+
+	%reprString(0)
 }
 
 %call(main)

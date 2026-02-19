@@ -93,6 +93,18 @@
 		%seg:store(%this, %array:size)
 	}
 
+	; this, from: char, to: char ->
+	; replace every occurence of from with to
+	%void_method{ replace, 3, 0,
+		%array:foreach{
+			%seg:load(%arg, 1)
+			%if {%seg:dest(0, lmeqr), ; this[idx] == from
+				%seg:load(%arg, 2)
+				%seg:store(%dest, 0)
+			}
+		}
+	}
+
 	; this -> (stdout)
 	%void_method{ string_print, 1, 0,
 		%array:foreach {
