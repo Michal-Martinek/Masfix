@@ -51,18 +51,20 @@
 			%call(free)
 		}
 
-		; -> copied: ptr
-		; copies struct values to new instance on heap
-		%macro shallow_copy() {
-			ldh ; temp store this
-			mov !op(a, %MEMORY_LAYOUT:SEG_TEMP, 3)
-			strr
-			%new()
-			mov !op(a, %MEMORY_LAYOUT:SEG_TEMP, 3)
-			%stack:pushm() ; new, this
-			%stack:dup_over(1)
-			%stack:push(%sizeof) ; new | this, new, count
+		; from: *struct, to: *struct ->
+		; moves struct fields to instance at *to
+		%macro shallow_move() {
+			%stack:push(%sizeof) ; from, to, size
 			%call(memcopy)
+		}
+
+		; this: *struct -> copied: ptr
+		; shallow copies struct to new instance on heap
+		%macro shallow_copy() {
+			%new() ; new_ptr
+			%stack:swap2()
+			%stack:dup_over(1)
+			%shallow_move() ; new | this new
 			; -> new
 		}
 

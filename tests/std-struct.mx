@@ -5,6 +5,7 @@
 %include "structs"
 %include "control"
 %include "procedures"
+%include "pair"
 
 %macro separate_errs(num) {
 	%nop(!print_endl(outu %num))
@@ -88,18 +89,20 @@
 		%seg:push_addr(%local, 0)
 		%seg:push_addr(%local, %pair:sizeof)
 		%call(pair_compare_eq)
-		%print_endl(
+		%print_spaced(
 			%stack:pop()
 			outur
 		)
 
-		; test memcopy
-		%seg:local(0,
-			%pair:shallow_copy()
-		)
-		%stack:pop()
-		movr
-		%pair:default_print()
+		; test copy semantics
+		%seg:push_addr(%local, 0)
+		%pair:shallow_copy()
+		%print_spaced( outum )
+
+		%stack:push(0)
+		%stack:push(0)
+		%stack:push(',')
+		%call(pair_print)
 
 		%stack:push(%MEMORY_LAYOUT:SEG_HEAP)
 		%stack:push(8)
