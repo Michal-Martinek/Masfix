@@ -54,6 +54,14 @@
 		%seg:this(0, %init())
 	}
 
+	; this ->
+	; duplicates value array after repositioning (call after struct:move)
+	%void_method{ array_repositioned, 1, 0,
+		%seg:this(%capacity, str 0) ; force copy: this.capacity = 0
+		%seg:push(%this, %size)     ; this.reserve(this.size)
+		%call(at_least_capacity)
+	}
+
 	; this, index -> item (G_DEST)
 	; safely indexes array
 	%method{ index, 2, 0,

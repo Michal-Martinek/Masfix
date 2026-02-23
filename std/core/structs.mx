@@ -14,6 +14,9 @@
 ;;    - inplace initialization of values
 ;; %deinit()
 ;;    - inplace deinitialization of values
+;; %void_method repositioned(this)
+;;    - move / duplicate values after copy (ie. referenced data)
+;;    - calling this is user's responsibility
 
 
 %namespace struct {

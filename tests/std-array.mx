@@ -145,6 +145,18 @@
 	%seg:push_addr(%local, 0)
 	%call(array_print)
 
+	; copying
+	%seg:push_addr(%local, 0)
+	%array:shallow_copy()
+	%stack:dup()
+	%call(array_repositioned)
+	%stack:top() ; copy stays at stack:top
+	movm
+	%print_endl(
+		outc 'C'
+		%array:default_print()
+	)
+
 	%seg:push_addr(%local, 0)
 	%stack:push(proc_int_lt_with_emit)
 	%call(array_sort)
@@ -152,6 +164,8 @@
 
 	%seg:push_addr(%local, 0)
 	%call(array_print)
+
+	%call(array_print) ; unchanged copy
 
 	; init(1) = 32, sum with rest
 	%seg:push_addr(%local, 0)
