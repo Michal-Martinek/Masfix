@@ -35,6 +35,17 @@
 	jmpr
 	%stack:top()
 }
+; call func by ptr in seg[idx]
+; if ptr is null do default_instrs instead
+%macro call_ptr_with_default(ptr_seg, ptr_idx, default_instrs) {
+	%seg:move(%ptr_seg, %ptr_idx)
+	%if_else { lmeq 0,
+		%default_instrs
+	,
+		ldm
+		%call_ptr()
+	}
+}
 
 ;; functions ---------------------------------
 ;; allow argument passing, local variables and returning
@@ -228,4 +239,5 @@
 	%call(%name)
 }
 
+%include "control"
 %include "math"

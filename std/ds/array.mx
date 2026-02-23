@@ -214,12 +214,9 @@
 		%call(assert_nonempty)
 		%stack:push(0) ; this[0]
 		%call(index_impl)
-		%stack:drop()  ; init_acc -> local acc
+		%stack:drop()  ; init_acc(this[0]) -> local acc
 		%seg:push(%dest, 0)
-		%if { %seg:arg(1, lmne 0),
-			ldm         ; if (init_acc != null):
-			%call_ptr() ;   acc = init_acc(this[0])
-		}
+		%call_ptr_with_default(%arg, 1, ld 0) ; default: nop
 		%seg:load(%this, %size)  ; for 1...size
 		%for_full{1, 1,
 			%stack:dup()         ; dest = this[idx]
@@ -235,6 +232,7 @@
 
 	; this, func_lt (elem, elem -> bool) -> void
 	; sort array inplace in ascending order
+	; default comparison is int:lt
 	%void_method{ array_sort, 2, 1, ; inner idx to second in pair
 		;; insertion sort
 		%foreach { ; IDX inserting element
@@ -249,8 +247,7 @@
 				%call(index_impl)
 				%seg:push(%dest, %minus1) ; idx-1
 				%seg:push(%dest, 0) ; idx
-				%seg:load(%arg, 1)
-				%call_ptr()
+				%call_ptr_with_default(%arg, 1, %stack:compare(lt))
 
 				%if_else {
 					%stack:pop()
