@@ -182,13 +182,22 @@
 		%seg:local(0, ldma 2)
 	}
 
+		%macro __free_assert_m(cond, value) {
+			lm(%cond) %value
+			beq __heap_free_error
+		}
 	; free segment @ data_ptr
 	%void_func {free, 1, 0,
-		%seg:arg(0, movm)
-		movs %chunk:data_offset
-		%assert(ldm)
+		%seg:move(%arg, 0)
+		%__free_assert_m(ab, %MEMORY_LAYOUT:SEG_HEAP)
+		%__free_assert_m(bl, %MEMORY_LAYOUT:SEG_DEBUG_GLOBALS)
+		movms %chunk:data_offset
+		%__free_assert_m(ne, 0)
 		%chunk:at(flags)
-		%assert(lmeq %chunk:FLAG_OCCUPIED)
+		%__free_assert_m(eq, %chunk:FLAG_OCCUPIED)
 		str %chunk:FLAG_FREE
+		%returnFunc(free)
+	:__heap_free_error
+		%error(1)
 	}
 }
