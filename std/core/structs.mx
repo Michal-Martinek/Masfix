@@ -25,33 +25,46 @@
 	%macro defineLocalMacros() {
 	;; creation & destruction
 
-		; -> new: ptr
+		; -> new: ptr (stack)
 		; allocate new uninitialized instance on heap
 		%macro new() {
 			%callWith1Arg(malloc, %sizeof)
 		}
-		; free instance @h from heap
+		; instance: ptr ->
+		; free instance from heap
 		%macro dealloc() {
-			%stack:pushh()
 			%call(free)
 		}
-		; -> new: ptr
+		; -> new: ptr (stack)
 		; constructs new instance on heap
-		; initializes with user-defined %init()
+		; instance initialized with user-defined %init()
 		%macro constructor() {
 			%new()
-			%stack:top()
-			movm
+			movr ; loaded by call(malloc)
 			%init()
 		}
-		; -> void
-		; destructs instance from heap
-		; deinits value with user-defined %deinit()
-		%macro destructor() {
-			%stack:pushh()
+		; @struct_ptr ->
+		; sets pointer here to newly constructed instance on heap
+		; instance initialized with user-defined %init()
+		%macro construct_here() {
+			%stack:pushh()  
+			%constructor()
+			%stack:pop()
+			%stack:drop()
 			movm
+			strr
+		}
+		; @struct_ptr ->
+		; destructs instance pointed to by m
+		; instance deinitialized with user-defined %deinit()
+		; struct_ptr is nullified for safety
+		%macro destructor() {
+			ldm
+			str 0
+			%stack:pushr()
+			movr
 			%deinit()
-			%call(free)
+			%dealloc()
 		}
 
 		; from: *struct, to: *struct ->
