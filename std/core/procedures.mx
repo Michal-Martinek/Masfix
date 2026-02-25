@@ -164,7 +164,7 @@
 %define this  (%MEMORY_LAYOUT:G_THIS_PTR)
 %define src   (%MEMORY_LAYOUT:G_SRC)
 %define dest  (%MEMORY_LAYOUT:G_DEST)
-%define temp  (%MEMORY_LAYOUT:SEG_TEMP)
+%define temp_addr (%MEMORY_LAYOUT:SEG_TEMP) ; don't use as @name!
 %namespace seg {
 	;; use ^ for name arg
 

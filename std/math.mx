@@ -50,7 +50,7 @@
 		movs 1
 		strsr
 	}
-	%seg:arg(0, %storem(%temp)) ; store remainder
+	%seg:arg(0, %storem(%temp_addr)) ; store remainder
 	%stack:top() ; return result
 }
 %macro ld_remainder() {
