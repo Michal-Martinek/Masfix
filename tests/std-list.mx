@@ -1,0 +1,82 @@
+%include "memory"
+%include "heap"
+%include "control"
+%include "procedures"
+%include "io"
+%include "list"
+%include "debug"
+%include "array"
+
+%proc{ print_lists, ; uses main's local segment
+	outc 'A'
+	%seg:push_addr(%local, 0)
+	%print_spaced( %call(list_print) )
+	outc 'B'
+	%seg:push_addr(%local, 1)
+	%print_spaced( %call(list_print) )
+	outc 'C'
+	%seg:push(%local, 2)
+	%print_endl( %call(list_print) )
+}
+
+%macro callListMethodWithArgs(methodName, listIdx, pushArguemts) {
+	%if_else { ; lives list in main:locals? 
+		ld %listIdx
+		lle 1
+	,
+		%seg:push_addr(%local, %listIdx),
+		%seg:push(%local, %listIdx)
+	}
+	%pushArguemts
+	%call(%methodName)
+}
+%macro callListMethod(methodName, listIdx) { ; no arguments
+	%callListMethodWithArgs(%methodName, %listIdx, ld 0)
+}
+%macro printResult(desc, delim) {
+	outc %desc
+	outc ':'
+	%stack:pop()
+	outum
+	outc %delim
+}
+%macro populateFirstArray() { ; initialize array at local:0
+	%callListMethodWithArgs(list_insert_after, 0, %stack:push(5))
+	%callListMethodWithArgs(list_insert_after, 0, %stack:push(6))
+	%callListMethodWithArgs(list_insert_back, 0, %stack:push(7))
+}
+
+%void_func{ main, 0, 6, ; 2 * sizeof(list) + sizeof(ptr) + sizeof(array)
+	%seg:local(0, %list:init()) ; first 2 lists live in locals
+	%seg:local(1, %list:init())     ; NOTE: testing of different schemes
+	%seg:local(2, %list:construct_here()) ; third lives in heap (here is ptr to that struct)
+	%seg:local(3, %array:init())
+
+	%populateFirstArray()
+
+	; A.insert_after(list[1], 2)
+	%callListMethodWithArgs(list_index, 0, %stack:push(1))
+	%printResult('I', '\n')
+	%seg:push_seg(%this)
+	%stack:push(2)
+	%call(list_insert_after)
+
+	%call(print_lists)
+
+	%print_spaced( outc 'A' )
+	%callListMethod(list_first, 0)
+	%printResult('F', ' ')
+	%callListMethod(list_last, 0)
+	%printResult('L', '\n')
+
+	; size(A, B, C)
+	%print_spaced( outc 'S' )
+	%callListMethod(list_size, 0)
+	%printResult('A', ' ')
+	%callListMethod(list_size, 1)
+	%printResult('B', ' ')
+	%callListMethod(list_size, 2)
+	%printResult('C', '\n')
+}
+
+%call(main)
