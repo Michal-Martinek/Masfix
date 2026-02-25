@@ -202,12 +202,12 @@
 		; detach single node after THIS, set THIS to detached
 		; assert detachable node exists
 		%proc{ __list_detach_after_this__asserted,
-			%call(__list_assert_this_has_next)
 			%seg:push_seg(%this) ; save head
-			%advance_this()          ; THIS = THIS.next
+			%call(__list_assert_this_has_next)
+			%advance_this()      ; THIS = THIS.next
 			%seg:load(%this, %list_node:next) ; detached.next = null
 			str 0
-			%stack:drop()            ; head.next = detached.next
+			%stack:drop()        ; head.next = detached.next
 			movm
 			strr
 		}

@@ -7,6 +7,8 @@
 %include "debug"
 %include "array"
 
+%vm_runtime_delim()
+
 %proc{ print_lists, ; uses main's local segment
 	outc 'A'
 	%seg:push_addr(%local, 0)
@@ -19,7 +21,7 @@
 	%print_endl( %call(list_print) )
 }
 
-%macro callListMethodWithArgs(methodName, listIdx, pushArguemts) {
+%macro callListMethodWithArgs(methodName, listIdx, pushArguments) {
 	%if_else { ; lives list in main:locals? 
 		ld %listIdx
 		lle 1
@@ -27,7 +29,7 @@
 		%seg:push_addr(%local, %listIdx),
 		%seg:push(%local, %listIdx)
 	}
-	%pushArguemts
+	%pushArguments
 	%call(%methodName)
 }
 %macro callListMethod(methodName, listIdx) { ; no arguments
@@ -40,7 +42,7 @@
 	outum
 	outc %delim
 }
-%macro populateFirstArray() { ; initialize array at local:0
+%macro populateFirstList() { ; initialize array at local:0
 	%callListMethodWithArgs(list_insert_after, 0, %stack:push(5))
 	%callListMethodWithArgs(list_insert_after, 0, %stack:push(6))
 	%callListMethodWithArgs(list_insert_back, 0, %stack:push(7))
@@ -52,7 +54,7 @@
 	%seg:local(2, %list:construct_here()) ; third lives in heap (here is ptr to that struct)
 	%seg:local(3, %array:init())
 
-	%populateFirstArray()
+	%populateFirstList()
 
 	; A.insert_after(list[1], 2)
 	%callListMethodWithArgs(list_index, 0, %stack:push(1))
@@ -77,6 +79,89 @@
 	%printResult('B', ' ')
 	%callListMethod(list_size, 2)
 	%printResult('C', '\n')
+
+	; TODO splice
+	
+	; set elems to their idx
+	%seg:point(%this, %local, 0)
+	%list:foreach {
+		%stack:top()
+		%seg:store(%this, %list_node:value)
+	}
+	%call(print_lists)
 }
 
 %call(main)
+
+; testing for errors in ctime ----------------------------------------------------
+%macro setLocalsToTemp() {
+	%nop { ; point locals to temp (because we're not in any function)
+		!store(%local, %temp_addr)
+	}
+}
+%macro initCtimeTesting() {
+	%setLocalsToTemp()
+	%nop {
+		!seg:temp(0, %list:init()) ; clear all lists
+		!seg:temp(1, %list:init())
+		; DONT USE third - passed via ptr
+		!populateFirstList()
+		!stack:push(%temp_addr)
+		!print_endl(
+			%call(list_print)
+		)
+	}
+}
+%macro _implErrorneousTest(methodName, listIdx, pushArguments, preDesc, desc) {
+	%print_spaced( outc %preDesc )
+	%callListMethodWithArgs(%methodName, %listIdx, %pushArguments)
+	%printResult(%desc, '\n')
+}
+%macro testPossiblyErrorneous(methodName, listIdx, pushArguments, preDesc, desc) {
+	%nop {
+		!_implErrorneousTest(%methodName, %listIdx, %pushArguments, %preDesc, %desc)
+	}
+	%setLocalsToTemp() ; need to be repeated after error in function causes local segment to not return to original state
+}
+; test indexing bounds
+%initCtimeTesting()
+%nop(!print_endl(
+	outc 'I'
+	outc 'E'
+	outc 's'
+))
+%testPossiblyErrorneous(list_index, 0, %stack:push(0), '0', 'I')
+%testPossiblyErrorneous(list_index, 0, %stack:push(2), '2', 'I')
+%testPossiblyErrorneous(list_index, 0, %stack:push(3), '3', 'I') ; out of bounds
+%nop(!print_spaced( outc 'B' ))
+%testPossiblyErrorneous(list_index, 1, %stack:push(0), '0', 'I') ; empty[0]
+
+; popping
+%nop(!print_endl(
+	outc 'P'
+	outc 'O'
+	outc 'P'
+	outc ' '
+	outc '*'
+	%load(%temp_addr) ; first node in first list
+	outum
+))
+; A = [6, 5, 7]
+%testPossiblyErrorneous(list_pop_after, 0, ld 0, '0', 'F') ; pop front
+%nop { ; pop after 5 -> 7
+	!load(%temp_addr)
+	!storer(%local)
+}
+%testPossiblyErrorneous(list_pop_after, 0, ld 0, '0', 'A') ; ^^
+%testPossiblyErrorneous(list_pop_back,  0, ld 0, '0', 'B') ; pop back
+%testPossiblyErrorneous(list_size,      0, ld 0, '0', 'S') ; size = 0
+
+; popping empty
+%testPossiblyErrorneous(list_pop_after, 0, ld 0, 'A', '@') ; pop after
+%testPossiblyErrorneous(list_pop_back,  1, ld 0, 'B', '@') ; pop back
+%nop { ; !this.has_next
+	!print_spaced( outc 'N' )
+	!store(12, 0)
+	!stack:push(12)
+	!call(list_pop_after)
+}

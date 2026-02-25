@@ -1,9 +1,31 @@
 :returncode 0
 
-:stdout 50
+:stdout 209
+- VM -
+[6, 5, 7]
+IEs
+0 I:6
+2 I:7
+3 
+ERROR: 2
+B 0 
+ERROR: 2
+POP *2054
+0 F:6
+0 A:7
+0 B:5
+0 S:0
+A 
+ERROR: 0
+B 
+ERROR: 0
+N 
+ERROR: 0
+- RUN -
 I:5
 A[6, 5, 2, 7] B[] C[]
 A F:6 L:7
 S A:4 B:0 C:0
+A[0, 1, 2, 3] B[] C[]
 
 
