@@ -168,11 +168,30 @@
 %namespace seg {
 	;; use ^ for name arg
 
-	; push segment address
-	%macro push_addr(name, idx) {
+	; load segment address
+	%macro load_addr(name, idx) {
 		mov %name
 		ldma %idx
+	}
+	; push segment address
+	%macro push_seg(name) {
+		%load_addr(%name, 0)
 		%stack:pushr()
+	}
+	; push address of segment:idx
+	%macro push_addr(name, idx) {
+		%load_addr(%name, %idx)
+		%stack:pushr()
+	}
+	; set dest_segment to idx_seg:idx
+	%macro point(dest_seq, idx_seg, idx) {
+		%load_addr(%idx_seg, %idx)
+		%storer(%dest_seq)
+	}
+	; set dest_segment to pointer from idx_seg:idx
+	%macro pointptr(dest_seq, idx_seg, idx) {
+		%load(%idx_seg, %idx)
+		%storer(%dest_seq)
 	}
 	; move to segment
 	%macro move(name, idx) {
@@ -193,6 +212,11 @@
 	%macro store(name, idx) {
 		%move(%name, %idx)
 		strr
+	}
+	; set value of segment to imm
+	%macro set(name, idx, imm) {
+		%move(%name, %idx)
+		str %imm
 	}
 	; push segment value
 	%macro push(name, idx) {
