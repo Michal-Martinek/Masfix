@@ -42,18 +42,61 @@
 	outum
 	outc %delim
 }
+
+; copies of list members, with debug information printing
+%void_method{ list_clear_debug, 1, 1, ; next=null
+	%print_spaced( ; list struct idx
+		outur
+		outc ':'
+	)
+	%seg:set(%local, 0, 0)
+	%while { %load(%this), ; THIS != null
+		%seg:load(%this, %list_node:next) ; new_next <- THIS.next <- null
+		str 0
+		%stack:pushr() ; new_next
+		%if { %seg:load(%local, 0), ; old_next != null
+			%stack:dup_over(1)
+			outur ; what free called at
+			outc 32
+			%call(free)
+		}
+		%seg:pop(%local, 0) ; next = new_next
+		%storer(%this)       ; THIS = new_next
+	}
+	outc '\n'
+}
+%macro list_debug_deinit() {
+	%stack:pushh()
+	%call(list_clear_debug)
+}
+%macro list_debug_destructor() {
+	ldm
+	str 0
+	%stack:pushr()
+	movr
+	%list_debug_deinit()
+	%print_endl {
+		%stack:top() ; emit free argument
+		outc 'F'
+		outum
+	}
+	%list:dealloc()
+}
+; ------------------------------------
+
 %macro populateFirstList() { ; initialize array at local:0
 	%callListMethodWithArgs(list_insert_after, 0, %stack:push(5))
 	%callListMethodWithArgs(list_insert_after, 0, %stack:push(6))
 	%callListMethodWithArgs(list_insert_back, 0, %stack:push(7))
 }
-
-%void_func{ main, 0, 6, ; 2 * sizeof(list) + sizeof(ptr) + sizeof(array)
+%macro initLocalLists() { ; initialize local arrays
 	%seg:local(0, %list:init()) ; first 2 lists live in locals
 	%seg:local(1, %list:init())     ; NOTE: testing of different schemes
 	%seg:local(2, %list:construct_here()) ; third lives in heap (here is ptr to that struct)
 	%seg:local(3, %array:init())
-
+}
+%void_func{ main, 0, 6, ; 2 * sizeof(list) + sizeof(ptr) + sizeof(array)
+	%initLocalLists()
 	%populateFirstList()
 
 	; A.insert_after(list[1], 2)
@@ -82,13 +125,49 @@
 
 	; TODO splice
 	
-	; set elems to their idx
+	; set elems to their idx, emit node addresses
+	%print_spaced( outc 'A' )
+	%print_spaced( outc '&' )
 	%seg:point(%this, %local, 0)
 	%list:foreach {
+		%print_spaced( outuh )
 		%stack:top()
 		%seg:store(%this, %list_node:value)
 	}
+	outc '\n'
 	%call(print_lists)
+
+	; list destructing
+	%callListMethod(list_clear_debug, 0) ; A.clear()
+	%seg:load(%local, 0)
+	%print_endl( ; see list was deinitialized
+		outc 'D'
+		outum
+	)
+	%callListMethod(list_clear_debug, 1) ; B.clear()
+	%seg:move(%local, 2) ; empty C.destructor()
+	%list_debug_destructor()
+	%seg:load(%local, 2)
+	%print_endl(
+		outc 'C'
+		outum
+	)
+	%callWith1Arg(malloc, 1) ; change the new location
+	%callWith1Arg(malloc, 1)
+
+	%initLocalLists()
+	%callListMethodWithArgs(list_insert_after, 2, %stack:push(69))
+	%seg:move(%local, 2) ; nonempty C.destructor()
+	%print_endl(
+		outc 'V'
+		outum
+	)
+	%list_debug_destructor()
+	%seg:load(%local, 2)
+	%print_endl(
+		outc 'D'
+		outum
+	)
 }
 
 %call(main)

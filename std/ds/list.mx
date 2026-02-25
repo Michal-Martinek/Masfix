@@ -19,7 +19,6 @@
 	%macro deinit() {
 		str 0
 	}
-	; TODO remove?
 	; @list_node -> bool
 	%macro has_next() {
 		lmne 0
@@ -62,8 +61,26 @@
 	; @list
 	; free all list nodes
 	%macro deinit() {
-		; TODO proper free
-		str 0
+		%stack:pushh()
+		%call(list_clear)
+	}
+
+	; this ->
+	; clears list by deallocating all it's nodes
+	; node values should be deconstructed in advance
+	%void_method{ list_clear, 1, 1, ; next=null
+		%seg:set(%local, 0, 0)
+		%while { %load(%this), ; THIS != null
+			%seg:load(%this, %list_node:next) ; new_next <- THIS.next <- null
+			str 0
+			%stack:pushr() ; new_next
+			%if { %seg:load(%local, 0), ; old_next != null
+				%stack:dup_over(1)
+				%call(free)
+			}
+			%seg:pop(%local, 0) ; next = new_next
+			%storer(%this)      ; THIS = new_next
+		}
 	}
 
 	; this -> value (THIS)
