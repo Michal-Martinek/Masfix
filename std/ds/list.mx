@@ -1,0 +1,217 @@
+
+%include "memory"
+%include "heap"
+%include "control"
+%include "math"
+%include "procedures"
+%include "structs"
+%include "exceptions"
+
+; single node of linked list, with one-word value (int / ptr)
+%namespace list_node {
+	%struct:begin()
+	%struct:field(next, 1) ; *list_node
+	%struct:field(value, 1)
+
+	%macro init() {
+		str 0
+	}
+	%macro deinit() {
+		str 0
+	}
+	; TODO remove?
+	; @list_node -> bool
+	%macro has_next() {
+		lmne 0
+	}
+	%macro mov_next() {
+		movm
+	}
+
+	%struct:end()
+}
+
+;; singly linked list of list_nodes
+;; this parameter is pointer to list struct! (to list_node* this.head)
+%namespace list {
+	%namespace helpers {
+		; (this.head) -> (THIS)
+		%macro head_to_this() {
+			%seg:pointptr(%this, %this, %list:head)
+		}
+		; (THIS) -> bool (r)
+		%macro this_has_next() {
+			%seg:load(%this, %list_node:next)
+		}
+		; THIS = THIS.next
+		%macro advance_this() {
+			%seg:pointptr(%this, %this, %list_node:next)
+		}
+	}
+	%using helpers
+
+;; API
+	%struct:begin()
+	%struct:field(head, 1) ; *list_node
+
+	; @list
+	; initialize to empty state
+	%macro init() {
+		str 0
+	}
+	; @list
+	; free all list nodes
+	%macro deinit() {
+		; TODO proper free
+		str 0
+	}
+
+	; this -> value (THIS)
+	; get value of first element
+	%method{ list_first, 1, 0,
+		%call(__list_assert_this_has_next)
+		%head_to_this()
+		%seg:load(%this, %list_node:value)
+	}
+	; this -> value (THIS)
+	; get value of last element
+	%method{ list_last, 1, 0,
+		%call(__list_assert_this_has_next)
+		%call(__list_index_last)
+		%seg:load(%this, %list_node:value)
+	}
+
+	; (THIS)
+	; moves itrs: THIS - curr node, SRC - previous node
+	; performs %instrs on each element
+	;   - value @h, current list_node at THIS
+	;   - element index at stack:top (readonly)
+	;   - after iteration: index in m (-1 if empty)
+	%macro foreach(instrs) {
+		%stack:push(%minus1)
+		%while { %this_has_next(), ; THIS.next != null
+			%seg:point(%src, %this, 0) ; SRC = THIS
+			%advance_this() ; THIS = THIS.next
+			%stack:top() ; index ++
+			stra 1
+			%seg:move(%this, %list_node:value)
+			%instrs
+		}
+		%stack:drop()
+	}
+
+	; this -> size
+	%method{ list_size, 1, 0,
+		%foreach { ld 0 }
+		ldma 1
+	}
+	; this, index -> value (THIS)
+	%method{ list_index, 2, 0,
+		%foreach {
+			%if { ; index == index
+				%stack:top() ; loop idx
+				%seg:arg(1, leqm)
+			,
+				%seg:load(%this, %list_node:value)
+				%returnr(list_index)
+			}
+		}
+		%error(2)
+	}
+
+	; after: *node, value -> (THIS)
+	; insert new value after node
+	; for insert_first() set: after = this
+	%void_method{ list_insert_after, 2, 0,
+		; method: THIS = after
+		%list_node:new()   ; new node after
+		%call(__list_insert_after_this)
+		%seg:load(%arg, 1) ; new.value = value
+		%seg:store(%this, %list_node:value)
+	}
+	; after: *node -> value
+	; pop element after given, return it's value
+	; for pop_first() set: after = this
+	%method{ list_pop_after, 1, 0,
+		; method: THIS = after
+		%call(__list_detach_after_this__asserted)
+		%seg:push_seg(%this) ; free THIS
+		%call(free)
+		%seg:load(%this, %list_node:value) ; return detached.value
+	}
+	; this, value -> (THIS)
+	; insert new value at end of list
+	%void_method{ list_insert_back, 2, 0,
+		%list_node:new()   ; new node after
+		%call(__list_index_last)
+		%call(__list_insert_after_this)
+		%seg:load(%arg, 1) ; new.value = value
+		%seg:store(%this, %list_node:value)
+	}
+	; this -> value
+	; pop last element, return it's value
+	%method{ list_pop_back, 1, 0,
+		%foreach { ld 0 } ; nop ; SRC->before last
+		%assert( lmne %minus1 ) ; -1 means empty
+		%seg:point(%this, %src, 0)  ; THIS = SRC
+		%call(__list_detach_after_this__asserted)
+		%seg:push_seg(%this); free THIS
+		%call(free)
+		%seg:load(%this, %list_node:value) ; return detached.value
+	}
+
+	; this ->
+	%void_method{ list_print, 1, 0,
+		outc '['
+		%foreach {
+			outum
+			%if { %this_has_next(),
+				outc ','
+				outc ' '
+			}
+		}
+		outc ']'
+	}
+
+	%namespace impl {
+	;; using procedures to save instructions, most IO happens via segment pointers
+
+		; (THIS)
+		%proc{ __list_assert_this_has_next,
+			%assert(
+				%this_has_next()
+			)
+		}
+		; (THIS) -> (THIS)
+		; traverse list to last node
+		%proc{ __list_index_last,
+			%while { %this_has_next(),
+				%advance_this()
+			}
+		}
+		; (THIS), *node -> (THIS)
+		; insert node after THIS, set THIS to inserted node
+		%void_func{ __list_insert_after_this, 1, 0,
+			%seg:push(%this, %list_node:next) ; tail = this.next
+			%seg:load(%arg, 0)                ; this.next = node
+			%seg:store(%this, %list_node:next)
+			%storer(%this)                    ; THIS = new
+			%seg:pop(%this, %list_node:next)  ; new.next = tail
+		}
+		; (THIS) -> (THIS)
+		; detach single node after THIS, set THIS to detached
+		; assert detachable node exists
+		%proc{ __list_detach_after_this__asserted,
+			%call(__list_assert_this_has_next)
+			%seg:push_seg(%this) ; save head
+			%advance_this()          ; THIS = THIS.next
+			%seg:load(%this, %list_node:next) ; detached.next = null
+			str 0
+			%stack:drop()            ; head.next = detached.next
+			movm
+			strr
+		}
+	}
+
+	%struct:end()
+}
