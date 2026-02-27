@@ -123,7 +123,27 @@
 	%callListMethod(list_size, 2)
 	%printResult('C', '\n')
 
-	; TODO splice
+	; A.splice(C)
+	outc 'S'
+	outc 'P'
+	outc 'L'
+	outc 'I'
+	outc 'C'
+	outc 'E'
+	outc ':'
+	outc ' '
+
+	%callListMethodWithArgs(list_splice, 0, %seg:push(%local, 2)) ; empty C
+
+	%callListMethodWithArgs(list_insert_after, 2, %stack:push(9))
+	%callListMethodWithArgs(list_insert_after, 2, %stack:push(8))
+
+	%print_spaced( outc 'C' )
+	%print_spaced( %callListMethod(list_print, 2) )
+
+	%callListMethodWithArgs(list_splice, 0, %seg:push(%local, 2)) ; splice [8, 9] up front
+
+	%print_endl( %callListMethod(list_print, 0) )
 	
 	; set elems to their idx, emit node addresses
 	%print_spaced( outc 'A' )

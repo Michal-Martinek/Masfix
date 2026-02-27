@@ -177,6 +177,26 @@
 		%seg:load(%this, %list_node:value) ; return detached.value
 	}
 
+	; this, other: *list ->
+	; splice list elements from other to front of this
+	; doesn't reallocate any nodes
+	%void_method{ list_splice, 2, 1,
+		%if { ; other is empty: do nothing
+			%seg:movptr(%arg, 1)
+			lmeq 0
+		,
+			%returnFunc(list_splice)
+		}
+		ldm ; other.first
+		str 0
+		%seg:move(%this, %head) ; tail = this.head, this.head = other.first
+		swap
+		%seg:store(%local, 0)
+		%call(__list_index_last)
+		%seg:load(%local, 0) ; last_spliced.next = tail
+		%seg:store(%this, %list_node:next)
+	}
+
 	; this ->
 	%void_method{ list_print, 1, 0,
 		outc '['
