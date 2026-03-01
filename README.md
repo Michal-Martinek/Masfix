@@ -23,7 +23,6 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 1) Install toolchain
 	* `g++ (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0`
 	* native compilation:
-		* `NASM version 2.16.03 compiled on Apr 17 2024`
 		* `gcc version 13.2.0 (x86_64-posix-seh-rev0, Built by MinGW-Builds project)`
 	* The above are from http://winlibs.com/
 	* `Python 3.13.0`
@@ -34,7 +33,7 @@ g++ Masfix.cpp -o Masfix.exe
 ```
 
 1) Run in interpreting mode  
-_Interpreter works even without nasm/gcc setup._
+_Interpreter works even without gcc setup._
 ```powershell
 Masfix --interpret tests\basic-test.mx
 test.py quick
@@ -44,7 +43,7 @@ test.py quick
 _This sequence should help you set up your enviroment._
 ```powershell
 Masfix --keep-asm --verbose tests\basic-test.mx
-nasm -fwin64 -g -F cv8 tests\basic-test.asm
+gcc -c -o tests\basic-test.obj tests\basic-test.s
 gcc -nostartfiles -Wl,-e,_start -lkernel32 -o tests\basic-test.exe -g tests\basic-test.obj
 tests\basic-test.exe
 echo %ERRORLEVEL%
@@ -55,6 +54,25 @@ test.py run
 ```powershell
 Masfix -r <.mx-file-to-run>
 ```
+
+### IDE setup (VS Code)
+#### Masfix syntax highlighting
+- I use `x86 and x86_64 Assembly` vscode extension
+- set vscode to auto-assign masfix files to this extension in `settings.json`:
+```json
+"files.associations": {
+	"*.mx": "asm-intel-x86-generic"
+}
+```
+
+#### Masfix code running
+- We recommend `Code Runner` extension with:
+```json
+"code-runner.executorMapByFileExtension": {
+	".mx": "Masfix -r",
+}
+```
+
 
 # Getting started
 - intended Masfix file extension - `.mx`

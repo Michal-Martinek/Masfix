@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 rem ---------------------------------------------
 rem remove-junk.bat
-rem Deletes all [.exe .dump .asm] files under a folder,
+rem Deletes all [.exe .dump .asm .s] files under a folder,
 rem    with the option to keep specified filenames.
 rem    keeps Masfix.exe
 rem Usage:
@@ -36,8 +36,8 @@ if defined keepList (
 )
 echo.
 
-rem 2) Loop through every .exe and .dump (recursive)
-for /r "%targetDir%" %%F in (*.exe *.dump *.asm) do (
+rem 2) Loop through listed file extensions (recursive)
+for /r "%targetDir%" %%F in (*.exe *.dump *.asm *.s) do (
     set "fname=%%~nxF"
     set "keepFlag=0"
 

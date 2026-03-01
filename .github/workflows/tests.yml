@@ -14,11 +14,10 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@v4
 
-      - name: Install nasm and mingw (Chocolatey)
+      - name: Install gcc (Chocolatey)
         shell: cmd
         run: |
-          nasm -v || choco install -y nasm
-          gcc -v || choco install -y mingw
+          gcc --version || choco install -y mingw
 
       - name: Set up Python
         uses: actions/setup-python@v4
