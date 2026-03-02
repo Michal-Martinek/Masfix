@@ -1,4 +1,5 @@
 # Masfix — Macro‑First, Assembly‑Like Language
+![Masfix logo](./assets/logos/red-blue.png)
 
 Masfix builds high‑level features from the ground up with a powerful macro system on top of minimal, suffix‑based instructions that compile directly to x64.
 
