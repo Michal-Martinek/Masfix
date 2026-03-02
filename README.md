@@ -126,10 +126,17 @@ strr     ; store r in memory at new addr
 ```
 
 
-# Background & philosophy
-The idea of developing a programming language first came to me when watching [Tsoding's development of _Porth_ language](https://gitlab.com/tsoding/porth).  
-The turing machine basis also comes from his project: [Tula](https://github.com/tsoding/tula).  
-  
-The main goal of this project is to explore how programming language internals work by implementing them from scratch and discovering the various challenges that emerge along the way.
+# Inspiration & background
+### Tsoding
+- The idea of developing a programming language first appeared to me when watching [Tsoding's development of _Porth_ language](https://gitlab.com/tsoding/porth) ([YouTube playlist](https://www.youtube.com/playlist?list=PLpM-Dvs8t0VbMZA7wW9aR3EtBqe2kinu4)).  
+- Concrete vision of **Masfix** came in early 2023 from his other project: [Tula](https://github.com/tsoding/tula).  
+
+### NAND to Tetris
+- great resource for hardware & software design
+- building a processor and software stack from only basic building blocks
+- [YouTube](https://www.youtube.com/playlist?list=PLrDd_kMiAuNmllp9vuPqCuttC1XL9VyVh)
+- Masfix's memory layout & [segments](./std/core/procedures.mx#L153) are inspired by their VM's memory layout
+
+The main goal of this project is to explore how programming language internals work by implementing them from scratch and discovering the various challenges that emerge along the way.  
 
 > Proudly by __Michal-Martinek__
