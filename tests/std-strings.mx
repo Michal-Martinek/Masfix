@@ -46,7 +46,7 @@
 	%string:constructor()
 	%string:constructor()
 
-	%testStrip( ld 0 ) ; empty string
+	%testStrip( ) ; empty string
 	%testStrip{
 		%addChar(0, ' ')
 	}

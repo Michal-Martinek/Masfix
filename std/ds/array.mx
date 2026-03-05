@@ -224,7 +224,7 @@
 		%call(index_impl)
 		%stack:drop()  ; init_acc(this[0]) -> local acc
 		%seg:push(%dest, 0)
-		%call_ptr_with_default(%arg, 1, ld 0) ; default: nop
+		%call_ptr_with_default(%arg, 1,) ; default: acc = this[0]
 		%seg:load(%this, %size)  ; for 1...size
 		%for_full{1, 1,
 			%stack:dup()         ; dest = this[idx]

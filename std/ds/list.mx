@@ -119,7 +119,7 @@
 
 	; this -> size
 	%method{ list_size, 1, 0,
-		%foreach { ld 0 }
+		%foreach { }
 		ldma 1
 	}
 	; this, index -> value (THIS)
@@ -168,7 +168,7 @@
 	; this -> value
 	; pop last element, return it's value
 	%method{ list_pop_back, 1, 0,
-		%foreach { ld 0 } ; nop ; SRC->before last
+		%foreach { } ; SRC->before last
 		%assert( lmne %minus1 ) ; -1 means empty
 		%seg:point(%this, %src, 0)  ; THIS = SRC
 		%call(__list_detach_after_this__asserted)
