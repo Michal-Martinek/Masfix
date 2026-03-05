@@ -684,7 +684,7 @@ public:
 	/// moves Tokens / inserts copies of Tokens from tlist into currList
 	/// first inserted inherits context from percentToken
 	void insertList(list<Token>& tlist, Token& percentToken, bool copy) {
-		assert(tlist.size());
+		if (tlist.empty()) return;
 		if (copy) {
 			itrs.top() = currList().insert(itrs.top(), tlist.begin(), tlist.end());
 		} else {
@@ -857,7 +857,6 @@ public:
 
 // helpers -------------------------------------------------
 	bool _addMacroArg(Macro& mac, vector<pair<list<Token>::iterator, list<Token>::iterator>>& argSpans, list<Token>::iterator& firstArg, Loc loc) {
-		checkReturnOnFail(firstArg != itrs.top(), "Empty argument field not allowed", loc, mac.noteArglist());
 		argSpans.push_back(pair(firstArg, itrs.top()));
 		return true;
 	}
@@ -1194,7 +1193,12 @@ bool processExpansionArglist(Token& token, Scope& scope, Macro& mac, Loc& loc) {
 			retval = retval && scope.sliceArglist(mac, loc);
 		);
 	} else {
-		return check(mac.argList.size() == 0, "Missing expansion arguments", loc, mac.noteArglist());
+		if (mac.argList.size() == 1) { // register empty argument
+			vector<pair<list<Token>::iterator, list<Token>::iterator>> argSpans;
+			argSpans.push_back(pair(token.tlist.begin(), token.tlist.end()));
+			mac.addExpansionArgs(argSpans);
+		}
+		return check(mac.argList.size() <= 1, "Missing expansion arguments", loc, mac.noteArglist());
 	}
 	return true;
 }

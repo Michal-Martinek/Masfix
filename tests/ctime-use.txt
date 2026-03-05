@@ -1,11 +1,10 @@
 :returncode 1
 
-:stderr 2214
+:stderr 2227
 tests\ctime-use.mx:13:1 ERROR: Missing directive name
 tests\ctime-use.mx:14:2 ERROR: Invalid directive name '!'
 tests\ctime-use.mx:15:1 ERROR: Unexpected ctime forcing '!'
-tests\ctime-use.mx:16:3 ERROR: Missing expansion arguments
-    - NOTE: Expected arguments: m(b)
+tests\ctime-use.mx:4:2 ERROR: Target value expected 'ld'
 tests\ctime-use.mx:18:6 ERROR: Unexpected token after macro use '!'
 tests\ctime-use.mx:19:7 ERROR: Unexpected macro use
 tests\ctime-use.mx:30:2 ERROR: Directive must not continue
@@ -18,6 +17,7 @@ tests\ctime-use.mx:4:2 ERROR: Undefined label 'ld grr'
 tests\ctime-use.mx:60:27 ERROR: Undeclared identifier 'c'
 tests\ctime-use.mx:60:40 ERROR: Expected instr field
 tests\ctime-use.mx:60:45 ERROR: Undeclared identifier 'oo'
+tests\ctime-use.mx:16:1 ERROR: Unexpected token '0'
 tests\ctime-use.mx:19:1 ERROR: Unexpected token '2'
 tests\ctime-use.mx:30:1 ERROR: Missing label name
 tests\ctime-use.mx:31:1 ERROR: Invalid label name '2'

@@ -191,3 +191,29 @@ ld %const !const
 	ld %const !const
 }
 %ctime(6)
+
+; empty arg field
+%twoArg()
+%threeArg()
+%oneArg(,)
+%twoArg(,)
+%threeArg(,)
+%threeArg(,,)
+
+%macro noArg() {}
+%macro nop(arg) {}
+%macro unop(p) { stra %p } ; unipersita oprany te k sobe pripouta (nebo zbicuje)
+%noArg(  %noArg())
+%noArg(  %nop( ) )
+%noArg(  %nop(9) )
+%noArg( %unop( ) )
+%noArg( %unop(9) )
+
+%unop( %noArg())
+%unop( %nop( ) )
+%unop( %nop(5) )
+%unop(%unop( ) )
+%unop(%unop(6) )
+
+%twoArg(  )
+%twoArg( %nop() )
