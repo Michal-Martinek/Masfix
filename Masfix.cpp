@@ -161,10 +161,11 @@ enum InstrNames {
 	Isysargq,
 	Isysaddr,
 	Isyscall,
+	Isysretq,
 
 	InstructionCount
 };
-static_assert(InstructionCount == 18, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 19, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -187,6 +188,7 @@ map<string, InstrNames> StrToInstr {
 {"sysargq", Isysargq},
 {"sysaddr", Isysaddr},
 {"syscall", Isyscall},
+{"sysretq", Isysretq},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -1572,7 +1574,6 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 18, "Exhaustive parseInstrOpcode definition");
 	for (int checkedLen = instr.opcodeStr.size(); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = instr.opcodeStr.substr(0, checkedLen);
 		if (substr == "sys") break; // unrecognized sys instr -> avoid "Unknown condition" error
@@ -1607,10 +1608,12 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
+	if (instr.instr == Isyscall) {
+		checkReturnOnFail(imm.type == Talpha || imm.type == Tstring, "Expected syscall identifier", instr);
+		return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+	}
 	if (imm.type == Talpha) {
-		if (instr.instr == Isyscall) {
-			return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
-		} else if (!parseCtx.strToLabel.count(imm.data)) {
+		if (!parseCtx.strToLabel.count(imm.data)) {
 			checkReturnOnFail(_validIdentChar(imm.data.at(0)), "Invalid instruction immediate", instr);
 			return check(false, "Undefined label", instr);
 		}
@@ -1654,7 +1657,7 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 18 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 19 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
@@ -1732,7 +1735,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 18, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 19, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1771,7 +1774,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
-	} else if (instr.instr == Isysargw || instr.instr == Isysargq || instr.instr == Isysaddr) {
+	} else if (instr.instr == Isysargw || instr.instr == Isysargq || instr.instr == Isysaddr || instr.instr == Isysretq) {
 		unreachable();
 	} else if (instr.instr == Isyscall) {
 		unreachable();
@@ -1907,7 +1910,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 18, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 19, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr == Imov) {
@@ -1960,6 +1963,9 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 			"	call sysargs_push\n";
 	} else if (instr == Isyscall) {
 		outFile << "	call call_syscall\n";
+	} else if (instr == Isysretq) {
+		outFile << "	mov rax, [rip + sys_retval]\n"
+			"	mov QWORD PTR [r13 + 2*rcx], rax\n";
 	} else {
 		unreachable();
 	}
@@ -2195,6 +2201,8 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	sub rsp, 32 # reserve shadow space\n"
 		"	call rax\n"
 		"	# retvalue\n"
+		"	mov [rip + sys_retval], rax\n"
+		"	mov r15w, ax\n"
 		"	# restore regs\n"
 		"	mov rsp, rbp\n"
 		"	ret\n"
@@ -2249,6 +2257,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	stdin_buff_char_count: .skip 8\n"
 		"\n"
 		"	sys_args_count: .skip 8\n"
+		"	sys_retval: .skip 8\n"
 		"	sys_args: .skip 8 * 8\n"
 		"\n"
 		".data\n"

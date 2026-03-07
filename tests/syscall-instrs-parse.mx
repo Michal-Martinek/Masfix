@@ -35,3 +35,26 @@ sysargw
 sysargwa 8
 sysargwra 8
 sysargw label
+
+sysret
+sysretq
+sysretq 8
+sysretq< 8
+sysretqm
+sysretqmt label
+
+syscal
+syscall
+syscallq
+syscallr
+syscallra
+syscalla
+syscall 0
+syscall 65535
+syscall label
+syscall 'c'
+syscall "name"
+syscall "ExitProcess"
+syscall "exitProcess"
+syscall "\n"
+syscall .
