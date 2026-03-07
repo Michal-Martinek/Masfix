@@ -196,6 +196,13 @@ map<InstrNames, RegNames> InstrToModReg = {
 	// others don't have modifiable destination
 };
 
+map<string, int> SyscallIdentToType = {
+	{"ExitProcess", 0},
+	{"GetStdHandle", 0},
+	{"WriteFile", 0},
+	{"ReadFile", 0},
+};
+
 // structs -------------------------------
 struct Loc {
 	string file;
@@ -1601,7 +1608,9 @@ bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
 	if (imm.type == Talpha) {
-		if (!parseCtx.strToLabel.count(imm.data)) {
+		if (instr.instr == Isyscall) {
+			return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+		} else if (!parseCtx.strToLabel.count(imm.data)) {
 			checkReturnOnFail(_validIdentChar(imm.data.at(0)), "Invalid instruction immediate", instr);
 			return check(false, "Undefined label", instr);
 		}
@@ -1631,8 +1640,8 @@ bool checkSuffixCombination(Instr& instr) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
 	} else if (instr.instr == Isyscall) {
-		// TODO
-		// unreachable();
+		checkReturnOnFail(!instr.hasReg() && !instr.hasOp(), "Unexpected syscall suffix", instr);
+		checkReturnOnFail(instr.hasImm(), "Expected syscall identifier", instr);
 	} else {
 		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
 		if (instr.hasOp()) {
@@ -1942,21 +1951,15 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 			"	cmp rdx, 10\n"
 			"	jne instr_" << instrNum << "\n";
 	} else if (instr == Isysargw) {
-		outFile <<
-			"	movzx rcx, WORD PTR [r13 + 2*rcx]\n"
-			"	call sysargs_push\n";
+		outFile << "	call sysargs_push\n";
 	} else if (instr == Isysargq) {
-		outFile <<
-			"	mov rcx, [r13 + 2*rcx]\n"
+		outFile << "	mov rcx, [r13 + 2*rcx]\n"
 			"	call sysargs_push\n";
 	} else if (instr == Isysaddr) {
-	outFile <<
-		"	lea rcx, [r13 + 2*rcx]\n"
-		"	call sysargs_push\n";
+		outFile << "	lea rcx, [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
 	} else if (instr == Isyscall) {
-	outFile <<
-		"	lea rax, [rip + ReadFile]\n"
-		"	call call_syscall\n";
+		outFile << "	call call_syscall\n";
 	} else {
 		unreachable();
 	}
@@ -1973,7 +1976,11 @@ void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 		genRegisterFetch(outFile, instr.suffixes.reg, instrNum, !instr.hasOp());
 	}
 	if (instr.hasImm()) {
-		outFile << "	mov rcx, " << instr.immediate << '\n';
+		if (instr.instr == Isyscall) {
+			outFile << "	lea rax, [rip + " << instr.immediates.front().data << "]\n";
+		} else {
+			outFile << "	mov rcx, " << instr.immediate << '\n';
+		}
 	}
 	if (instr.hasOp()) {
 		genOperation(outFile, instr.suffixes.op);
