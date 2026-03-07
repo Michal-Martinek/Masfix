@@ -156,9 +156,14 @@ enum InstrNames {
 	Iipc,
 	Iinu,
 	Iinl,
+
+	Isysargq,
+	Isysaddr,
+	Isyscall,
+
 	InstructionCount
 };
-static_assert(InstructionCount == 14, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 17, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -176,6 +181,10 @@ map<string, InstrNames> StrToInstr {
 {"ipc", Iipc},
 {"inu", Iinu},
 {"inl", Iinl},
+
+{"sysargq", Isysargq},
+{"sysaddr", Isysaddr},
+{"syscall", Isyscall},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -1554,8 +1563,8 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 14, "Exhaustive parseInstrOpcode definition");
-	for (int checkedLen = min(4, (int)instr.opcodeStr.size()); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
+	static_assert(InstructionCount == 17, "Exhaustive parseInstrOpcode definition");
+	for (int checkedLen = instr.opcodeStr.size(); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = instr.opcodeStr.substr(0, checkedLen);
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
@@ -1618,6 +1627,9 @@ bool checkSuffixCombination(Instr& instr) {
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
+	} else if (instr.instr == Isyscall) {
+		// TODO
+		// unreachable();
 	} else {
 		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
 		if (instr.hasOp()) {
@@ -1630,8 +1642,8 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
-	assert(instr.instr != InstructionCount);
+	static_assert(InstructionCount == 17 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
 		raiseWarning("No-OP instruction", instr);
@@ -1708,7 +1720,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 14, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 17, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1747,8 +1759,13 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
+	} else if (instr.instr == Isysargq || instr.instr == Isysaddr) {
+		unreachable();
+	} else if (instr.instr == Isyscall) {
+		unreachable();
+	} else {
+		unreachable();
 	}
-	else unreachable();
 }
 void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
@@ -1878,7 +1895,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 14, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 17, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr == Imov) {
@@ -1921,11 +1938,23 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		outFile << "	call get_next_char\n"
 			"	cmp rdx, 10\n"
 			"	jne instr_" << instrNum << "\n";
+	} else if (instr == Isysargq) {
+		outFile <<
+			"	mov rcx, [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
+		} else if (instr == Isysaddr) {
+		outFile <<
+			"	lea rcx, [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
+		} else if (instr == Isyscall) {
+		outFile <<
+			"	lea rax, [rip + ExitProcess]\n"
+			"	call call_syscall\n";
 	} else {
 		unreachable();
 	}
 }
-void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
+void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
 	// operands - first - rbx, second - rcx (also result of operation)
 	// addr of cells[0] - r13
@@ -2112,12 +2141,43 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	pop rax\n"
 		"	ret\n"
 		"\n"
+		"# syscalls ----------------------------\n"
+		"\n"
+		"# qword: rcx - pushed to sys_args\n"
+		"sysargs_push:\n"
+		"	lea rbx, [rip + sys_args] # sys_args[count] = rcx\n"
+		"	mov rax, [rip + sys_args_count]\n"
+		"	mov [rbx + 8*rax], rcx\n"
+		"	inc QWORD PTR [rip + sys_args_count]\n"
+		"	ret\n"
+		"\n"
+		"# rax: winapi func addr\n"
+		"call_syscall:\n"
+		"	# align stack\n"
+		"	mov rbp, rsp\n"
+		"	and rsp, -16 # force 16-byte alignment\n"
+		"\n"
+		"	# pop args -> regs\n"
+		"	mov rcx, [rip + sys_args + 0]\n"
+		"	mov rdx, [rip + sys_args + 8]\n"
+		"	mov r8, [rip + sys_args + 16]\n"
+		"	mov r9, [rip + sys_args + 24]\n"
+		"	# TODO args to stack\n"
+		"	# syscall\n"
+		"	sub rsp, 32 # reserve shadow space\n"
+		"	call rax\n"
+		"	# retvalue\n"
+		"	# restore regs\n"
+		"	mov rsp, rbp\n"
+		"\n"
 		".global _start\n"
 		"_start:\n"
 		"	# initialization\n"
 		"	call get_std_fds\n"
 		"	mov QWORD PTR [rip + stdin_buff_char_count], 0\n"
 		"	mov QWORD PTR [rip + stdin_buff_chars_read], 0\n"
+		"\n"
+		"	mov QWORD PTR [rip + sys_args_count], 0\n"
 		"\n"
 		"	lea r13, QWORD PTR [rip + cells]\n"
 		"	xor r14, r14\n"
@@ -2129,7 +2189,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		instr = instrs[i];
 		outFile << "instr_" << i << ":\n";
 		outFile << "	# " << instr.toStr() << '\n';
-		genAssembly(outFile, instr, i);
+		genInstr(outFile, instr, i);
 	}
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
@@ -2157,6 +2217,9 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	stdin_buff:  .skip STDIN_BUFF_SIZE  # resb\n"
 		"	stdin_buff_chars_read: .skip 8\n"
 		"	stdin_buff_char_count: .skip 8\n"
+		"\n"
+		"	sys_args_count: .skip 8\n"
+		"	sys_args: .skip 8 * 8\n"
 		"\n"
 		".data\n"
 		"	.equ STDOUT_BUFF_SIZE, " << STDOUT_BUFF_SIZE << "\n"
