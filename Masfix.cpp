@@ -1566,6 +1566,7 @@ bool parseInstrOpcode(Instr& instr) {
 	static_assert(InstructionCount == 17, "Exhaustive parseInstrOpcode definition");
 	for (int checkedLen = instr.opcodeStr.size(); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = instr.opcodeStr.substr(0, checkedLen);
+		if (substr == "sys") break; // unrecognized sys instr -> avoid "Unknown condition" error
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
 			string suffix = instr.opcodeStr.substr(checkedLen);

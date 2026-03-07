@@ -1,0 +1,21 @@
+:returncode 1
+
+:stderr 1268
+tests\syscall-instrs-parse.mx:3:1 ERROR: Target value expected 'sysaddr'
+tests\syscall-instrs-parse.mx:7:1 ERROR: This instruction cannot have a modifier 'sysaddra'
+tests\syscall-instrs-parse.mx:8:1 ERROR: This instruction cannot have a modifier 'sysaddrt 7'
+tests\syscall-instrs-parse.mx:10:1 ERROR: Unexpected register suffix 'sysaddrmar'
+tests\syscall-instrs-parse.mx:11:1 ERROR: Unexpected operation suffix 'sysaddrmat'
+tests\syscall-instrs-parse.mx:16:1 ERROR: Missing condition 'sy'
+tests\syscall-instrs-parse.mx:17:1 ERROR: Unknown instruction 'sys'
+tests\syscall-instrs-parse.mx:18:1 ERROR: Unknown instruction 'sysp'
+tests\syscall-instrs-parse.mx:19:1 ERROR: Unknown instruction 'sysarg'
+tests\syscall-instrs-parse.mx:20:1 ERROR: Unknown instruction 'sysargh'
+tests\syscall-instrs-parse.mx:21:1 ERROR: Unknown instruction 'sysargb'
+tests\syscall-instrs-parse.mx:23:1 ERROR: Target value expected 'sysargq'
+tests\syscall-instrs-parse.mx:27:1 ERROR: This instruction cannot have a modifier 'sysargqa'
+tests\syscall-instrs-parse.mx:28:1 ERROR: This instruction cannot have a modifier 'sysargqt 7'
+tests\syscall-instrs-parse.mx:30:1 ERROR: Unexpected register suffix 'sysargqmar'
+tests\syscall-instrs-parse.mx:31:1 ERROR: Unexpected operation suffix 'sysargqmat'
+
+

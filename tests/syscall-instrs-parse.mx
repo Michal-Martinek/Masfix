@@ -1,0 +1,32 @@
+
+; test syntax of syscall instructions
+sysaddr
+sysaddrr
+sysaddrh
+sysaddrp
+sysaddra
+sysaddrt 7
+sysaddr label
+sysaddrmar
+sysaddrmat
+sysaddrma 2
+
+:label
+
+sy
+sys
+sysp
+sysarg
+sysargh
+sysargb
+
+sysargq
+sysargqr
+sysargqh
+sysargqp
+sysargqa
+sysargqt 7
+sysargq label
+sysargqmar
+sysargqmat
+sysargqma 2
