@@ -157,13 +157,14 @@ enum InstrNames {
 	Iinu,
 	Iinl,
 
+	Isysargw,
 	Isysargq,
 	Isysaddr,
 	Isyscall,
 
 	InstructionCount
 };
-static_assert(InstructionCount == 17, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 18, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -182,6 +183,7 @@ map<string, InstrNames> StrToInstr {
 {"inu", Iinu},
 {"inl", Iinl},
 
+{"sysargw", Isysargw},
 {"sysargq", Isysargq},
 {"sysaddr", Isysaddr},
 {"syscall", Isyscall},
@@ -1563,7 +1565,7 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 17, "Exhaustive parseInstrOpcode definition");
+	static_assert(InstructionCount == 18, "Exhaustive parseInstrOpcode definition");
 	for (int checkedLen = instr.opcodeStr.size(); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = instr.opcodeStr.substr(0, checkedLen);
 		if (substr == "sys") break; // unrecognized sys instr -> avoid "Unknown condition" error
@@ -1643,7 +1645,7 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 17 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 18 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
@@ -1721,7 +1723,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 17, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 18, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1760,7 +1762,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
-	} else if (instr.instr == Isysargq || instr.instr == Isysaddr) {
+	} else if (instr.instr == Isysargw || instr.instr == Isysargq || instr.instr == Isysaddr) {
 		unreachable();
 	} else if (instr.instr == Isyscall) {
 		unreachable();
@@ -1896,7 +1898,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 17, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 18, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr == Imov) {
@@ -1939,18 +1941,22 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		outFile << "	call get_next_char\n"
 			"	cmp rdx, 10\n"
 			"	jne instr_" << instrNum << "\n";
+	} else if (instr == Isysargw) {
+		outFile <<
+			"	movzx rcx, WORD PTR [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
 	} else if (instr == Isysargq) {
 		outFile <<
 			"	mov rcx, [r13 + 2*rcx]\n"
 			"	call sysargs_push\n";
-		} else if (instr == Isysaddr) {
-		outFile <<
-			"	lea rcx, [r13 + 2*rcx]\n"
-			"	call sysargs_push\n";
-		} else if (instr == Isyscall) {
-		outFile <<
-			"	lea rax, [rip + ExitProcess]\n"
-			"	call call_syscall\n";
+	} else if (instr == Isysaddr) {
+	outFile <<
+		"	lea rcx, [r13 + 2*rcx]\n"
+		"	call sysargs_push\n";
+	} else if (instr == Isyscall) {
+	outFile <<
+		"	lea rax, [rip + ReadFile]\n"
+		"	call call_syscall\n";
 	} else {
 		unreachable();
 	}
@@ -2157,6 +2163,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	# align stack\n"
 		"	mov rbp, rsp\n"
 		"	and rsp, -16 # force 16-byte alignment\n"
+		"	push 0\n"
 		"\n"
 		"	# args to stack\n"
 		"	call_syscall_stack_args: # while arg count > 4: pop args -> push call stack\n"
