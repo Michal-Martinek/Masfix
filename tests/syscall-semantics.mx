@@ -75,13 +75,23 @@ mova 1
 outum
 outc '\n'
 
-%macro test_std_handle(handle) {
+%macro test_std_handle(handle, print) {
 	%handle
 	syscall GetStdHandle
+	sysretq 3
+	; hide value if != -1
+	mov 100
+	str %print
+	bmne print_def_(%print)
+	mov 3
+	strsr
+	bmne end
+	str 'h'
+	ld 11111
+:print_def_(%print)
 	outur
 	outc ';'
 	outc ' '
-	sysretq 3
 
 	mov 0
 	outum
@@ -138,9 +148,11 @@ str 88
 
 %test_std_handle(
 	sysargw 33 ; bad arg -> (QWORD)-1
+	, 1
 )
 %test_std_handle(
 	%dword_negative(11) ; 104
+	, 0 ; hide volatile handle value
 )
 
 mov 0
@@ -152,3 +164,8 @@ outcm
 mova 1
 outcm
 outc '\n'
+
+sysargw 1234
+syscall ExitProcess
+
+outu 5
