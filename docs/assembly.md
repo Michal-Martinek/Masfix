@@ -156,6 +156,46 @@ outcmt 2 ; prints ('-' * 2) = 90 = 'Z'
 outurs 30 ; prints (65 - 30) = 35
 ```
 
+### System call instructions
+Masfix supports making calls to [Windows API](https://learn.microsoft.com/en-us/windows/win32/apiindex/windows-api-list) system subroutines.  
+Users first push relevant arguments, then use `syscall` instruction to execute it.  
+
+#### pushing syscall arguments
+Push requested arguments one by one from left to right as in function prototype.  
+* `sysargw` - push one architecture wide number (16 bits) as argument
+* `sysargq` - push 8 consecutive bytes starting at memory[target] as argument
+	- numbers are stored in little-endian format
+* `sysaddr` - push 64 bit address of memory[target]
+
+These instructions have no other side-effects.  
+
+#### syscall & return
+* `syscall SysName` - perform system call to `SysName` with previously pushed arguments
+	- bottom bits of return value stored in **r**
+* `sysretq` - store last syscall's return value to 8 bytes starting at memory[target] (see `sysargq`)
+
+#### Syscall examples
+```
+sysargq 4 ; push file handle stored at mem addresses [4-7] (64 = 4 * 16 bits)
+sysaddr %WRITE_BUFF ; push pointer to masfix memory at %WRITE_BUFF
+mov %WRITE_BUFF ; set c-string to output
+	str '!' ; pack 2 chars into one memory addr - WriteFile reads raw bytes
+	ld '#'  ; little-endian (lower 8 - first char)
+	str|r< 8
+	mova 1  ; null termination
+	str 0
+sysargw 2   ; num bytes - 16 bit value 2 gets zero padded to 64 bits
+sysaddr 16  ; address where system puts number of bytes written as 32 bit result
+sysargw 0   ; null pointer
+syscall WriteFile ; https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-writefile
+
+; bottom 16 bits of result in r
+sysretq 8   ; whole 64 bits of result stored to mem[8]
+
+sysargw 1234        ; (QWORD)1234
+syscall ExitProcess ; exits process with given exit code
+```
+
 ### Operations
 Operations perform aritmetic or bitwise operations between [registers](#registers) and [immediate value](#immediate).  
 Operands "come in the same order" (_L/R_) as in the [instruction suffix](#suffixes).  
