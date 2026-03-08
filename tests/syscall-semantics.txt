@@ -1,5 +1,7 @@
 :returncode 1234
 
+:testmode runonly
+
 :stdout 115
 > $ 1, 5:
 81
