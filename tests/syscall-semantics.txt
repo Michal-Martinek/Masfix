@@ -2,8 +2,10 @@
 
 :testmode runonly
 
-:stdout 115
-> $ 1, 5:
+:stdout 140
+> $ 
+DW 1295,4,0,1298,1299,0
+1, 5:
 81
 QE
 000

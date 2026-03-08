@@ -14,6 +14,7 @@
 	sysargq 8
 }
 %define WRITE_BUFF 77
+%define num_written 16
 %macro syscall_fileAPI(handle, bytes, cstr_instrs) {
 	%dword_negative(%handle) ; stdout
 	syscall GetStdHandle
@@ -24,10 +25,24 @@
 	sysaddr(h)
 	%cstr_instrs
 	sysargw %bytes ; num bytes
-	sysaddr 16 ; num written
+	sysaddr %num_written
 	sysargw 0 ; overlapped
 	syscall WriteFile
 }
+
+; test system only writes DWORD to num_written
+mov %num_written
+movs 1
+strh| 1280 ; bits: 101|h
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+
 %syscall_fileAPI(11, 4,
 	str '>'
 	ld ' '
@@ -37,8 +52,33 @@
 	ld ' '
 	str|r< 8
 )
-mov 100
+mov 100 ; retval
 strr
+
+outc '\n'
+mov %num_written
+outc 'D'
+outc 'W'
+outc ' '
+movs 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc '\n'
+
 ; report retvalue + numwritten (from "> ")
 %syscall_fileAPI(12, 4,
 	str '('
@@ -47,7 +87,7 @@ strr
 	mov %WRITE_BUFF
 	str|r< 8
 
-	mov 16 ; num written (2)
+	mov %num_written ; num written (2)
 	ldma '0'
 	mov %WRITE_BUFF
 	mova 1
