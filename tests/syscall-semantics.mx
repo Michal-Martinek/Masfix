@@ -1,0 +1,154 @@
+
+%macro dword_negative(x) {
+mov 8
+str 0
+strs %x
+mova 1
+str 0
+strs 1
+mova 1
+str 0
+mova 1
+str 0
+sysargq 8
+}
+
+%dword_negative(11) ; stdout
+syscall GetStdHandle
+
+sysretq 0 ; handle
+sysargq 0
+mov 77 ; "buff"
+str '>'
+ld ' '
+str|r< 8
+sysaddr(h)
+sysargw 2 ; num bytes
+sysaddr 8 ; num written
+sysargw 0 ; overlapped
+syscall WriteFile
+
+outc '('
+mov 8
+outum
+outc ')'
+
+; handle
+%dword_negative(10) ; stdin
+syscall GetStdHandle
+sysretq 0 ; handle
+sysargq 0
+
+; buffer
+sysaddr 10000
+
+; bytes to read
+sysargw 8
+
+sysaddr 8 ; res - read
+sysargw 0 ; overlapped
+
+ld 67
+syscall ReadFile
+
+outur
+outc ','
+outc ' '
+mov 8
+outum
+outc ':'
+outc 10
+
+mov 10000
+outum& 255
+outc '\n'
+outcm
+mova 1
+outcm
+mova 1
+outcm
+mova 1
+outum
+mova 1
+outum
+mova 1
+outum
+outc '\n'
+
+%macro test_std_handle(handle) {
+	%handle
+	syscall GetStdHandle
+	outur
+	outc ';'
+	outc ' '
+	sysretq 3
+
+	mov 0
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '|'
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '|'
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '\n'
+	mova 1
+}
+
+; memset 0: ABCD
+mov 0
+str 65
+mova 1
+str 66
+mova 1
+str 67
+mova 1
+str 68
+
+; after
+mova 3
+str 55
+mova 1
+str 66
+mova 1
+str 77
+mova 1
+str 88
+
+%test_std_handle(
+	sysargw 33 ; bad arg -> (QWORD)-1
+)
+%test_std_handle(
+	%dword_negative(11) ; 104
+)
+
+mov 0
+outcm
+mova 1
+outcm
+mova 1
+outcm
+mova 1
+outcm
+outc '\n'
