@@ -1,37 +1,62 @@
 
+; test basic syscall instruction semantics
 %macro dword_negative(x) {
-mov 8
-str 0
-strs %x
-mova 1
-str 0
-strs 1
-mova 1
-str 0
-mova 1
-str 0
-sysargq 8
+	mov 8
+	str 0
+	strs %x
+	mova 1
+	str 0
+	strs 1
+	mova 1
+	str 0
+	mova 1
+	str 0
+	sysargq 8
 }
+%define WRITE_BUFF 77
+%macro syscall_fileAPI(handle, bytes, cstr_instrs) {
+	%dword_negative(%handle) ; stdout
+	syscall GetStdHandle
 
-%dword_negative(11) ; stdout
-syscall GetStdHandle
+	sysretq 0 ; handle
+	sysargq 0
+	mov %WRITE_BUFF ; "buff"
+	sysaddr(h)
+	%cstr_instrs
+	sysargw %bytes ; num bytes
+	sysaddr 16 ; num written
+	sysargw 0 ; overlapped
+	syscall WriteFile
+}
+%syscall_fileAPI(11, 4,
+	str '>'
+	ld ' '
+	str|r< 8
+	mova 1
+	str '$'
+	ld ' '
+	str|r< 8
+)
+mov 100
+strr
+; report retvalue + numwritten (from "> ")
+%syscall_fileAPI(12, 4,
+	str '('
+	mov 100
+	ldma '0' ; (int)retval
+	mov %WRITE_BUFF
+	str|r< 8
 
-sysretq 0 ; handle
-sysargq 0
-mov 77 ; "buff"
-str '>'
-ld ' '
-str|r< 8
-sysaddr(h)
-sysargw 2 ; num bytes
-sysaddr 8 ; num written
-sysargw 0 ; overlapped
-syscall WriteFile
+	mov 16 ; num written (2)
+	ldma '0'
+	mov %WRITE_BUFF
+	mova 1
+	strr
+	
+	ld ')'
+	str|r< 8
+)
 
-outc '('
-mov 8
-outum
-outc ')'
 
 ; handle
 %dword_negative(10) ; stdin
@@ -75,6 +100,7 @@ mova 1
 outum
 outc '\n'
 
+; test QWORD operations memory safety
 %macro test_std_handle(handle, print) {
 	%handle
 	syscall GetStdHandle
