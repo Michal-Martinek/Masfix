@@ -2,6 +2,33 @@
 %include "memory"
 %include "control"
 
+%define DWORD 2 ; words
+%define QWORD 4
+%namespace int64 {
+	%define sizeof 4
+	%macro init() {
+		str 0
+		mova 1
+		str 0
+		mova 1
+		str 0
+		mova 1
+		str 0
+		movs 3
+	}
+	%macro initMinusR(where) {
+		mov %where
+		str 0
+		strsr
+		mova 1
+		str %minus1
+		mova 1
+		str %minus1
+		mova 1
+		str %minus1
+	}
+}
+
 ; TODO should these be ctime only macros?
 
 ; perform any binary operation (supply only letters)

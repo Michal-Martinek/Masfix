@@ -1,4 +1,9 @@
 
+%define BITS 16 ; per word
+%define BYTES_PER_WORD 2
+%define WORD_IDX_WIDTH 1 ; 2 ^ WORD_IDX_WIDTH = BYTES_PER_WORD
+%define WORD_IDX_MASK 1 ; BYTES_PER_WORD - 1
+
 ; generic memory access -------------------------
 %macro store(at, val) {
 	mov %at
