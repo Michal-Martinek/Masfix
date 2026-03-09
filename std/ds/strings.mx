@@ -121,3 +121,90 @@
 
 	%struct:end()
 }
+
+; C-style string - null-terminated, packed bytes
+%namespace cstr {
+	%struct:begin()
+	%struct:field(data, 1)
+
+	; buffer, buff_size: words, string -> bytes_written
+	; pack string to buffer
+	%func{ cstr_pack_string, 3, 0,
+		%seg:pointptr(%this, %arg, 2)
+		%seg:pointptr(%src, %arg, 0) ; dest in buff
+		movm ; ensure zero padd
+		str 0
+		%array:foreach {
+			%if_else { ; writing high / low
+				%stack:top()
+				ld& %WORD_IDX_MASK
+			, ; high portion
+				%seg:load(%dest, 0)
+				%seg:move(%src, 0)
+				str|r< 8 ; high part is 0
+				mova 1   ; nullify next
+				str 0
+				%seg:advance(%src, 1)
+			, ; lower
+				%seg:load(%dest, 0)
+				%seg:move(%src, 0)
+				strr& 255 ; nullify high part
+				%if { ; if next byte would be written outside buffer
+					%load(%src) ; SRC - &buffer + 1 >= buff_size
+					%seg:arg(0, ldsm)
+					lda 1
+					%seg:arg(1, lrgem)
+				,
+					%loop_break_offset(2)
+				}
+			}
+		}
+		%stack:top() ; recover idx -> bytes_written
+		mova 2
+		ldma 1 ; idx -> count
+	}
+	
+	; string -> cstr
+	; construct new c-string from string
+	%func{ cstr_from_string, 1, 2,
+		%seg:pointptr(%this, %arg, 0)
+		; locals: buff_size, *cstr
+		%stack:dropN(2) ; store in locals
+		%seg:push(%this, %array:size) ; buff_size = string.size / BYTES_PER_WORD + 2
+		str> %WORD_IDX_WIDTH
+		stra 2 ; extra for padding
+		%stack:pushm() ; *cstr = malloc(buff_size)
+		%call(malloc)
+		%save_retval() ; return buffer (destroy ARG 0 !)
+		%stack:swap2() ; pack(buffer, buff_size, string)
+		%seg:push_seg(%this)
+		%call(cstr_pack_string)
+		%returnFunc(cstr_from_string) ; dont overwrite retval
+	}
+
+	; cstr_data, string ->
+	; unpack characters from cstr to string by appending them
+	%void_func{ cstr_unpack_to_string, 2, 0,
+		%seg:pointptr(%src, %arg, 0)
+		%do_while { ld 1,
+			%seg:push(%src, 0) ; unpack word to stack
+			str> 8 ; high part
+			%stack:pushr()
+			str& 255
+
+			%seg:push(%arg, 1)
+			%stack:swap2()
+			beq cstr_unpack_to_string__end ; byte == 0
+			%call(push_back)
+
+			%seg:push(%arg, 1)
+			%stack:swap2()
+			beq cstr_unpack_to_string__end
+			%call(push_back)
+
+			%seg:advance(%src, 1)
+		}
+		:cstr_unpack_to_string__end
+	}
+	%struct:end()
+}
