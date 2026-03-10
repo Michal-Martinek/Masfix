@@ -6,6 +6,7 @@
 %include "structs"
 %include "array"
 %include "strings"
+%include "system.mx"
 
 ; buffered file IO
 %namespace filestream {
@@ -43,9 +44,8 @@
 			%int64:initMinusR(%temp_addr)
 			sysargq %temp_addr
 		)
-		syscall GetStdHandle
-		%seg:load_addr(%this, %handle)
-		sysretq(r)
+		%sys:call(GetStdHandle)
+		%sys:retto(%this, %handle)
 	}
 
 	%namespace WIN_DesiredAccess { ; can be combined
@@ -64,24 +64,21 @@
 	; this, filename: cstr, DesiredAccess, CreationDisposition ->
 	; open or create specified file
 	%void_method{ filestream_open_file, 4, 0,
-		%seg:load(%arg, 1)  ; [in] LPCSTR lpFileName
-		sysaddr(r)
-		%seg:load(%arg, 2)  ; [in] DWORD dwDesiredAccess
+		%sys:ptr(%arg, 1)      ; [in] LPCSTR lpFileName
+		%seg:load(%arg, 2)     ; [in] DWORD dwDesiredAccess
 		%seg:temp(0,
 			%int64:init()
 			mova %int64:DWORD_HIGH
 			strr< !op(t, 3, 4)
 		)
 		sysargq %temp_addr
-		sysargw 1           ; [in] DWORD dwShareMode = FILE_SHARE_READ
-		sysargw 0           ; [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL
-		%seg:load(%arg, 3)  ; [in] DWORD dwCreationDisposition
-		sysargw(r)
-		sysargw 128         ; [in] DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL
-		sysargw 0           ; [in, optional] HANDLE hTemplateFile = NULL
-		syscall CreateFileA ; HANDLE CreateFileA()
-		%seg:move(%this, %handle)
-		sysretq(h)
+		%sys:argimm(1)         ; [in] DWORD dwShareMode = FILE_SHARE_READ
+		%sys:nullptr()         ; [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL
+		%sys:argw(%arg, 3)     ; [in] DWORD dwCreationDisposition
+		%sys:argimm(128)       ; [in] DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL
+		%sys:nullptr()         ; [in, optional] HANDLE hTemplateFile = NULL
+		%sys:call(CreateFileA) ; HANDLE CreateFileA()
+		%sys:retto(%this, %handle)
 	}
 
 	%struct:end()

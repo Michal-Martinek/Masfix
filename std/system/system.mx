@@ -1,0 +1,47 @@
+
+%include "procedures"
+
+
+;; generic utility for system calls
+%namespace sys {
+;; arguments
+	%macro argimm(value) {
+		sysargw %value
+	}
+	%macro nullptr() {
+		%argimm(0)
+	}
+	; push value in seg as sysarg
+	%macro argw(seg_name, idx) {
+		%seg:load(%seg_name, %idx)
+		sysargw(r)
+	}
+	; push address of segment as sysarg
+	%macro addr(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysaddr(h)
+	}
+	; push memory pointer in segment as sysarg
+	%macro ptr(seg_name, idx) {
+		%seg:load(%seg_name, %idx)
+		sysaddr(r)
+	}
+
+;; syscall & retval
+	%macro call(syscall_name) {
+		syscall %syscall_name
+	}
+	%macro save_retval() {
+		sysretq %temp_addr
+	}
+	; save last syscall return value to seg
+	%macro retto(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysretq(h)
+	}
+	; save last syscall return value to addr pointer by seg
+	%macro retptr(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysretq(m)
+	}
+}
