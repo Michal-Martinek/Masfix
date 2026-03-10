@@ -1,0 +1,88 @@
+
+%include "memory"
+%include "control"
+%include "procedures"
+%include "math"
+%include "structs"
+%include "array"
+%include "strings"
+
+; buffered file IO
+%namespace filestream {
+	%struct:begin()
+	%define BUFF_SIZE 1024
+
+	; %define FLAG_DIRECTION 1 ; write, read
+
+	%struct:field(buffer, %cstr:sizeof)  ; container holding cstr
+	%struct:field(bytes_written, 1)      ; buff end idx
+	%struct:field(bytes_read, 1)         ; read chars from start
+	; %struct:field(flags, 1)
+	%struct:field(handle, %int64:sizeof) ; file descriptor
+
+	%macro init() {
+		%stack:pushh() ; reserve buffer
+		%stack:push(%BUFF_SIZE)
+		stra 4 ; little extra
+		%call(malloc)
+		%stack:pop()
+		%stack:drop()
+		movm
+		strr
+
+		%do_at(bytes_written, str 0)
+		%do_at(bytes_read, str 0)
+		%do_at(handle, %int64:init())
+	}
+
+	; this, stream: int ->
+	; open standart file stream: 0 - stdin, 1 - stdout, 2 - stderr 
+	%void_method{ filestream_open_std_filestream, 2, 0,
+		%seg:arg(1, ; -(stream num + 10)
+			ldma 10
+			%int64:initMinusR(%temp_addr)
+			sysargq %temp_addr
+		)
+		syscall GetStdHandle
+		%seg:load_addr(%this, %handle)
+		sysretq(r)
+	}
+
+	%namespace WIN_DesiredAccess { ; can be combined
+		%define GENERIC_ALL     1 ; DWORD 0x1000'0000 - All possible access rights
+		%define GENERIC_EXECUTE 2 ; DWORD 0x2000'0000 - Execute access
+		%define GENERIC_WRITE   4 ; DWORD 0x4000'0000 - Write access
+		%define GENERIC_READ    8 ; DWORD 0x8000'0000 - Read access
+	}
+	%namespace WIN_CreationDisposition {
+		%define CREATE_NEW 1    ; fails on already existing
+		%define CREATE_ALWAYS 2 ; truncate already existing
+		%define OPEN_EXISTING 3
+		%define OPEN_ALWAYS 4   ; create new if not found
+		%define TRUNCATE_EXISTING 5
+	}
+	; this, filename: cstr, DesiredAccess, CreationDisposition ->
+	; open or create specified file
+	%void_method{ filestream_open_file, 4, 0,
+		%seg:load(%arg, 1)  ; [in] LPCSTR lpFileName
+		sysaddr(r)
+		%seg:load(%arg, 2)  ; [in] DWORD dwDesiredAccess
+		%seg:temp(0,
+			%int64:init()
+			mova %int64:DWORD_HIGH
+			strr< !op(t, 3, 4)
+		)
+		sysargq %temp_addr
+		sysargw 1           ; [in] DWORD dwShareMode = FILE_SHARE_READ
+		sysargw 0           ; [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL
+		%seg:load(%arg, 3)  ; [in] DWORD dwCreationDisposition
+		sysargw(r)
+		sysargw 128         ; [in] DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL
+		sysargw 0           ; [in, optional] HANDLE hTemplateFile = NULL
+		syscall CreateFileA ; HANDLE CreateFileA()
+		%seg:move(%this, %handle)
+		sysretq(h)
+	}
+
+	%struct:end()
+}

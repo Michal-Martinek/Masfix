@@ -5,7 +5,12 @@
 %define DWORD 2 ; words
 %define QWORD 4
 %namespace int64 {
+	%define BOTTOM_WORD 0
+	%define DWORD_HIGH  1
+	%define QWORD_LOW   2
+	%define QWORD_HIGH  3
 	%define sizeof 4
+	
 	%macro init() {
 		str 0
 		mova 1
