@@ -201,8 +201,11 @@ map<InstrNames, RegNames> InstrToModReg = {
 map<string, int> SyscallIdentToType = {
 	{"ExitProcess", 0},
 	{"GetStdHandle", 0},
+	{"CreateFileA", 0},
+	{"CreateFileW", 0},
 	{"WriteFile", 0},
 	{"ReadFile", 0},
+	{"GetLastError", 0},
 };
 
 // structs -------------------------------
@@ -2005,11 +2008,6 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile <<
 		".intel_syntax noprefix\n"
 		"\n"
-		".extern ExitProcess\n"
-		".extern GetStdHandle\n"
-		".extern WriteFile\n"
-		".extern ReadFile\n"
-		"\n"
 		".text\n"
 		"exit: # exits the program with code in rax\n"
 		"	mov rcx, rax\n"
@@ -2345,6 +2343,7 @@ void populateIncludePaths(Flags& flags) {
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"core");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"ds");
+	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"system");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder);
 }
 Flags processLineArgs(int argc, char *argv[]) {
