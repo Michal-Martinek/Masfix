@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 2829
+:stderr 3215
 tests\syscall-instrs-parse.mx:3:1 ERROR: Target value expected 'sysaddr'
 tests\syscall-instrs-parse.mx:7:1 ERROR: This instruction cannot have a modifier 'sysaddra'
 tests\syscall-instrs-parse.mx:8:1 ERROR: This instruction cannot have a modifier 'sysaddrt 7'
@@ -36,5 +36,10 @@ tests\syscall-instrs-parse.mx:56:1 ERROR: Unknown syscall identifier 'syscall "n
 tests\syscall-instrs-parse.mx:58:1 ERROR: Unknown syscall identifier 'syscall "exitProcess"'
 tests\syscall-instrs-parse.mx:59:1 ERROR: Unknown syscall identifier 'syscall "\n"'
 tests\syscall-instrs-parse.mx:60:1 ERROR: Unknown syscall identifier 'syscall .'
+tests\syscall-instrs-parse.mx:62:1 ERROR: Unknown instruction 'syso'
+tests\syscall-instrs-parse.mx:63:1 ERROR: Unknown instruction 'sysoff'
+tests\syscall-instrs-parse.mx:64:1 ERROR: Target value expected 'sysoffset'
+tests\syscall-instrs-parse.mx:67:1 ERROR: This instruction cannot have a modifier 'sysoffset.r'
+tests\syscall-instrs-parse.mx:69:1 ERROR: Missing immediate 'sysoffseth&'
 
 

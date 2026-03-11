@@ -58,3 +58,13 @@ syscall "ExitProcess"
 syscall "exitProcess"
 syscall "\n"
 syscall .
+
+syso
+sysoff
+sysoffset
+sysoffset 0
+sysoffset 1
+sysoffset(.r)
+sysoffset(r)
+sysoffset(h&)
+sysoffset(h&) 1

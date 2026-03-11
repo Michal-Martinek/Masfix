@@ -160,12 +160,13 @@ enum InstrNames {
 	Isysargw,
 	Isysargq,
 	Isysaddr,
+	Isysoffset,
 	Isyscall,
 	Isysretq,
 
 	InstructionCount
 };
-static_assert(InstructionCount == 19, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 20, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -187,6 +188,7 @@ map<string, InstrNames> StrToInstr {
 {"sysargw", Isysargw},
 {"sysargq", Isysargq},
 {"sysaddr", Isysaddr},
+{"sysoffset", Isysoffset},
 {"syscall", Isyscall},
 {"sysretq", Isysretq},
 };
@@ -205,6 +207,7 @@ map<string, int> SyscallIdentToType = {
 	{"CreateFileW", 0},
 	{"WriteFile", 0},
 	{"ReadFile", 0},
+	{"CloseHandle", 0},
 	{"GetLastError", 0},
 };
 
@@ -1660,7 +1663,7 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 19 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 20 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
@@ -1738,7 +1741,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 19, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 20, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1913,7 +1916,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 19, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 20, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr == Imov) {
@@ -1964,6 +1967,10 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 	} else if (instr == Isysaddr) {
 		outFile << "	lea rcx, [r13 + 2*rcx]\n"
 			"	call sysargs_push\n";
+	} else if (instr == Isysoffset) {
+		outFile << "	lea rbx, [rip + sys_args] # sys_args[count-1] += rcx\n"
+			"	mov rax, [rip + sys_args_count]\n"
+			"	add [rbx + 8*rax - 8], rcx\n";
 	} else if (instr == Isyscall) {
 		outFile << "	call call_syscall\n";
 	} else if (instr == Isysretq) {

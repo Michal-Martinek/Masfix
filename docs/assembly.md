@@ -166,6 +166,7 @@ Push requested arguments one by one from left to right as in function prototype.
 * `sysargq` - push 8 consecutive bytes starting at memory[target] as argument
 	- numbers are stored in little-endian format
 * `sysaddr` - push 64 bit address of memory[target]
+* `sysoffset` - offset last argument (memory pointer from `sysaddr`) by **target** bytes
 
 These instructions have no other side-effects.  
 
