@@ -1,5 +1,6 @@
 
 %include "procedures"
+%include "exceptions"
 
 
 ;; generic utility for system calls
@@ -16,15 +17,29 @@
 		%seg:load(%seg_name, %idx)
 		sysargw(r)
 	}
+	; push qword value from seg as sysarg
+	%macro argq(seg_name, idx) {
+		%seg:load_addr(%seg_name, %idx)
+		sysargq(r)
+	}
 	; push address of segment as sysarg
 	%macro addr(seg_name, idx) {
 		%seg:move(%seg_name, %idx)
 		sysaddr(h)
 	}
+	; push address of segment + offset from r
+	%macro addr_offset(seg_name) {
+		%sys:addr(%dest, 0)
+		%offsetr()
+	}
 	; push memory pointer in segment as sysarg
 	%macro ptr(seg_name, idx) {
 		%seg:load(%seg_name, %idx)
 		sysaddr(r)
+	}
+	; offset last system argument by r
+	%macro offsetr() {
+		sysoffset(r)
 	}
 
 ;; syscall & retval
@@ -43,5 +58,10 @@
 	%macro retptr(seg_name, idx) {
 		%seg:move(%seg_name, %idx)
 		sysretq(m)
+	}
+	; assert syscall success
+	%macro assert_success(cond) {
+		; TODO proper description, GetLastError on fail
+		%assert(%cond)
 	}
 }
