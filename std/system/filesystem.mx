@@ -3,6 +3,7 @@
 %include "control"
 %include "procedures"
 %include "math"
+%include "exceptions"
 %include "structs"
 %include "array"
 %include "strings"
@@ -11,18 +12,55 @@
 ; buffered file IO
 %namespace filestream {
 	%struct:begin()
-	%define BUFF_SIZE 1024
-
-	; %define FLAG_DIRECTION 1 ; write, read
+	%define BUFF_SIZE 1024 ; words
 
 	%struct:field(buffer, %cstr:sizeof)  ; container holding cstr
-	%struct:field(bytes_written, 1)      ; buff end idx
-	%struct:field(bytes_read, 1)         ; read chars from start
-	; %struct:field(flags, 1)
+	%struct:field(bytes_written, 1)      ; bytes written to buff! (points after last written char)
+	%struct:field(bytes_read, 1)         ; bytes read from buff!  (points to first unread char)
 	%struct:field(handle, %int64:sizeof) ; file descriptor
 
+	%namespace impl {
+		%macro eraseBuffer() { ; erase buffer
+			%seg:set(%this, %bytes_written, 0)
+			%seg:set(%this, %bytes_read, 0)
+		}
+		%macro numBytes() { ; count number of bytes
+			%seg:load(%this, %bytes_written)
+			%seg:this(%bytes_read, ldsm)
+		}
+		%macro buffEmpty() {
+			%numBytes()
+			leq 0
+		}
+		%macro almostFull() {
+			%seg:this(%bytes_written, ldm> %WORD_IDX_WIDTH)
+			lda 4
+			lae %BUFF_SIZE
+		}
+		%macro setSRC() { ; set SRC to start of buff, r = 0/1 offset
+			%seg:pointptr(%src, %this, %buffer)
+			%seg:load(%this, %bytes_read) ; SRC += bytes_read / 2
+			mov %src
+			strar> 1
+			ld& 1
+		}
+		%macro setDEST() { ; set DEST to end of buffer, r = 0/1 offset
+			%seg:pointptr(%dest, %this, %buffer)
+			%seg:load(%this, %bytes_written) ; DEST += bytes_written / 2
+			mov %dest
+			strar> 1
+			ld& 1
+		}
+		%macro null_terminate() { ; set null termination to buff end
+			%impl:setDEST()
+			%seg:dest(0,
+				str&rt 255
+			)
+		}
+	}
+
 	%macro init() {
-		%stack:pushh() ; reserve buffer
+		%stack:pushh() ; reserve buffer - always initialized
 		%stack:push(%BUFF_SIZE)
 		stra 4 ; little extra
 		%call(malloc)
@@ -35,14 +73,26 @@
 		%do_at(bytes_read, str 0)
 		%do_at(handle, %int64:init())
 	}
+	%macro deinit() {
+		%stack:pushh()
+		%call(filestream_close)
+		%seg:push(%this, %buffer)
+		%call(free) ; free buffer
+	}
+
+;; opening & closing files -----------------------------------
+
+	%define STDIN  0
+	%define STDOUT 1
+	%define STDERR 2
 
 	; this, stream: int ->
-	; open standart file stream: 0 - stdin, 1 - stdout, 2 - stderr 
+	; open standart file stream 
 	%void_method{ filestream_open_std_filestream, 2, 0,
 		%seg:arg(1, ; -(stream num + 10)
 			ldma 10
 			%int64:initMinusR(%temp_addr)
-			sysargq %temp_addr
+			%sys:tempq()
 		)
 		%sys:call(GetStdHandle)
 		%sys:retto(%this, %handle)
@@ -71,7 +121,7 @@
 			mova %int64:DWORD_HIGH
 			strr< !op(t, 3, 4)
 		)
-		sysargq %temp_addr
+		%sys:tempq()
 		%sys:argimm(1)         ; [in] DWORD dwShareMode = FILE_SHARE_READ
 		%sys:nullptr()         ; [in, optional] LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL
 		%sys:argw(%arg, 3)     ; [in] DWORD dwCreationDisposition
@@ -79,6 +129,225 @@
 		%sys:nullptr()         ; [in, optional] HANDLE hTemplateFile = NULL
 		%sys:call(CreateFileA) ; HANDLE CreateFileA()
 		%sys:retto(%this, %handle)
+	}
+
+	; this ->
+	; flush buffer contents to file
+	%void_method{ filestream_flush, 1, 0,
+		%if { %impl:numBytes(), ; not empty
+			%assert( %seg:this(%bytes_read, lmeq 0) ) ; expecting: buff always starts at beginning
+			%sys:argq(%this, %handle)        ; [in] HANDLE hFile
+			%sys:ptr(%this, %buffer)         ; [in] LPCVOID lpBuffer
+			%sys:argw(%this, %bytes_written) ; [in] DWORD nNumberOfBytesToWrite
+			%sys:tempaddr()                 ; [out, optional] LPDWORD lpNumberOfBytesWritten
+			%sys:nullptr()                   ; [in, out, optional] LPOVERLAPPED lpOverlapped
+			%sys:call(WriteFile)             ; BOOL WriteFile()
+			%sys:assert_success { ; ret == true && written all
+				lrne 0
+				mov %temp_addr
+				ldtm
+				%seg:this(%bytes_written, lreqm)
+			}
+		}
+		%impl:eraseBuffer()
+	}
+
+	; this ->
+	; flush buffer and close file
+	; read buffers must not have bytes_read == 0
+	%void_method{ filestream_close, 1, 0,
+		; guess if Write/Read buffer - WriteBuff always starts at buff start -> flush to file
+		%if { %seg:this(%handle, lmeq 0), ; already closed
+			%returnFunc(filestream_close)
+		}
+		%if { %seg:this(%bytes_read, lmeq 0),
+			%seg:push(%arg, 0)
+			%call(filestream_flush)
+		}
+		%sys:argq(%this, %handle) ; [in] HANDLE hObject
+		%sys:call(CloseHandle)    ; BOOL CloseHandle()
+		%seg:this(%handle, %int64:init()) ; nullify handle
+	}
+
+;; reading from filestream --------------------------------------
+
+	; this ->
+	; read bytes from file to buffer
+	%void_method{ filestream__read_file, 1, 0,
+		%sys:argq(%this, %handle) ; [in] HANDLE hFile
+		%sys:ptr(%this, %buffer)  ; [out] LPVOID lpBuffer = this.buffer + this.bytes_read
+		%seg:load(%this, %bytes_read)
+		%sys:offsetr()
+		ld %BUFF_SIZE       ; [in] DWORD nNumberOfBytesToRead = BUFF_SIZE - bytes_written
+		ldt %BYTES_PER_WORD
+		%seg:this(%bytes_written, ldsm)
+		%sys:argr()
+		%sys:tempaddr()    ; [out, optional] LPDWORD lpNumberOfBytesRead
+		%sys:nullptr()      ; [in, out, optional] LPOVERLAPPED lpOverlapped
+		%sys:call(ReadFile) ; BOOL ReadFile()
+		%load(%temp_addr)
+		%seg:this(%bytes_written, strar)
+		%impl:null_terminate()
+	}
+
+	; this, string ->
+	; copy buffer contents to string by appending them
+	%void_method{ filestream_copy_to_string, 2, 0,
+		; zero padding is guaranteed by the write side
+		% if { %impl:setSRC(), ; if unaligned: push first char
+			%seg:push(%arg, 1) ; string.push_back(*(SRC++))
+			%seg:push(%src, 0)
+			str> 8
+			%seg:advance(%src, 1)
+		}
+		%seg:push_seg(%src) ; cstr to str
+		%seg:push(%arg, 1)
+		%call(cstr_unpack_to_string)
+	}
+
+	; this, output: null|buffer, count: uint ->
+	; eat count bytes to output buffer (rounded up to word size)
+	; expects aligned byte buffer 
+	; reads raw bytes - even null
+	%void_method{ filestream_eat_bytes, 3, 0,
+		%if {
+			%impl:numBytes()
+			%seg:move(%arg, 2)
+			lmblr
+		,
+			%seg:push_seg(%this)
+			%call(filestream__read_file)
+		}
+		%assert {
+			%impl:setSRC()
+			leq 0
+		}
+		%seg:push_seg(%src)
+		%seg:push(%arg, 1)
+		%if { lne 0, ; if output != null
+			%seg:push(%arg, 2)
+			str> %WORD_IDX_WIDTH
+			%call(memcopy)
+		}
+		%seg:load(%arg, 2)
+		%seg:this(%bytes_read, strar)
+	}
+	
+	; this -> char
+	; peek first char in buffer, 0 on EOF
+	%method{ filestream_peek_char, 1, 0,
+		%if { %impl:buffEmpty(),
+			%seg:push_seg(%this)
+			%call(filestream__read_file) ; 0 if nothing read
+		}
+		%seg:movptr(%this, %buffer)
+		%impl:setSRC()
+		%stack:pushr()
+		%seg:load(%src, 0)
+		%stack:drop() ; char = (read >> 8 * offset) & 0xFF
+		ld>mt 8
+		ld& 255
+	}
+	; this -> char
+	; eat single char from stream, 0 on EOF
+	%method{ filestream_eat_char, 1, 0,
+		%seg:push_seg(%this)
+		%call(filestream_peek_char)
+		%save_retval()
+		%seg:this(%bytes_read, stra 1)
+		%if { %impl:buffEmpty()
+		, ; align buf to start
+			%impl:eraseBuffer()
+		}
+		%returnFunc(filestream_eat_char)
+	}
+
+	; this, appendTo: string, upto: char -> found_upto: bool
+	; eat characters from buffer upto char
+	; upto is eaten, not appended
+	; last '\r' (13) is stripped
+	%method{ filestream_eat_upto, 3, 1,
+		; locals: last read
+		%while { ; anything eaten
+			%seg:push_seg(%this)
+			%call(filestream_eat_char)
+			%seg:pop(%local, 0)
+		,
+			%if { ; ate upto
+				%seg:load(%local, 0)
+				%seg:move(%arg, 2)
+				lreqm
+			,
+				%if { ; string.last() = '\r'
+					%seg:push(%arg, 1)
+					%call(last)
+					leq '\r'
+				,
+					%seg:push(%arg, 1)
+					%call(pop_back)
+				}
+				%return_imm(filestream_eat_upto, 1)
+			}
+			%seg:push(%arg, 1) ; string.push_back(eaten)
+			%seg:push(%local, 0)
+			%call(push_back)
+			%seg:pointptr(%this, %arg, 0) ; restore THIS
+		}
+		ld 0 ; EOF
+	}
+
+;; writing to filestream ------------------------------------
+
+	; this, char ->
+	; emplace single character to buffer
+	%void_method{ filestream_emplace_char, 2, 0,
+		%if { %impl:almostFull(),
+			%seg:push_seg(%this)
+			%call(filestream_flush)
+		}
+		%if_else { %impl:setDEST(), ; misaligned
+			%seg:load(%arg, 1)
+			%seg:dest(0, str|r< 8 )
+			mova 1
+			str 0
+		,
+			%seg:load(%arg, 1)
+			%seg:dest(0, strr )
+		}
+		%seg:this(%bytes_written, stra 1)
+	}
+
+	; this, string ->
+	; add string contents to buffer
+	%void_method{ filestream_emplace_string, 2, %string:sizeof,
+		%seg:push(%arg, 1) ; copy to local (mutable string view)
+		%seg:push_addr(%local, 0)
+		%string:shallow_move()
+		%while { %seg:load(%local, %array:size), ; string not empty
+			%if { %impl:almostFull(),
+				%seg:push_seg(%this)
+				%call(filestream_flush)
+			}
+			%if { %impl:setDEST(), ; misaligned
+				%seg:push_seg(%this) ; push single char
+				%seg:movptr(%local, %array:data_ptr)
+				%stack:pushm()
+				%call(filestream_emplace_char) ; -> aligned
+				%seg:advance(%dest, 1)
+				%seg:local(%array:size, strs 1) ; advance string view
+				%seg:local(%array:data_ptr, stra 1)
+			}
+			%seg:push_seg(%dest)
+			ld %BUFF_SIZE ; remaining size = BUFF_SIZE - bytes_written/2
+			%seg:this(%bytes_written, ldsm> %WORD_IDX_WIDTH)
+			%seg:push(%local, 0) ; str
+			%call(cstr_pack_string)
+			%stack:pop()
+			%seg:this(%bytes_written, strar)
+			%seg:local(%array:size, strsr) ; advance string view
+			%seg:local(%array:data_ptr, strar)
+		}
+		%impl:null_terminate()
 	}
 
 	%struct:end()

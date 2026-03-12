@@ -1,0 +1,169 @@
+; #! ; Hello?? Do you see me? xoxo @!
+%include "memory"
+%include "procedures"
+%include "control"
+%include "io"
+%include "structs"
+%include "array"
+%include "strings"
+%include "system"
+%include "filesystem"
+
+%define MANUAL_TEST 1 ; set to auto input
+
+%macro path_add_char(c) {
+	%seg:push(%arg, 0)
+	%stack:push(%c)
+	%call(push_back)
+}
+; path: out string, stdinstream: filestream ->
+%void_func{ get_file_arg, 2, 0,
+	outc 'P'
+	outc 'a'
+	outc 't'
+	outc 'h'
+	outc ':'
+	outc ' '
+	; open stdin
+	%seg:push(%arg, 1)
+	%stack:push(%filestream:STDIN)
+	%call(filestream_open_std_filestream)
+	; construct file path
+	%if_else { ld %MANUAL_TEST,
+	; yes, this test reads itself
+		%path_add_char('t')
+		%path_add_char('e')
+		%path_add_char('s')
+		%path_add_char('t')
+		%path_add_char('s')
+		%path_add_char('/')
+		%path_add_char('s')
+		%path_add_char('y')
+		%path_add_char('s')
+		%path_add_char('-')
+		%path_add_char('f')
+		%path_add_char('i')
+		%path_add_char('l')
+		%path_add_char('e')
+		%path_add_char('s')
+		%path_add_char('t')
+		%path_add_char('r')
+		%path_add_char('e')
+		%path_add_char('a')
+		%path_add_char('m')
+		%path_add_char('.')
+		%path_add_char('m')
+		%path_add_char('x')
+	,
+		%seg:push(%arg, 1)
+		%seg:push(%arg, 0)
+		%stack:push('\n')
+		%call(filestream_eat_upto)
+	}
+	%seg:push(%arg, 0)
+	%print_endl {
+		%string:repr()
+	}
+}
+
+%macro seeFirstLine() {
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%stack:push('\n')
+	%call(filestream_eat_upto)
+
+	%seg:push(%local, %locLine)
+	%string:repr()
+	outc '\n'
+
+	%seg:push(%local, %locLine)
+	%call(clear)
+}
+
+%define locStdIn 0
+%define locTestIn 1
+%define locStdErr 2
+%define locPath 3
+%define locLine 4
+%define locCstrPath 5
+
+%void_func{ main, 0, 8,
+	; locals: 3 * filestream, 2 * string, cstr
+	%seg:local(%locStdIn,  %filestream:construct_here())
+	%seg:local(%locTestIn, %filestream:construct_here())
+	%seg:local(%locStdErr, %filestream:construct_here())
+	%seg:local(%locPath,   %string:construct_here())
+	%seg:local(%locLine,   %string:construct_here())
+
+	; open STDERR
+	%seg:push(%local, %locStdErr)
+	%stack:push(%filestream:STDERR)
+	%call(filestream_open_std_filestream)
+
+	; testPath = get_file_arg()
+	%seg:push(%local, %locPath)
+	%seg:push(%local, %locStdIn)
+	%call(get_file_arg)
+	
+	; cstr = from_string(path)
+	%seg:push(%local, %locPath)
+	%call(cstr_from_string)
+	%seg:pop(%local, %locCstrPath)
+
+	; TestIn.open(cstrPath)
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locCstrPath)
+	%stack:push(%filestream:WIN_DesiredAccess:GENERIC_READ)
+	%stack:push(%filestream:WIN_CreationDisposition:OPEN_EXISTING)
+	%call(filestream_open_file)
+
+	%print_endl {
+		outc 'O'
+		outc 'P'
+		outc 'E'
+		outc 'N'
+		outc ':'
+		outc ' '
+		%sys:SeeLastError()
+	}
+
+	%seeFirstLine()
+
+	%seg:push(%local, %locTestIn)
+
+	; close streams
+	%seg:push(%local, %locTestIn)
+	%call(filestream_close)
+	; %seg:push(%local, %locStdIn) ; test the destructor
+	; %call(filestream_close)
+	%seg:push(%local, %locStdErr)
+	%call(filestream_close)
+
+	; see if STDIN will be closed by destructor
+	%seg:push(%local, %locStdIn)
+
+	%seg:local(%locStdIn,  %filestream:destructor())
+	%seg:local(%locTestIn, %filestream:destructor())
+	%seg:local(%locStdErr, %filestream:destructor())
+	%seg:local(%locPath,   %string:destructor())
+	%seg:local(%locLine,   %string:destructor())
+
+	outc 'G'
+	outc 'O'
+	outc 'O'
+	outc 'D'
+	outc ' '
+	%sys:SeeLastError()
+	outc ' '
+	outc 'I'
+	outc 'N'
+	outc ' '
+	%stack:pop()
+	movra %filestream:handle
+	outum
+	outc '\n'
+	
+}
+%call(main)
+
+;#END

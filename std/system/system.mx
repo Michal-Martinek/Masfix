@@ -1,4 +1,5 @@
 
+%include "memory"
 %include "procedures"
 %include "exceptions"
 
@@ -12,10 +13,14 @@
 	%macro nullptr() {
 		%argimm(0)
 	}
+	; push r as sysarg
+	%macro argr() {
+		sysargw(r)
+	}
 	; push value in seg as sysarg
 	%macro argw(seg_name, idx) {
 		%seg:load(%seg_name, %idx)
-		sysargw(r)
+		%argr()
 	}
 	; push qword value from seg as sysarg
 	%macro argq(seg_name, idx) {
@@ -41,13 +46,19 @@
 	%macro offsetr() {
 		sysoffset(r)
 	}
+	
+	; push address to temp segment
+	%macro tempaddr() {
+		sysaddr %temp_addr
+	}
+	; push qword from temp segment
+	%macro tempq() {
+		sysargq %temp_addr
+	}
 
 ;; syscall & retval
 	%macro call(syscall_name) {
 		syscall %syscall_name
-	}
-	%macro save_retval() {
-		sysretq %temp_addr
 	}
 	; save last syscall return value to seg
 	%macro retto(seg_name, idx) {
@@ -59,9 +70,19 @@
 		%seg:move(%seg_name, %idx)
 		sysretq(m)
 	}
+	; save last retval to temp
+	%macro rettemp() {
+		mov %temp_addr
+		sysretq(h)
+	}
 	; assert syscall success
 	%macro assert_success(cond) {
 		; TODO proper description, GetLastError on fail
 		%assert(%cond)
+	}
+
+	%macro SeeLastError() {
+		syscall GetLastError
+		outur
 	}
 }

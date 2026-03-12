@@ -1,0 +1,14 @@
+:returncode 0
+
+:testmode runonly
+
+:stdout 92
+Path: "tests/sys-filestream.mx"
+OPEN: 0
+"; #! ; Hello?? Do you see me? xoxo @!"
+GOOD 0 IN 0
+
+
+:stdin 23
+tests/sys-filestream.mx
+
