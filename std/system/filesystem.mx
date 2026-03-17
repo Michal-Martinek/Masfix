@@ -338,10 +338,14 @@
 				%seg:local(%array:data_ptr, stra 1)
 			}
 			%seg:push_seg(%dest)
-			ld %BUFF_SIZE ; remaining size = BUFF_SIZE - bytes_written/2
-			%seg:this(%bytes_written, ldsm> %WORD_IDX_WIDTH)
-			%seg:push(%local, 0) ; str
+			%seg:this(%bytes_written, ; remaining size = BUFF_SIZE - bytes_written/2
+				ld %BUFF_SIZE
+				ldsm> %WORD_IDX_WIDTH
+				%stack:pushr()
+			)
+			%seg:push_seg(%local) ; str
 			%call(cstr_pack_string)
+			%seg:pointptr(%this, %arg, 0) ; restore THIS
 			%stack:pop()
 			%seg:this(%bytes_written, strar)
 			%seg:local(%array:size, strsr) ; advance string view

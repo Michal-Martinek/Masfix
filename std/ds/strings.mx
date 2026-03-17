@@ -159,9 +159,8 @@
 				}
 			}
 		}
-		%stack:top() ; recover idx -> bytes_written
-		mova 2
-		ldma 1 ; idx -> count
+		%stack:reserve(2) ; recover idx -> bytes_written
+		%stack:top()
 	}
 	
 	; string -> cstr

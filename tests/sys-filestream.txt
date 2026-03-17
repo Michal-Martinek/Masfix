@@ -2,11 +2,28 @@
 
 :testmode runonly
 
-:stdout 92
-Path: "tests/sys-filestream.mx"
+:stdout 223
+Path; "tests/sys-filestream.mx"
 OPEN: 0
-"; #! ; Hello?? Do you see me? xoxo @!"
+" ; #! ; Hello?? Do you see me? xoxo @!	"
+INC: %memory %procedures %control %io %structs %array %strings %system %filesystem 
+LENS: 18, 45, 1, 11, 20, 29, 31, 15, 20, 1, 
 GOOD 0 IN 0
+
+
+:stderr 300
+%memory,%procedures,%control,%io,%structs,%array,%strings,%system,%filesystem,
+#COMMENTS:
+; set to auto input
+; path: out string, stdinstream: filestream ->
+; '
+; open stdin
+; construct file path
+; YES, this test reads itself!
+; emplace single char to err ;
+; TestIn -> Line
+; ; output first line
+; 
 
 
 :stdin 23

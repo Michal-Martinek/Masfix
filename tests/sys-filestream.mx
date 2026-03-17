@@ -1,4 +1,4 @@
-; #! ; Hello?? Do you see me? xoxo @!
+ ; #! ; Hello?? Do you see me? xoxo @!	
 %include "memory"
 %include "procedures"
 %include "control"
@@ -9,6 +9,7 @@
 %include "system"
 %include "filesystem"
 
+;#COMMENTS:
 %define MANUAL_TEST 1 ; set to auto input
 
 %macro path_add_char(c) {
@@ -22,7 +23,7 @@
 	outc 'a'
 	outc 't'
 	outc 'h'
-	outc ':'
+	outc ';'
 	outc ' '
 	; open stdin
 	%seg:push(%arg, 1)
@@ -30,7 +31,7 @@
 	%call(filestream_open_std_filestream)
 	; construct file path
 	%if_else { ld %MANUAL_TEST,
-	; yes, this test reads itself
+	; YES, this test reads itself!
 		%path_add_char('t')
 		%path_add_char('e')
 		%path_add_char('s')
@@ -65,13 +66,22 @@
 		%string:repr()
 	}
 }
-
-%macro seeFirstLine() {
+; emplace single char to err ;  
+%macro errEmplaceChar(c) {
+	%seg:push(%local, %locStdErr)
+	%stack:push(%c)
+	%call(filestream_emplace_char)
+}
+%macro eatLine() { ; TestIn -> Line
 	%seg:push(%local, %locTestIn)
 	%seg:push(%local, %locLine)
 	%stack:push('\n')
 	%call(filestream_eat_upto)
+}
+	;; output first line 
+%macro seeFirstLine() {
 
+	%eatLine()
 	%seg:push(%local, %locLine)
 	%string:repr()
 	outc '\n'
@@ -79,21 +89,148 @@
 	%seg:push(%local, %locLine)
 	%call(clear)
 }
+;
+;	
+;#END-COMMENTS
+
+%macro outpIncludes() {
+	outc 'I'
+	outc 'N'
+	outc 'C'
+	outc ':'
+	outc ' '
+	%while { ; not empty line
+		%eatLine()
+		%seg:push(%local, %locLine)
+		%call(strip)
+		%seg:load(%this, %array:size)
+	,
+		%seg:push(%local, %locLine) ; Line[0]
+		%stack:push(0)
+		%call(index)
+		outcr
+
+		%seg:push(%local, %locStdErr)
+		%seg:push(%dest, 0)
+		%call(filestream_emplace_char)
+
+		%seg:push(%local, %locLine) ; Line.split(Tail, '"')
+		%seg:push(%local, %locTail)
+		%stack:push('"')
+		%call(split)
+
+
+		%seg:push(%local, %locTail) ; Tail.pop() last '"'
+		%call(pop_back)
+
+		%print_spaced {
+			%seg:push(%local, %locTail)
+			%call(string_print)
+		}
+
+		%seg:push(%local, %locStdErr)
+		%seg:push(%local, %locTail)
+		%call(filestream_emplace_string)
+
+		%errEmplaceChar(',')
+
+		%seg:push(%local, %locLine)
+		%call(clear)
+		%seg:push(%local, %locTail)
+		%call(clear)
+	}
+	%errEmplaceChar('\n')
+	outc '\n'
+}
+
+%macro emitComments() {
+	%eatLine() ; #COMMENTS
+	%seg:push(%local, %locLine)
+	%stack:push(0)
+	%call(pop_index)
+	%seg:push(%local, %locStdErr)
+	%seg:push(%local, %locLine)
+	%call(filestream_emplace_string)
+
+	outc 'L'
+	outc 'E'
+	outc 'N'
+	outc 'S'
+	outc ':'
+	outc ' '
+
+	%errEmplaceChar('\n')
+	%seg:push(%local, %locLine)
+	%call(clear)
+
+	%while {
+		%eatLine()
+
+		%seg:push(%local, %locLine) ; Line.split(Tail, ';')
+		%seg:push(%local, %locTail)
+		%stack:push(';')
+		%call(split)
+		%seg:movptr(%local, %locTail) ; anything there
+		%array:at(size)
+		%stack:pushm()
+
+		; # ENDING COMMENT?
+		%if_else { lmab 0,
+			%seg:push(%local, %locTail)
+			%stack:push(0)
+			%call(index)
+
+			%stack:pop()
+			lne '#'
+		,
+			ld 1 ; continue loop
+		}
+	,
+		%if { ; skip line if no comment
+			%stack:pop()
+			leq 0
+		,
+			%loop_continue_offset(1)
+		}
+		outum
+		%print_separator()
+
+		%seg:push(%local, %locTail)
+		%call(strip)
+
+		%errEmplaceChar(';')
+		%errEmplaceChar(' ')
+		
+		%seg:push(%local, %locStdErr)
+		%seg:push(%local, %locTail)
+		%call(filestream_emplace_string)
+		%errEmplaceChar('\n')
+
+		%seg:push(%local, %locLine)
+		%call(clear)
+		%seg:push(%local, %locTail)
+		%call(clear)
+	}
+	outc '\n'
+}
 
 %define locStdIn 0
 %define locTestIn 1
 %define locStdErr 2
 %define locPath 3
 %define locLine 4
-%define locCstrPath 5
+%define locTail 5
+%define locCstrPath 6
 
 %void_func{ main, 0, 8,
-	; locals: 3 * filestream, 2 * string, cstr
+	; locals: 3 * filestream, 3 * string, cstr
 	%seg:local(%locStdIn,  %filestream:construct_here())
 	%seg:local(%locTestIn, %filestream:construct_here())
 	%seg:local(%locStdErr, %filestream:construct_here())
 	%seg:local(%locPath,   %string:construct_here())
 	%seg:local(%locLine,   %string:construct_here())
+	%seg:local(%locTail,   %string:construct_here())
+	%seg:local(%locCstrPath, str 0)
 
 	; open STDERR
 	%seg:push(%local, %locStdErr)
@@ -128,8 +265,9 @@
 	}
 
 	%seeFirstLine()
-
-	%seg:push(%local, %locTestIn)
+	
+	%outpIncludes()
+	
 
 	; close streams
 	%seg:push(%local, %locTestIn)
