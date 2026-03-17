@@ -8,6 +8,7 @@
 %include "strings"
 %include "system"
 %include "filesystem"
+%include "debug"
 
 ;#COMMENTS:
 %define MANUAL_TEST 1 ; set to auto input
@@ -92,6 +93,7 @@
 ;
 ;	
 ;#END-COMMENTS
+;#!$
 
 %macro outpIncludes() {
 	outc 'I'
@@ -100,6 +102,7 @@
 	outc ':'
 	outc ' '
 	%while { ; not empty line
+; ABCDEFGHIJKLMNOPQRSTUVWXYZ
 		%eatLine()
 		%seg:push(%local, %locLine)
 		%call(strip)
@@ -205,9 +208,9 @@
 		%seg:push(%local, %locTail)
 		%call(filestream_emplace_string)
 		%errEmplaceChar('\n')
-
 		%seg:push(%local, %locLine)
 		%call(clear)
+;#BUFF-READ-POINT
 		%seg:push(%local, %locTail)
 		%call(clear)
 	}
@@ -267,7 +270,78 @@
 	%seeFirstLine()
 	
 	%outpIncludes()
+
+	%emitComments()
+
+	outc 'B'
+	outc 'T'
+	outc 's'
+	outc ':'
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(%temp_addr)
+	%stack:push(8)
+	%call(filestream_eat_bytes)
+	%stack:push(%temp_addr)
+	%stack:push(4)
+	%print_endl {
+		%call(memdump)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
 	
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(0)   ; OK - no output
+	%stack:push(109) ; drop odd number of bytes
+	%call(filestream_eat_bytes)
+
+	%while {
+		%seg:push(%local, %locTestIn)
+		%call(filestream_peek_char)
+		lne 'X'
+	,
+		%stack:drop()
+
+		%seg:push(%local, %locTestIn)
+		%call(filestream_eat_char)
+		%stack:pop()
+		outcr
+	}
+	outc '\n'
+
+	%while { ; drop lines upto #BUFF-READ-POINT
+		%eatLine()
+		%seg:movptr(%local, %locLine)
+		movma 1 ; data[1]
+		lmne '#'
+	,
+		%seg:push(%local, %locLine)
+		%call(clear)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
+
 
 	; close streams
 	%seg:push(%local, %locTestIn)

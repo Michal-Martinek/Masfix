@@ -198,6 +198,7 @@
 			%seg:push(%arg, 1) ; string.push_back(*(SRC++))
 			%seg:push(%src, 0)
 			str> 8
+			%call(push_back)
 			%seg:advance(%src, 1)
 		}
 		%seg:push_seg(%src) ; cstr to str
@@ -206,8 +207,8 @@
 	}
 
 	; this, output: null|buffer, count: uint ->
-	; eat count bytes to output buffer (rounded up to word size)
-	; expects aligned byte buffer 
+	; eat count bytes to output buffer
+	; expects aligned byte buffer, copies at least count bytes (rounded up to wordsize)
 	; reads raw bytes - even null
 	%void_method{ filestream_eat_bytes, 3, 0,
 		%if {
@@ -240,7 +241,6 @@
 			%seg:push_seg(%this)
 			%call(filestream__read_file) ; 0 if nothing read
 		}
-		%seg:movptr(%this, %buffer)
 		%impl:setSRC()
 		%stack:pushr()
 		%seg:load(%src, 0)

@@ -2,17 +2,29 @@
 
 :testmode runonly
 
-:stdout 223
+:stdout 431
 Path; "tests/sys-filestream.mx"
 OPEN: 0
 " ; #! ; Hello?? Do you see me? xoxo @!	"
-INC: %memory %procedures %control %io %structs %array %strings %system %filesystem 
+INC: %memory %procedures %control %io %structs %array %strings %system %filesystem %debug 
 LENS: 18, 45, 1, 11, 20, 29, 31, 15, 20, 1, 
+BTs:
+8: 9019 9249 2573 2573
+"%macro outpIncludes() {
+	outc 'I'
+	outc 'N'
+	outc 'C'
+	outc ':'
+	outc ' '
+	%while { ; not empty line
+; ABCDEFGHIJKLMN"
+ ABCDEFGHIJKLMNOPQRSTUVW
+";#BUFF-READ-POINT		%seg:p"
 GOOD 0 IN 0
 
 
-:stderr 300
-%memory,%procedures,%control,%io,%structs,%array,%strings,%system,%filesystem,
+:stderr 307
+%memory,%procedures,%control,%io,%structs,%array,%strings,%system,%filesystem,%debug,
 #COMMENTS:
 ; set to auto input
 ; path: out string, stdinstream: filestream ->
