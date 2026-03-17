@@ -3,8 +3,8 @@ sysargw 8
 
 jmp second
 outu 1
-ctxcall First
+ctxcall GetMacArgData
 :second
 outu 2
-ctxcall Second
+ctxcall GetMacArgData
 

@@ -4,6 +4,7 @@
 namespace fs = std::filesystem;
 
 #include <string>
+#include <cstring>
 #include <map>
 #include <set>
 #include <vector>
@@ -202,6 +203,25 @@ map<InstrNames, RegNames> InstrToModReg = {
 	{Ild , Rr},
 	{Ijmp, Rp},
 	// others don't have modifiable destination
+};
+
+enum CtxcallNames {
+	CtxGetTokenMeta,
+	CtxSetTokenMeta,
+	CtxGetMacArgData,
+	CtxcallCount,
+};
+static_assert(CtxcallCount == 3, "Exhaustive StrToCtxcallName definition");
+map<string, CtxcallNames> StrToCtxcallName = {
+	{"GetTokenMeta", CtxGetTokenMeta},
+	{"SetTokenMeta", CtxSetTokenMeta},
+	{"GetMacArgData", CtxGetMacArgData},
+};
+static_assert(CtxcallCount == 3, "Exhaustive CtxcallToNumArgs definition");
+map<CtxcallNames, int> CtxcallToNumArgs = {
+	{CtxGetTokenMeta, 0},
+	{CtxSetTokenMeta, 0},
+	{CtxGetMacArgData, 3},
 };
 
 // structs -------------------------------
@@ -521,13 +541,22 @@ struct VM {
 		sysargCount ++;
 	}
 
-	int64_t sysargGetInt() {
+	uint64_t sysargGetInt() {
 		return sysargs[sysargEaten++];
+	}
+	unsigned short sysargGetShort() {
+		return sysargGetInt();
 	}
 	// eat pointer sysarg
 	bool sysargGetPtr(void** res) {
 		*res = (void*)sysargGetInt();
 		return *res >= &mem && *res <= &mem[CELLS];
+	}
+	void ctxcallReturn(int64_t retval) {
+		sysretval = retval;
+		reg = retval;
+		sysargCount = 0;
+		sysargEaten = 0;
 	}
 };
 VM globalVm = VM(true);
@@ -1633,7 +1662,10 @@ bool parseInstrImmediate(Instr& instr) {
 	if (instr.instr == Isyscall || instr.instr == Ictxcall) {
 		checkReturnOnFail(imm.type == Talpha || imm.type == Tstring, "Expected syscall identifier", instr);
 		// NOTE available syscall identifiers are known only at link time
-		// return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+		if (instr.instr == Ictxcall) {
+			checkReturnOnFail(StrToCtxcallName.count(imm.data), "Unknown syscall identifier", instr);
+			instr.immediate = StrToCtxcallName[imm.data];
+		}
 		return true;
 	}
 	if (imm.type == Talpha) {
@@ -1758,6 +1790,42 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	if (instr.suffixes.cond == Cbe) return ureg <= (unsigned short)target;
 	unreachable();
 }
+bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
+	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
+	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
+		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount));
+	bool res = true;
+	if (ctxName == CtxGetTokenMeta) {
+		unreachable();
+	} else if (ctxName == CtxSetTokenMeta) {
+		unreachable();
+	} else if (ctxName == CtxGetMacArgData) {
+		// GetMacArgData(ushort argIdx, char* buff, ushort buff_size) -> ushort bytes_written
+		// read n-th macro argument's text into buffer
+		uint64_t idx = vm.sysargGetInt();
+		char* buff;
+		returnOnFalse(vm.sysargGetPtr((void**)&buff));
+		uint64_t buff_size = vm.sysargGetInt();
+		
+		returnOnFalse(scope.insideMacro());
+		vector<MacroArg>& arglist = scope.currMacro().argList;
+		returnOnFalse(idx < arglist.size());
+		list<Token>& tokens = arglist[idx].value.top();
+		returnOnFalse(tokens.size());
+		string arg = tokens.front().data;
+
+		uint64_t bytes_to_write = min(buff_size, (uint64_t)arg.size());
+		unsigned short* memEnd = &vm.mem[CELLS]; // prevent writing outside VM memory
+		bytes_to_write = min(bytes_to_write, (uint64_t)memEnd - (uint64_t)buff);
+		if (bytes_to_write && arg.size()) {
+			strcpy(buff, arg.substr(0, bytes_to_write).c_str());
+		}
+		retval = bytes_to_write;
+	} else {
+		unreachable();
+	}
+	return res;
+}
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
 	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
@@ -1803,7 +1871,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Isysargq) {
 		vm.addSysarg(*(int64_t*)(&vm.mem[target]));
 	} else if (instr.instr == Isysaddr) {
-		vm.addSysarg((int64_t)& vm.mem[target]);
+		vm.addSysarg((uint64_t)& vm.mem[target]);
 	} else if (instr.instr == Isysoffset) {
 		vm.sysargs[vm.sysargCount-1] += target;
 	} else if (instr.instr == Isyscall) {
@@ -1813,6 +1881,9 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 			string instrNum = to_string(globalVm.ip);
 			addError("\nERROR: instr_" + instrNum + ": context call unavailable during runtime /0\n", true);
 		}
+		uint64_t retvalue = 0;
+		interpCtxcall(vm, instr, retvalue);
+		vm.ctxcallReturn(retvalue);
 	} else if (instr.instr == Isysretq) {
 		int64_t* dest = (int64_t*)&vm.mem[target];
 		*dest = vm.sysretval;
