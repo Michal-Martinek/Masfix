@@ -342,6 +342,33 @@
 	%seg:push(%local, %locLine)
 	%call(clear)
 
+	; eat_upto multiple times over buffer end
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%stack:push(0) ; stop at EOF
+	%call(filestream_eat_upto)
+
+	outc 'S'
+	outc 'I'
+	outc 'Z'
+	outc 'E'
+	outc ':'
+	outc ' '
+	%print_endl {
+		%seg:movptr(%local, %locLine)
+		%array:at(size)
+		outum
+	}
+	
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+
+	; emplace huge string to test buffer boundary
+	%seg:push(%local, %locStdErr)
+	%seg:push(%local, %locLine)
+	%call(filestream_emplace_string)
+
 
 	; close streams
 	%seg:push(%local, %locTestIn)
@@ -378,4 +405,4 @@
 }
 %call(main)
 
-;#END
+;END
