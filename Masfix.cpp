@@ -496,12 +496,20 @@ struct VM {
 	unsigned short ip;
 	unsigned short mem[CELLS];
 
+	int64_t sysargs[16] = { 0 };
+	unsigned int sysargCount = 0;
+	int64_t sysretval = 0;
+
 	VM() {};
 	void start(unsigned short startIdx) {
  		ip = startIdx;
 	}
 	unsigned short& cell() {
 		return mem[head];
+	}
+	void addSysarg(int64_t value) {
+		sysargs[sysargCount] = value;
+		sysargCount ++;
 	}
 };
 VM globalVm;
@@ -1771,10 +1779,19 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
+	} else if (instr.instr == Isysargw) {
+		vm.addSysarg(target);
+	} else if (instr.instr == Isysargq) {
+		vm.addSysarg(*(int64_t*)(&vm.mem[target]));
+	} else if (instr.instr == Isysaddr) {
+		vm.addSysarg((int64_t)& vm.mem[target]);
+	} else if (instr.instr == Isysoffset) {
+		vm.sysargs[vm.sysargCount-1] += target;
 	} else if (instr.instr == Isyscall) {
 		raiseError("Syscall instruction not available in interpret mode", instr, "", true);
-	} else if (instr.instr >= Isysargw && instr.instr <= Isysretq) {
-		raiseError("System instruction not available in interpret mode", instr, "", true);
+	} else if (instr.instr == Isysretq) {
+		int64_t* dest = (int64_t*)&vm.mem[target];
+		*dest = vm.sysretval;
 	} else {
 		unreachable();
 	}
