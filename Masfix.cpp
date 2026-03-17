@@ -161,12 +161,14 @@ enum InstrNames {
 	Isysargq,
 	Isysaddr,
 	Isysoffset,
-	Isyscall,
 	Isysretq,
+
+	Isyscall,
+	Ictxcall,
 
 	InstructionCount
 };
-static_assert(InstructionCount == 20, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 21, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -189,8 +191,10 @@ map<string, InstrNames> StrToInstr {
 {"sysargq", Isysargq},
 {"sysaddr", Isysaddr},
 {"sysoffset", Isysoffset},
-{"syscall", Isyscall},
 {"sysretq", Isysretq},
+
+{"syscall", Isyscall},
+{"ctxcall", Ictxcall},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -491,6 +495,8 @@ struct ParseCtx {
 ParseCtx parseCtx;
 /// structure simulating the virtual machine during interpretation
 struct VM {
+	bool isCtimeVM; // compiler communication is available
+
 	unsigned short head;
 	unsigned short reg;
 	unsigned short ip;
@@ -498,9 +504,12 @@ struct VM {
 
 	int64_t sysargs[16] = { 0 };
 	unsigned int sysargCount = 0;
+	unsigned int sysargEaten = 0;
 	int64_t sysretval = 0;
 
-	VM() {};
+	VM(bool isCtimeVM) {
+		this->isCtimeVM = isCtimeVM;
+	}
 	void start(unsigned short startIdx) {
  		ip = startIdx;
 	}
@@ -511,8 +520,18 @@ struct VM {
 		sysargs[sysargCount] = value;
 		sysargCount ++;
 	}
+
+	int64_t sysargGetInt() {
+		return sysargs[sysargEaten++];
+	}
+	// eat pointer sysarg
+	bool sysargGetPtr(void** res) {
+		*res = (void*)sysargGetInt();
+		return *res >= &mem && *res <= &mem[CELLS];
+	}
 };
-VM globalVm;
+VM globalVm = VM(true);
+
 /// holds all compile time flags and settings
 struct Flags {
 	bool verbose = false;
@@ -1611,7 +1630,7 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
-	if (instr.instr == Isyscall) {
+	if (instr.instr == Isyscall || instr.instr == Ictxcall) {
 		checkReturnOnFail(imm.type == Talpha || imm.type == Tstring, "Expected syscall identifier", instr);
 		// NOTE available syscall identifiers are known only at link time
 		// return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
@@ -1647,7 +1666,7 @@ bool checkSuffixCombination(Instr& instr) {
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
-	} else if (instr.instr == Isyscall) {
+	} else if (instr.instr == Isyscall || instr.instr == Ictxcall) {
 		checkReturnOnFail(!instr.hasReg() && !instr.hasOp(), "Unexpected syscall suffix", instr);
 		checkReturnOnFail(instr.hasImm(), "Expected syscall identifier", instr);
 	} else {
@@ -1662,7 +1681,7 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 20 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 21 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
@@ -1740,7 +1759,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 20, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1789,6 +1808,11 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 		vm.sysargs[vm.sysargCount-1] += target;
 	} else if (instr.instr == Isyscall) {
 		raiseError("Syscall instruction not available in interpret mode", instr, "", true);
+	} else if (instr.instr == Ictxcall) {
+		if (!globalVm.isCtimeVM) {
+			string instrNum = to_string(globalVm.ip);
+			addError("\nERROR: instr_" + instrNum + ": context call unavailable during runtime /0\n", true);
+		}
 	} else if (instr.instr == Isysretq) {
 		int64_t* dest = (int64_t*)&vm.mem[target];
 		*dest = vm.sysretval;
@@ -1923,67 +1947,74 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 		unreachable();
 	}
 }
-void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 20, "Exhaustive genInstrBody definition");
+void genInstrBody(ofstream& outFile, Instr& instr, int instrNum, bool inputToR=true) {
+	static_assert(InstructionCount == 21, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
-	if (instr == Imov) {
+	if (instr.instr == Imov) {
 		outFile << "	mov r14, rcx\n";
-	} else if (instr == Istr) {
+	} else if (instr.instr == Istr) {
 		outFile << "	mov [2*r14+r13], cx\n";
-	} else if (instr == Ild) {
+	} else if (instr.instr == Ild) {
 		outFile << "	mov r15, rcx\n";
-	} else if (instr == Ijmp || instr == Ib) {
+	} else if (instr.instr == Ijmp || instr.instr == Ib) {
 		outFile <<
 		"	mov rsi, " << instrNum << "\n"
 		"	cmp rcx, OFFSET FLAT:instruction_count\n"
 		"	ja jmp_error\n"
 		"	lea rbx, [rip + instruction_offsets]\n"
 		"	jmp [rbx+8*rcx]\n";
-	} else if (instr == Il || instr == Is) { // handled in genCond
-	} else if (instr == Iswap) {
+	} else if (instr.instr == Il || instr.instr == Is) { // handled in genCond
+	} else if (instr.instr == Iswap) {
 		outFile << "	mov cx, [2*r14+r13]\n"
 			"	mov [2*r14+r13], r15w\n"
 			"	mov r15w, cx\n";
-	} else if (instr == Ioutu) {
+	} else if (instr.instr == Ioutu) {
 		outFile << "	mov rax, rcx\n"
 			"	call print_unsigned\n";
-	} else if (instr == Ioutc) {
+	} else if (instr.instr == Ioutc) {
 		outFile <<
 			"	lea rdx, [rip + stdout_buff]\n"
 			"	mov [rdx], cl\n"
 			"	mov r8, 1\n"
 			"	call stdout_write\n";
-	} else if (instr == Iinc) {
+	} else if (instr.instr == Iinc) {
 		outFile << "	call get_next_char\n"
 			"	mov " << inputDest << ", dx\n";
-	} else if (instr == Iipc) {
+	} else if (instr.instr == Iipc) {
 		outFile << "	call stdin_peek\n"
 			"	mov " << inputDest << ", dx\n";
-	} else if (instr == Iinu) {
+	} else if (instr.instr == Iinu) {
 		outFile << "	call input_unsigned\n"
 			"	mov " << inputDest << ", ax\n";
-	} else if (instr == Iinl) {
+	} else if (instr.instr == Iinl) {
 		outFile << "	call get_next_char\n"
 			"	cmp rdx, 10\n"
 			"	jne instr_" << instrNum << "\n";
-	} else if (instr == Isysargw) {
+	} else if (instr.instr == Isysargw) {
 		outFile << "	call sysargs_push\n";
-	} else if (instr == Isysargq) {
+	} else if (instr.instr == Isysargq) {
 		outFile << "	mov rcx, [r13 + 2*rcx]\n"
 			"	call sysargs_push\n";
-	} else if (instr == Isysaddr) {
+	} else if (instr.instr == Isysaddr) {
 		outFile << "	lea rcx, [r13 + 2*rcx]\n"
 			"	call sysargs_push\n";
-	} else if (instr == Isysoffset) {
+	} else if (instr.instr == Isysoffset) {
 		outFile << "	lea rbx, [rip + sys_args] # sys_args[count-1] += rcx\n"
 			"	mov rax, [rip + sys_args_count]\n"
 			"	add [rbx + 8*rax - 8], rcx\n";
-	} else if (instr == Isyscall) {
+	} else if (instr.instr == Isyscall) {
 		outFile << "	call call_syscall\n";
-	} else if (instr == Isysretq) {
+	} else if (instr.instr == Isysretq) {
 		outFile << "	mov rax, [rip + sys_retval]\n"
 			"	mov QWORD PTR [r13 + 2*rcx], rax\n";
+	} else if (instr.instr == Ictxcall) {
+		outFile << // allow ctxcall compilation, but error out on running it
+		"	mov rsi, " << instrNum << "\n"
+		"	mov rcx, 0\n" // unfortunate errorneous value reporting
+		"	lea rdx, [rip + invalid_ctxcall_error_message]\n"
+		"	mov r8, OFFSET FLAT:invalid_ctxcall_error_len\n"
+		"	call error\n";
 	} else {
 		unreachable();
 	}
@@ -2002,6 +2033,7 @@ void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	if (instr.hasImm()) {
 		if (instr.instr == Isyscall) {
 			outFile << "	lea rax, [rip + " << instr.immediates.front().data << "]\n";
+		} else if (instr.instr == Ictxcall) {
 		} else {
 			outFile << "	mov rcx, " << instr.immediate << '\n';
 		}
@@ -2016,7 +2048,7 @@ void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	if (instr.hasCond()) {
 		genCond(outFile, instr.instr, instr.suffixes.condReg, instr.suffixes.cond, instrNum);
 	}
-	genInstrBody(outFile, instr.instr, instrNum, instr.suffixes.reg == Rr);
+	genInstrBody(outFile, instr, instrNum, instr.suffixes.reg == Rr);
 }
 
 void generate(ofstream& outFile, vector<Instr>& instrs) {
@@ -2290,6 +2322,9 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	jmp_error_message: .ascii \": jmp destination out of bounds: \"\n"
 		"	.equ jmp_error_message_len, . - jmp_error_message\n"
 		"\n"
+		"	invalid_ctxcall_error_message: .ascii \": context call unavailable during runtime /\"\n"
+		"	.equ invalid_ctxcall_error_len, . - invalid_ctxcall_error_message\n"
+		"\n"
 		"	# instruction addresses\n"
 		"	.equ instruction_count, " << instrs.size() << "\n"
 		"	instruction_offsets: .quad ";
@@ -2448,7 +2483,7 @@ void initParseCtx(Flags& flags, string mainRelPath) {
 void run(Flags& flags) {
 	int exitCode = 0;
 	if (flags.interpret) {
-		globalVm = VM();
+		globalVm = VM(false);
 		interpret();
 	} else {
 		ofstream outFile = openOutputFile(flags.filePath("s"));

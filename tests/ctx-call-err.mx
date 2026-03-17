@@ -1,0 +1,10 @@
+
+sysargw 8
+
+jmp second
+outu 1
+ctxcall First
+:second
+outu 2
+ctxcall Second
+
