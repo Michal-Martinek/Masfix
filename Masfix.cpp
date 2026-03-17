@@ -200,17 +200,6 @@ map<InstrNames, RegNames> InstrToModReg = {
 	// others don't have modifiable destination
 };
 
-map<string, int> SyscallIdentToType = {
-	{"ExitProcess", 0},
-	{"GetStdHandle", 0},
-	{"CreateFileA", 0},
-	{"CreateFileW", 0},
-	{"WriteFile", 0},
-	{"ReadFile", 0},
-	{"CloseHandle", 0},
-	{"GetLastError", 0},
-};
-
 // structs -------------------------------
 struct Loc {
 	string file;
@@ -1616,7 +1605,9 @@ bool parseInstrImmediate(Instr& instr) {
 	Token& imm = instr.immediates.front();
 	if (instr.instr == Isyscall) {
 		checkReturnOnFail(imm.type == Talpha || imm.type == Tstring, "Expected syscall identifier", instr);
-		return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+		// NOTE available syscall identifiers are known only at link time
+		// return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+		return true;
 	}
 	if (imm.type == Talpha) {
 		if (!parseCtx.strToLabel.count(imm.data)) {
@@ -1780,10 +1771,10 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
-	} else if (instr.instr == Isysargw || instr.instr == Isysargq || instr.instr == Isysaddr || instr.instr == Isysretq) {
-		unreachable();
 	} else if (instr.instr == Isyscall) {
-		unreachable();
+		raiseError("Syscall instruction not available in interpret mode", instr, "", true);
+	} else if (instr.instr >= Isysargw && instr.instr <= Isysretq) {
+		raiseError("System instruction not available in interpret mode", instr, "", true);
 	} else {
 		unreachable();
 	}

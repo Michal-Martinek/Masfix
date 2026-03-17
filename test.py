@@ -24,8 +24,10 @@ DescriptionFields = {
 	'stdin':  bytes,
 }
 StrEnumOptions = { # first is considered default, StrEnum w/o assigned value means "unset"
-	'testmode': ['both', 'runonly']
+	'testmode': ['both', 'runonly', 'interponly']
 }
+
+MarkRunOnly = []
 
 def defaultTestcaseDesc():
 	d = dict()
@@ -123,10 +125,10 @@ def askWhetherToDo(doWhat: str) -> bool:
 	answer = input(f'\nWould you like to {doWhat}? (y / n): ')
 	print()
 	return answer and answer[0].lower() == 'y'
-def updateFileOutput(file: Path, verbose=True):
+def updateFileOutput(file: Path, verbose=True, overwriteTestmode=None):
 	print('[UPDATING]', file)
 	original = getTestcaseDesc(file, update=True)
-	ran = runFile(file, original['stdin'], False)
+	ran = runFile(file, original['stdin'], original.get('testmode', 'both') == 'interponly')
 	if verbose:
 		print()
 		print('[NOTE] returncode:', ran['returncode'])
@@ -135,6 +137,8 @@ def updateFileOutput(file: Path, verbose=True):
 		print('[NOTE] stderr:')
 		print(ran['stderr'], end='')
 	original.update(ran)
+	if overwriteTestmode in StrEnumOptions['testmode']:
+		original['testmode'] = overwriteTestmode
 	saveDesc(file, original)
 def updateInput(file: Path):
 	print('[INPUT]', file)
@@ -170,6 +174,8 @@ def checkTestResult(expected: dict, ran: dict, keyName: str):
 def runTest(path: Path, interpret: bool, desc: dict) -> bool:
 	ran = runFile(path, desc['stdin'], interpret)
 	res = checkTestResult(desc, ran, 'stdout')
+	if interpret and 'testmode' not in desc and 'System instruction not available in interpret mode' in ran['stderr']:
+		MarkRunOnly.append(path)
 	if not interpret or 'jmp destination out of bounds' not in desc['stderr']:
 		res &= checkTestResult(desc, ran, 'returncode')
 		res &= checkTestResult(desc, ran, 'stderr')
@@ -187,7 +193,7 @@ def _handleTestResult(failedTests: list[Path]):
 def updateFileOutputs(files: list[Path], verbose=False):
 	for file in files:
 		try:
-			updateFileOutput(file, verbose)
+			updateFileOutput(file, verbose, 'runonly' if file in MarkRunOnly else None)
 		except ExecutionException:
 			print()
 def iterTestsInDirectory(dir):
@@ -212,7 +218,7 @@ def runTests(dir: Path, quick: bool):
 			skippedInterp = desc.get('testmode', 'both') == 'runonly'
 			if not skippedInterp:
 				passed = runTest(path, True, desc)
-			if (not quick or skippedInterp):
+			if (not quick or skippedInterp) and desc.get('testmode', 'both') != 'interponly':
 				passed = passed and runTest(path, False, desc)
 		except TestcaseException:
 			passed = False
