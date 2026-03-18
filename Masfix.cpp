@@ -208,21 +208,33 @@ map<InstrNames, RegNames> InstrToModReg = {
 
 enum CtxcallNames {
 	CtxGetTokenMeta,
-	CtxSetTokenMeta,
-	CtxGetMacArgData,
+	CtxGetTokenData,
+	
+	CtxAdvanceCurrToken,
+	CtxPointMacArg,
+
+	CtxOutputToken,
+	CtxOutputTlistRest,
+	
 	CtxcallCount,
 };
-static_assert(CtxcallCount == 3, "Exhaustive StrToCtxcallName definition");
+static_assert(CtxcallCount == 6, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
-	{"GetTokenMeta", CtxGetTokenMeta},
-	{"SetTokenMeta", CtxSetTokenMeta},
-	{"GetMacArgData", CtxGetMacArgData},
+	{"CtxGetTokenMeta", CtxGetTokenMeta},
+	{"CtxGetTokenData", CtxGetTokenData},
+	{"CtxAdvanceCurrToken", CtxAdvanceCurrToken},
+	{"CtxPointMacArg", CtxPointMacArg},
+	{"CtxOutputToken", CtxOutputToken},
+	{"CtxOutputTlistRest", CtxOutputTlistRest},
 };
-static_assert(CtxcallCount == 3, "Exhaustive CtxcallToNumArgs definition");
+static_assert(CtxcallCount == 6, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
-	{CtxGetTokenMeta, 0},
-	{CtxSetTokenMeta, 0},
-	{CtxGetMacArgData, 3},
+	{CtxGetTokenMeta, 1},
+	{CtxGetTokenData, 3},
+	{CtxAdvanceCurrToken, 2},
+	{CtxPointMacArg, 1},
+	{CtxOutputToken, 2},
+	{CtxOutputTlistRest, 0},
 };
 
 // structs -------------------------------
@@ -1807,8 +1819,9 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
-		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount));
-	bool res = true;
+		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount)
+	);
+	static_assert(CtxcallCount == 6, "Exhaustive interpCtxcall definition");
 	if (ctxName == CtxGetTokenMeta) {
 		unreachable();
 	} else if (ctxName == CtxSetTokenMeta) {
@@ -1838,7 +1851,7 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 	} else {
 		unreachable();
 	}
-	return res;
+	return true;
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
 	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
