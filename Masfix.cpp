@@ -42,9 +42,10 @@ enum TokenTypes {
 	Tspecial,
 	Tcolon,
 	Tseparator,
+
 	Tlist,
 
-	// intermediate preprocess tokens
+// intermediate preprocess tokens - hidden from ctxcalls //
 	TImodule,    // top-level token holding entire contents of a module
 	TIexpansion, // macro body expansion
 	TIctime,     // macro expansion expanded as compile time
@@ -226,9 +227,9 @@ map<CtxcallNames, int> CtxcallToNumArgs = {
 
 // structs -------------------------------
 struct Loc {
-	string file;
 	int row;
 	int col;
+	string file;
 
 	Loc() {}
 	Loc(string file, int row, int col) {
@@ -240,14 +241,20 @@ struct Loc {
 		return file + ":" + to_string(row) + ":" + to_string(col);
 	}
 };
-struct Token {
-	TokenTypes type=TokenCount;
-	string data; // contains only data - no quotes, quotes added when mentioning in error
-	list<Token> tlist;
 
-	Loc loc;
-	bool continued; // continues meaning of previous token
+#define TOKEN_META_DATA_SIZE_W (1 + 1 + 1 + 2)
+struct Token {
+// ctxcall - TokenMeta //
+	TokenTypes type=TokenCount;
+
 	bool firstOnLine;
+	bool continued; // continues meaning of previous token
+	Loc loc; // ctxcall Meta - row, col, LocFile - file //
+
+// ctxcall - TokenData //
+	string data; // contains only data - no quotes, quotes added when mentioning in error
+// ctxcall - hidden //
+	list<Token> tlist;
 
 	//–– construtors
     Token() = default;
@@ -309,11 +316,18 @@ struct Token {
 		return data.at(0) + 2 - (data.at(0) == '(');
 	}
 	// quoted: quote strings & chars?
-	string toStr(bool quoted=false) {
+	string toStr(bool quoted=false, bool recurseTlist=false) {
 		assert(this != nullptr);
 		string out = data;
 		if (type == Tlist) {
-			out.push_back(tlistCloseChar());
+			if (recurseTlist) {
+				for (Token& inside : tlist) {
+					if (inside.firstOnLine) out += '\n';
+					else if (!inside.continued && out.size() > 1) out += ' ';
+					out += inside.toStr(quoted, recurseTlist);
+				}
+			}
+			if (data.size()) out.push_back(tlistCloseChar());
 		} else if (type == TIexpansion) {
 			out = "%" + out;
 		} else if (type == Tstring && quoted) {
@@ -531,7 +545,7 @@ struct VM {
 		this->isCtimeVM = isCtimeVM;
 	}
 	void start(unsigned short startIdx) {
- 		ip = startIdx;
+		ip = startIdx;
 	}
 	unsigned short& cell() {
 		return mem[head];
@@ -540,16 +554,16 @@ struct VM {
 		sysargs[sysargCount] = value;
 		sysargCount ++;
 	}
-
-	uint64_t sysargGetInt() {
+	uint64_t sysargEatInt() {
 		return sysargs[sysargEaten++];
 	}
-	unsigned short sysargGetShort() {
-		return sysargGetInt();
+	unsigned short sysargEatShort() {
+		return sysargEatInt();
 	}
 	// eat pointer sysarg
-	bool sysargGetPtr(void** res) {
-		*res = (void*)sysargGetInt();
+	bool sysargEatPtr(void** res, bool nullable=false) {
+		*res = (void*)sysargEatInt();
+		if (nullable && *res == 0) return true;
 		return *res >= &mem && *res <= &mem[CELLS];
 	}
 	void ctxcallReturn(int64_t retval) {
