@@ -560,6 +560,8 @@ struct VM {
 	unsigned int sysargEaten = 0;
 	int64_t sysretval = 0;
 
+	bool ctimeReturnR; // don't return r at ctime end when any ctxcall used
+
 // VM runtime data & API //
 	unsigned short head;
 	unsigned short reg;
@@ -956,19 +958,18 @@ public:
 		int retval = 0;
 		if (safeToRun) {
 			interpret(parseCtx.parseStartIdx, this);
-			retval = globalVm.reg;
 		}
-		_updateTSafterCtime(ctimeExp, retval);
+		_updateTSafterCtime(ctimeExp, globalVm.ctimeReturnR, globalVm.reg);
 		endMacroExpansion();
 		parseCtx.removeCtimeInstrs();
 	}
-	/// removes ctime from token stream, inserts it's return value(s)
-	void _updateTSafterCtime(Token& ctimeExp, int retval) {
-		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval), ctimeExp);
+	/// removes ctime from token stream, inserts return value if no ctxcall already did
+	void _updateTSafterCtime(Token& ctimeExp, bool returnR, optional<int> retval) {
+		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval.value_or(0)), ctimeExp);
 		// return itr to ctime expansion to remove it
 		assert(&*--itrs.top() == &ctimeExp);	
 		eatenToken();
-		insertToken(move(retValToken));
+		if (returnR) insertToken(move(retValToken));
 	}
 
 // helpers -------------------------------------------------
@@ -1859,12 +1860,13 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 
 bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 	assert(vm.isCtimeVM);
+	vm.ctimeReturnR = false;
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
 		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount)
 	);
 	Macro& macro = *vm.ctimeMac;
-	static_assert(CtxcallCount == 6, "Exhaustive interpCtxcall definition");
+	static_assert(CtxcallCount == 7, "Exhaustive interpCtxcall definition");
 	// valid currToken not needed
 	if (ctxName == CtxPointMacroArg) {
 		// CtxPointMacArg(ushort macro_arg_idx) -> bool sucess
@@ -1969,6 +1971,7 @@ void openCtxRefs(VM& vm, Scope& scope) {
 	Instr ctxCallInstr(CtxPointMacroArg);
 	interpCtxcall(vm, ctxCallInstr, retval, scope);
 	vm.ctxcallReturn(vm.reg); // preserve r
+	vm.ctimeReturnR = true;
 }
 
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged, Scope& scope) {
