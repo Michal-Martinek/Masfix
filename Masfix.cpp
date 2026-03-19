@@ -210,31 +210,34 @@ enum CtxcallNames {
 	CtxGetTokenMeta,
 	CtxGetTokenData,
 	
-	CtxAdvanceCurrToken,
-	CtxPointMacArg,
+	CtxAdvanceSource,
+	CtxPointMacroArg,
+	CtxPointAfterCtimeUse,
 
-	CtxOutputToken,
-	CtxOutputTlistRest,
+	CtxEmplaceTokens,
+	CtxEmplaceMacroArg,
 	
 	CtxcallCount,
 };
-static_assert(CtxcallCount == 6, "Exhaustive StrToCtxcallName definition");
+static_assert(CtxcallCount == 7, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
 	{"GetTokenMeta", CtxGetTokenMeta},
 	{"GetTokenData", CtxGetTokenData},
-	{"AdvanceCurrToken", CtxAdvanceCurrToken},
-	{"PointMacArg", CtxPointMacArg},
-	{"OutputToken", CtxOutputToken},
-	{"OutputTlistRest", CtxOutputTlistRest},
+	{"AdvanceSource", CtxAdvanceSource},
+	{"PointMacroArg", CtxPointMacroArg},
+	{"PointAfterCtimeUse", CtxPointAfterCtimeUse},
+	{"EmplaceTokens", CtxEmplaceTokens},
+	{"EmplaceMacroArg", CtxEmplaceMacroArg,}
 };
-static_assert(CtxcallCount == 6, "Exhaustive CtxcallToNumArgs definition");
+static_assert(CtxcallCount == 7, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxGetTokenMeta, 1},
 	{CtxGetTokenData, 3},
-	{CtxAdvanceCurrToken, 2},
-	{CtxPointMacArg, 1},
-	{CtxOutputToken, 2},
-	{CtxOutputTlistRest, 0},
+	{CtxAdvanceSource, 2},
+	{CtxPointMacroArg, 1},
+	{CtxPointAfterCtimeUse, 0},
+	{CtxEmplaceTokens, 2},
+	{CtxEmplaceMacroArg, 2,}
 };
 
 // structs -------------------------------
@@ -750,6 +753,9 @@ public:
 	}
 	Token& currToken() {
 		return *itrs.top();
+	}
+	list<Token>::iterator currTokenItr() {
+		return itrs.top();
 	}
 	Token* operator->() {
 		return &currToken();
@@ -1842,6 +1848,9 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 #define eatPtrArg(buff_name) \
 		char* buff_name; \
 		returnOnFalse(vm.sysargEatPtr((void**)&buff_name));
+#define eatPtrArgNullable(buff_name) \
+		char* buff_name; \
+		returnOnFalse(vm.sysargEatPtr((void**)&buff_name, true));
 #define checkValidCurrToken(); \
 		if (vm.currTlist == nullptr || vm.currToken == vm.currTlist->end()) { \
 			vm.currTlist = nullptr; \
@@ -1857,7 +1866,7 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 	Macro& macro = *vm.ctimeMac;
 	static_assert(CtxcallCount == 6, "Exhaustive interpCtxcall definition");
 	// valid currToken not needed
-	if (ctxName == CtxPointMacArg) {
+	if (ctxName == CtxPointMacroArg) {
 		// CtxPointMacArg(ushort macro_arg_idx) -> bool sucess
 		uint64_t idx = vm.sysargEatInt();
 		returnOnFalse(idx < macro.argList.size());
@@ -1866,7 +1875,40 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 		checkValidCurrToken();
 		retval = 1;
 		return true;
+	} else if (ctxName == CtxPointAfterCtimeUse) {
+		// CtxPointAfterCtimeUse() -> bool available
+		vm.currTlist = &scope.currList();
+		vm.currToken = scope.currTokenItr();
+		checkValidCurrToken();
+		retval = 1;
+		return true;
+	} else if (ctxName == CtxEmplaceTokens) {
+		// CtxEmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
+		// emplace tokens from string after ctime call directive, first inherits Meta from first_meta
+		// TODO nullify meta - default - tokenize -> ignores type
+		eatPtrArg(data_cstr);
+		eatPtrArg(first_meta);
+		
+		short meta_data[TOKEN_META_DATA_SIZE_W];
+		uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
+
+		Token ctx;
+		ctx.type = static_cast<TokenTypes>(meta_data[0]);
+		// TODO check
+		ctx.firstOnLine = !!meta_data[1];
+		ctx.continued = !!meta_data[2];
+		ctx.loc.row = meta_data[3];
+		ctx.loc.col = meta_data[4];
+		ctx.loc.file = macro.loc.file + "/ctxcall";
+
+		string data(data_cstr);
+		// TODO add null termination after memory
+		ctx.data = data;
+
+		// tokenize();
+		scope.insertToken(move(ctx));
 	}
+
 	// unpack currToken
 	returnOnFalse(vm.currTlist != nullptr);
 	Token& currToken = *vm.currToken;
@@ -1883,7 +1925,7 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 		meta_data[3] = currToken.loc.row;
 		meta_data[4] = currToken.loc.col;
 		
-		uint64_t bytes_written = vmExchangeBytes(vm, (char*)meta_data, 2 * TOKEN_META_DATA_SIZE_W, meta_dest, 2 * TOKEN_META_DATA_SIZE_W);
+		uint64_t bytes_written = vmExchangeBytes(vm, (char*)meta_data, sizeof(meta_data), meta_dest, sizeof(meta_data));
 		retval = bytes_written == 2 * TOKEN_META_DATA_SIZE_W ? 1 : 0;
 	} else if (ctxName == CtxGetTokenData) {
 		// GetTokenData(char* buff, ushort buff_size) -> ushort bytes_written
@@ -1894,14 +1936,24 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 		
 		string arg = currToken.data;
 		retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
-	} else if (ctxName == CtxAdvanceCurrToken) {
-		// CtxAdvanceCurrToken(nop, nop) -> bool success
+	} else if (ctxName == CtxAdvanceSource) {
+		// CtxAdvanceSource(nop, nop) -> bool success
 		vm.sysargEatInt();
 		vm.sysargEatInt();
 		++ vm.currToken;
 		checkValidCurrToken();
 		retval = 1;
-		return true;
+	} else if (ctxName == CtxEmplaceMacroArg) {
+		// EmplaceMacroArg(bool unwrap, TokenMeta*? meta) -> bool success
+		// emplace rest of pointed macro argument, with optional meta (see CtxEmplaceTokens)
+		// TODO remove Ctx from descriptions
+		bool unwrap = vm.sysargEatInt();
+		eatPtrArgNullable(first_meta);
+
+		returnOnFalse(vm.currTlist != &scope.currList()); // check macro arg is actually pointed
+		// TODO not unwrap
+		scope.insertList(*vm.currTlist, ctx, true);
+		retval = 1;
 	} else {
 		unreachable();
 	}
@@ -1914,7 +1966,7 @@ void openCtxRefs(VM& vm, Scope& scope) {
 	// open last ctime argument
 	uint64_t retval;
 	vm.addSysarg(0);
-	Instr ctxCallInstr(CtxPointMacArg);
+	Instr ctxCallInstr(CtxPointMacroArg);
 	interpCtxcall(vm, ctxCallInstr, retval, scope);
 	vm.ctxcallReturn(vm.reg); // preserve r
 }
