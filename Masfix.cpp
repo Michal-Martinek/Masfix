@@ -220,12 +220,12 @@ enum CtxcallNames {
 };
 static_assert(CtxcallCount == 6, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
-	{"CtxGetTokenMeta", CtxGetTokenMeta},
-	{"CtxGetTokenData", CtxGetTokenData},
-	{"CtxAdvanceCurrToken", CtxAdvanceCurrToken},
-	{"CtxPointMacArg", CtxPointMacArg},
-	{"CtxOutputToken", CtxOutputToken},
-	{"CtxOutputTlistRest", CtxOutputTlistRest},
+	{"GetTokenMeta", CtxGetTokenMeta},
+	{"GetTokenData", CtxGetTokenData},
+	{"AdvanceCurrToken", CtxAdvanceCurrToken},
+	{"PointMacArg", CtxPointMacArg},
+	{"OutputToken", CtxOutputToken},
+	{"OutputTlistRest", CtxOutputTlistRest},
 };
 static_assert(CtxcallCount == 6, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
@@ -491,6 +491,10 @@ struct Instr {
 		this->opcodeStr = opcodeStr;
 		this->opcodeLoc = opcodeLoc;
 	}
+	Instr(CtxcallNames ctxName) {
+		this->instr = Ictxcall;
+		this->immediate = ctxName;
+	}
 	bool hasImm() { return !immediates.empty(); }
 	bool hasCond() { return suffixes.cond != Cno; }
 	bool hasMod()  { return suffixes.modifier != OPno; }
@@ -541,18 +545,24 @@ struct ParseCtx {
 ParseCtx parseCtx;
 /// structure simulating the virtual machine during interpretation
 struct VM {
-	bool isCtimeVM; // compiler communication is available
+// context call references //
+	bool isCtimeVM; // compile-time execution - compiler context available
+	Macro* ctimeMac=nullptr;
+	list<Token>* currTlist = nullptr;
+	list<Token>::iterator currToken;
 
-	unsigned short head;
-	unsigned short reg;
-	unsigned short ip;
-	unsigned short mem[CELLS];
-
+// context call data //
 	int64_t sysargs[16] = { 0 };
 	unsigned int sysargCount = 0;
 	unsigned int sysargEaten = 0;
 	int64_t sysretval = 0;
 
+// VM runtime data & API //
+	unsigned short head;
+	unsigned short reg;
+	unsigned short ip;
+	unsigned short mem[CELLS];
+	
 	VM(bool isCtimeVM) {
 		this->isCtimeVM = isCtimeVM;
 	}
@@ -562,7 +572,10 @@ struct VM {
 	unsigned short& cell() {
 		return mem[head];
 	}
-	void addSysarg(int64_t value) {
+
+// context call API //
+
+	void addSysarg(uint64_t value) {
 		sysargs[sysargCount] = value;
 		sysargCount ++;
 	}
@@ -689,7 +702,7 @@ bool raiseWarning(string message, Loc loc, string note="") {
 	return false;
 }
 // struct Scope --------------------------------------------------------
-void interpret(int startIdx=0);
+void interpret(size_t startIdx, void* scopeForCtxcall=nullptr);
 
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
@@ -936,7 +949,7 @@ public:
 		bool safeToRun = forceParse(ctimeExp);
 		int retval = 0;
 		if (safeToRun) {
-			interpret(parseCtx.parseStartIdx);
+			interpret(parseCtx.parseStartIdx, this);
 			retval = globalVm.reg;
 		}
 		_updateTSafterCtime(ctimeExp, retval);
@@ -1816,44 +1829,97 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	if (instr.suffixes.cond == Cbe) return ureg <= (unsigned short)target;
 	unreachable();
 }
-bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
+uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, char* toBuff, uint64_t toBuffSize) {
+	uint64_t bytes_to_write = min(fromBuffSize, toBuffSize);
+	unsigned short* memEnd = &vm.mem[CELLS]; // prevent writing outside VM memory
+	bytes_to_write = min(bytes_to_write, (uint64_t)memEnd - (uint64_t)fromBuff);
+	if (bytes_to_write > 0) {
+		memcpy((void*)toBuff, (void*)fromBuff, bytes_to_write);
+		// TODO use byte copy funcs, not string
+	}
+	return bytes_to_write;
+}
+#define eatPtrArg(buff_name) \
+		char* buff_name; \
+		returnOnFalse(vm.sysargEatPtr((void**)&buff_name));
+#define checkValidCurrToken(); \
+		if (vm.currTlist == nullptr || vm.currToken == vm.currTlist->end()) { \
+			vm.currTlist = nullptr; \
+			return false; \
+		}
+
+bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
+	assert(vm.isCtimeVM);
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
 		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount)
 	);
+	Macro& macro = *vm.ctimeMac;
 	static_assert(CtxcallCount == 6, "Exhaustive interpCtxcall definition");
+	// valid currToken not needed
+	if (ctxName == CtxPointMacArg) {
+		// CtxPointMacArg(ushort macro_arg_idx) -> bool sucess
+		uint64_t idx = vm.sysargEatInt();
+		returnOnFalse(idx < macro.argList.size());
+		vm.currTlist = &macro.argList[idx].value.top();
+		vm.currToken = vm.currTlist->begin();
+		checkValidCurrToken();
+		retval = 1;
+		return true;
+	}
+	// unpack currToken
+	returnOnFalse(vm.currTlist != nullptr);
+	Token& currToken = *vm.currToken;
 	if (ctxName == CtxGetTokenMeta) {
-		unreachable();
-	} else if (ctxName == CtxSetTokenMeta) {
-		unreachable();
-	} else if (ctxName == CtxGetMacArgData) {
-		// GetMacArgData(ushort argIdx, char* buff, ushort buff_size) -> ushort bytes_written
-		// read n-th macro argument's text into buffer
-		uint64_t idx = vm.sysargGetInt();
-		char* buff;
-		returnOnFalse(vm.sysargGetPtr((void**)&buff));
-		uint64_t buff_size = vm.sysargGetInt();
-		
-		returnOnFalse(scope.insideMacro());
-		vector<MacroArg>& arglist = scope.currMacro().argList;
-		returnOnFalse(idx < arglist.size());
-		list<Token>& tokens = arglist[idx].value.top();
-		returnOnFalse(tokens.size());
-		string arg = tokens.front().data;
+		// GetTokenMeta(TokenMeta* meta) -> bool success
+		// get current token metadata
+		eatPtrArg(meta_dest);
 
-		uint64_t bytes_to_write = min(buff_size, (uint64_t)arg.size());
-		unsigned short* memEnd = &vm.mem[CELLS]; // prevent writing outside VM memory
-		bytes_to_write = min(bytes_to_write, (uint64_t)memEnd - (uint64_t)buff);
-		if (bytes_to_write && arg.size()) {
-			strcpy(buff, arg.substr(0, bytes_to_write).c_str());
-		}
-		retval = bytes_to_write;
+		// returnOnFalse(token.type <= Tlist); // hide intermediate tokens
+		short meta_data[TOKEN_META_DATA_SIZE_W];
+		meta_data[0] = currToken.type;
+		meta_data[1] = currToken.firstOnLine;
+		meta_data[2] = currToken.continued;
+		meta_data[3] = currToken.loc.row;
+		meta_data[4] = currToken.loc.col;
+		
+		uint64_t bytes_written = vmExchangeBytes(vm, (char*)meta_data, 2 * TOKEN_META_DATA_SIZE_W, meta_dest, 2 * TOKEN_META_DATA_SIZE_W);
+		retval = bytes_written == 2 * TOKEN_META_DATA_SIZE_W ? 1 : 0;
+	} else if (ctxName == CtxGetTokenData) {
+		// GetTokenData(char* buff, ushort buff_size) -> ushort bytes_written
+		// read curr token's text into buffer
+		uint64_t idx = vm.sysargEatInt();
+		eatPtrArg(mxBuff);
+		uint64_t mxBuffSize = vm.sysargEatInt();
+		
+		string arg = currToken.data;
+		retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
+	} else if (ctxName == CtxAdvanceCurrToken) {
+		// CtxAdvanceCurrToken(nop, nop) -> bool success
+		vm.sysargEatInt();
+		vm.sysargEatInt();
+		++ vm.currToken;
+		checkValidCurrToken();
+		retval = 1;
+		return true;
 	} else {
 		unreachable();
 	}
-	return true;
+	return false; // ignore retval
 }
-void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
+void openCtxRefs(VM& vm, Scope& scope) {
+	assert(vm.isCtimeVM);
+	vm.ctimeMac = &scope.currMacro();
+	vm.currTlist = nullptr;
+	// open last ctime argument
+	uint64_t retval;
+	vm.addSysarg(0);
+	Instr ctxCallInstr(CtxPointMacArg);
+	interpCtxcall(vm, ctxCallInstr, retval, scope);
+	vm.ctxcallReturn(vm.reg); // preserve r
+}
+
+void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged, Scope& scope) {
 	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
@@ -1909,7 +1975,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 			addError("\nERROR: instr_" + instrNum + ": context call unavailable during runtime /0\n", true);
 		}
 		uint64_t retvalue = 0;
-		interpCtxcall(vm, instr, retvalue);
+		interpCtxcall(vm, instr, retvalue, scope);
 		vm.ctxcallReturn(retvalue);
 	} else if (instr.instr == Isysretq) {
 		int64_t* dest = (int64_t*)&vm.mem[target];
@@ -1918,7 +1984,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 		unreachable();
 	}
 }
-void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
+void interpInstr(VM& vm, Instr& instr, bool& ipChanged, Scope& scope) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
 	unsigned short left, right;
 	if (instr.hasImm()) right = instr.immediate;
@@ -1936,14 +2002,16 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	if (instr.hasCond()) {
 		cond = interpCond(vm, instr, (signed short) right);
 	}
-	interpInstrBody(vm, instr, right, cond, ipChanged);
+	interpInstrBody(vm, instr, right, cond, ipChanged, scope);
 }
-void interpret(int startIdx) {
+void interpret(size_t startIdx, void* scopeForCtxcall) {
 	globalVm.start(startIdx);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
+	Scope& scope = *(Scope*)scopeForCtxcall;
+	if (globalVm.isCtimeVM) openCtxRefs(globalVm, scope);
 	while (globalVm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
-		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged);
+		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged, scope);
 		if (!ipChanged) globalVm.ip++;
 	}
 }
@@ -2580,9 +2648,9 @@ void initParseCtx(Flags& flags, string mainRelPath) {
 }
 void run(Flags& flags) {
 	int exitCode = 0;
+	globalVm = VM(false);
 	if (flags.interpret) {
-		globalVm = VM(false);
-		interpret();
+		interpret(0);
 	} else {
 		ofstream outFile = openOutputFile(flags.filePath("s"));
 		generate(outFile, parseCtx.instrs);
