@@ -568,6 +568,7 @@ struct VM {
 	unsigned short reg;
 	unsigned short ip;
 	unsigned short mem[CELLS];
+	int64_t mem_safety_padding=0;
 	
 	VM(bool isCtimeVM) {
 		this->isCtimeVM = isCtimeVM;
@@ -978,6 +979,8 @@ public:
 		if (safeToRun) {
 			initVmCtx(vm);
 			interpret(parseCtx.parseStartIdx);
+			vm.currTlist = nullptr;
+			assert(vm.mem_safety_padding == 0);
 			retval = vm.reg;
 		}
 		_updateTSafterCtime(ctimeExp, vm.ctimeReturnR, retval);
@@ -1859,8 +1862,9 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 }
 uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, char* toBuff, uint64_t toBuffSize) {
 	uint64_t bytes_to_write = min(fromBuffSize, toBuffSize);
-	unsigned short* memEnd = &vm.mem[CELLS]; // prevent writing outside VM memory
-	bytes_to_write = min(bytes_to_write, (uint64_t)memEnd - (uint64_t)fromBuff);
+	char* memEnd = (char*)&vm.mem_safety_padding; // prevent writing outside VM memory
+	bytes_to_write = min(bytes_to_write, (uint64_t)(memEnd - fromBuff));
+	bytes_to_write = min(bytes_to_write, (uint64_t)(memEnd - toBuff));
 	if (bytes_to_write > 0) {
 		memcpy((void*)toBuff, (void*)fromBuff, bytes_to_write);
 		// TODO use byte copy funcs, not string
@@ -2524,9 +2528,10 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	call exit\n"
 		"\n"
 		".bss\n"
-		"	.balign 8\n"
+		"	.balign 64\n"
 		"\n"
 		"	cells: .skip 2 * " << CELLS << " # resw for memory\n"
+		"	.skip 64\n # safety padding\n"
 		"	stdin_fd: .skip 8\n"
 		"	stdout_fd: .skip 8\n"
 		"	stderr_fd: .skip 8\n"
