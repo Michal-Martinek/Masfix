@@ -550,6 +550,7 @@ ParseCtx parseCtx;
 struct VM {
 // context call references //
 	bool isCtimeVM; // compile-time execution - compiler context available
+	void* ctxScope; // Scope& for ctxcall in ctime
 	Macro* ctimeMac=nullptr;
 	list<Token>* currTlist = nullptr;
 	list<Token>::iterator currToken;
@@ -707,7 +708,8 @@ bool raiseWarning(string message, Loc loc, string note="") {
 	return false;
 }
 // struct Scope --------------------------------------------------------
-void interpret(size_t startIdx, void* scopeForCtxcall=nullptr);
+void interpret(size_t startIdx);
+bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval);
 
 /// responsible for iterating tokens and nested tlists,
 /// keeping track of current module, namespace, expansion scope, arglist situation
@@ -744,7 +746,7 @@ private:
 			exitNamespace();
 			currModule++;
 		} else if (closedList.type == TIctime) {
-			parseInterpretCtime(closedList);
+			parseInterpretCtime(closedList, globalVm);
 		}
 	}
 
@@ -951,15 +953,34 @@ public:
 		return safeToRun;
 	}
 
+	void initVmCtx(VM& vm) {
+		assert(vm.isCtimeVM);
+		vm.ctxScope = this;
+		vm.ctimeMac = &currMacro();
+		vm.currTlist = nullptr;
+		// open last ctime argument
+		uint64_t retval;
+		vm.addSysarg(0);
+		Instr ctxCallInstr(CtxPointMacroArg);
+		interpCtxcall(vm, ctxCallInstr, retval); // NOTE also clears sysargs
+		if (retval != 1) {
+			// TODO open after ctime body
+		}
+		vm.ctxcallReturn(vm.reg); // preserve r
+		vm.ctimeReturnR = true; // set back
+	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
-	void parseInterpretCtime(Token& ctimeExp) {
+	void parseInterpretCtime(Token& ctimeExp, VM& vm) {
+		vm.ctimeReturnR = true; // still return on err in parsing
 		bool safeToRun = forceParse(ctimeExp);
 		int retval = 0;
 		if (safeToRun) {
-			interpret(parseCtx.parseStartIdx, this);
+			initVmCtx(vm);
+			interpret(parseCtx.parseStartIdx);
+			retval = vm.reg;
 		}
-		_updateTSafterCtime(ctimeExp, globalVm.ctimeReturnR, globalVm.reg);
+		_updateTSafterCtime(ctimeExp, vm.ctimeReturnR, retval);
 		endMacroExpansion();
 		parseCtx.removeCtimeInstrs();
 	}
@@ -1858,8 +1879,9 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 			return false; \
 		}
 
-bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
-	assert(vm.isCtimeVM);
+bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
+	assert(vm.isCtimeVM && vm.ctxScope != nullptr);
+	Scope& scope = *(Scope*)vm.ctxScope; // JOKE: it could be named scopeCtx in alternate universe
 	vm.ctimeReturnR = false;
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
@@ -1961,20 +1983,7 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval, Scope& scope) {
 	}
 	return false; // ignore retval
 }
-void openCtxRefs(VM& vm, Scope& scope) {
-	assert(vm.isCtimeVM);
-	vm.ctimeMac = &scope.currMacro();
-	vm.currTlist = nullptr;
-	// open last ctime argument
-	uint64_t retval;
-	vm.addSysarg(0);
-	Instr ctxCallInstr(CtxPointMacroArg);
-	interpCtxcall(vm, ctxCallInstr, retval, scope);
-	vm.ctxcallReturn(vm.reg); // preserve r
-	vm.ctimeReturnR = true;
-}
-
-void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged, Scope& scope) {
+void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
 	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
@@ -2030,7 +2039,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 			addError("\nERROR: instr_" + instrNum + ": context call unavailable during runtime /0\n", true);
 		}
 		uint64_t retvalue = 0;
-		interpCtxcall(vm, instr, retvalue, scope);
+		interpCtxcall(vm, instr, retvalue);
 		vm.ctxcallReturn(retvalue);
 	} else if (instr.instr == Isysretq) {
 		int64_t* dest = (int64_t*)&vm.mem[target];
@@ -2039,7 +2048,7 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 		unreachable();
 	}
 }
-void interpInstr(VM& vm, Instr& instr, bool& ipChanged, Scope& scope) {
+void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
 	unsigned short left, right;
 	if (instr.hasImm()) right = instr.immediate;
@@ -2057,16 +2066,14 @@ void interpInstr(VM& vm, Instr& instr, bool& ipChanged, Scope& scope) {
 	if (instr.hasCond()) {
 		cond = interpCond(vm, instr, (signed short) right);
 	}
-	interpInstrBody(vm, instr, right, cond, ipChanged, scope);
+	interpInstrBody(vm, instr, right, cond, ipChanged);
 }
-void interpret(size_t startIdx, void* scopeForCtxcall) {
+void interpret(size_t startIdx) {
 	globalVm.start(startIdx);
 	cin.unsetf(ios_base::skipws); // set cin to not ignore whitespace
-	Scope& scope = *(Scope*)scopeForCtxcall;
-	if (globalVm.isCtimeVM) openCtxRefs(globalVm, scope);
 	while (globalVm.ip < parseCtx.instrs.size()) {
 		bool ipChanged = false;
-		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged, scope);
+		interpInstr(globalVm, parseCtx.instrs[globalVm.ip], ipChanged);
 		if (!ipChanged) globalVm.ip++;
 	}
 }
