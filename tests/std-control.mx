@@ -16,8 +16,7 @@ outc '\n'
 ; generalized for
 ld 107
 %for_full(7, 10,
-	%stack:top()
-	outum
+	outur
 	outc ' '
 )
 outc '\n'
@@ -40,8 +39,7 @@ outc '\n'
 ; for loop
 ld 10
 %for {
-	%stack:top()
-	outum
+	outur
 	ld< 3 ; should be irrelevant
 }
 outc '\n'

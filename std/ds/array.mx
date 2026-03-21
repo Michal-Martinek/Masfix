@@ -185,14 +185,16 @@
 
 	; array @G_THIS_PTR
 	; performs instrs on each element
-	; instrs ABI - head will be at element (+ in G_DEST)
-	; idx - stack:top() - dont modify stack!
+	; %instrs ABI:
+	;    - idx - r, stack:top() - readonly
+	;    - head @element (+ in G_DEST)
 	%macro foreach(instrs) {
 		%seg:this(%size, ldm)
 		%for {
 			%stack:dup() ; idx
 			%call(index_impl)
-			%seg:dest(0,
+			%stack:top() ; load idx
+			%seg:dest(0, ; move element
 				%instrs
 			)
 		}
@@ -243,9 +245,8 @@
 	; default comparison is int:lt
 	%void_method{ array_sort, 2, 1, ; inner idx to second in pair
 		;; insertion sort
-		%foreach { ; IDX inserting element
-			%stack:top()
-			%seg:store(%local, 0)
+		%foreach {
+			%seg:store(%local, 0) ; IDX of inserting element
 			%while { ; for (idx = IDX; idx > 0; idx--)
 				%seg:local(0, lmab 0)
 			,

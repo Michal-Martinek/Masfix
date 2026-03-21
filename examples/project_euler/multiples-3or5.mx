@@ -21,7 +21,7 @@
 
 	%seg:arg(0, ldm)
 	%for {
-		%stack:top() ; local[0] = idx
+		; local[0] = idx
 		%seg:local(%idx, strr)
 
 		; %print_endl(outur)

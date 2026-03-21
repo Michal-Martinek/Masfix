@@ -38,7 +38,6 @@
 %void_func {memdump, 2, 0,
 	%seg:arg(1, ldm) ; ld count
 	%for {
-		%stack:top() ; idx
 		%seg:arg(0, movm) ; from
 		movar ; *(from + idx)
 

@@ -93,17 +93,18 @@
 }
 
 ; stop - r
-; curr idx @stack:top
+; curr idx in r + @stack:top
 ; step must be positive
-; r - volatile, ends with 0
+; ends with 0
 %macro for_full(start, step, body) {
 	%stack:pushr() ; stop
 	%stack:push(%start) ; idx
 	%while {
-		%stack:top()
-		movs 1
-		lltm ; idx < stop
+		%stack:ld_over(1) ; stop
+		mova 1
+		lmltr ; idx < stop
 	,
+		ldm ; idx
 		%body
 		%stack:top() ; idx += step
 		stra %step

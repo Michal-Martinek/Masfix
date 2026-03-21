@@ -89,7 +89,6 @@ outc 10
 	%callPwrStrLocal(2, 0) ; maxPwr = 2 ** 14
 	ld 15
 	%for {
-		%stack:top()
 		%print_spaced(outur)
 		
 		%callPwrStrLocal(2, 1) ; currPwr = 2 ** idx

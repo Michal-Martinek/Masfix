@@ -102,7 +102,7 @@
 	; moves itrs: THIS - curr node, SRC - previous node
 	; performs %instrs on each element
 	;   - value @h, current list_node at THIS
-	;   - element index at stack:top (readonly)
+	;   - element index in r, at stack:top (readonly)
 	;   - after iteration: index in m (-1 if empty)
 	%macro foreach(instrs) {
 		%stack:push(%minus1)
@@ -111,6 +111,7 @@
 			%advance_this() ; THIS = THIS.next
 			%stack:top() ; index ++
 			stra 1
+			ldm ; r = curr idx
 			%seg:move(%this, %list_node:value)
 			%instrs
 		}
@@ -125,8 +126,7 @@
 	; this, index -> value (THIS)
 	%method{ list_index, 2, 0,
 		%foreach {
-			%if { ; index == index
-				%stack:top() ; loop idx
+			%if { ; index == loop idx
 				%seg:arg(1, leqm)
 			,
 				%seg:load(%this, %list_node:value)
