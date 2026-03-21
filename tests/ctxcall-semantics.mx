@@ -1,0 +1,49 @@
+
+; test semantics of context calls
+
+%include "memory"
+%include "control"
+%macro printWchar() {
+	ldm& 255
+	outcr
+	ldm> 8
+	outcr
+	mova 1
+}
+
+%define RECURSE 1
+%define NO_RECURSE 0
+%define NOIDX 66
+%macro readArg(arg0, arg1, arg2, sep, to_addr, which, recurse) {
+	%if {
+		ld %which
+		lne %NOIDX
+	,
+		sysargw %which
+		ctxcall PointMacroArg
+		outur
+		outc ','
+	}
+
+	; ReadTokenData(to_addr, 1024, recurse)
+	mov %to_addr
+	sysaddr(h)
+	sysargw 1024
+	sysargw 0
+	ctxcall ReadTokenData
+	outur
+	outc '>'
+	outc ' '
+
+	; print written chars
+	lda 1
+	ld> 1
+	%for {
+		movra %to_addr
+		%printWchar()
+	}
+	outc '\n'
+}
+!readArg(36 A, 78 B, 9 C,          ||, 256, %NOIDX, %NO_RECURSE) ; default arg idxing
+!readArg("(7,)".., 78, 9,         ||, 256,      0, %RECURSE   ) ; TODO recurse
+!readArg(Sweet, Home, Alabama... , ||, 65534,    2, %NO_RECURSE) ; test memory overrun

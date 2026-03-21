@@ -3,8 +3,8 @@ sysargw 8
 
 jmp second
 outu 1
-ctxcall GetTokenData
+ctxcall ReadTokenData
 :second
 outu 2
-ctxcall GetTokenData
+ctxcall ReadTokenData
 

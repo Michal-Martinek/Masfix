@@ -208,11 +208,11 @@ map<InstrNames, RegNames> InstrToModReg = {
 
 enum CtxcallNames {
 	CtxGetTokenMeta,
-	CtxGetTokenData,
+	CtxReadTokenData,
 	
 	CtxAdvanceSource,
-	CtxPointMacroArg,
-	CtxPointAfterCtimeUse,
+	CtxSelectMacroArg,
+	CtxSelectCtimeUse,
 
 	CtxEmplaceTokens,
 	CtxEmplaceMacroArg,
@@ -222,28 +222,28 @@ enum CtxcallNames {
 static_assert(CtxcallCount == 7, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
 	{"GetTokenMeta", CtxGetTokenMeta},
-	{"GetTokenData", CtxGetTokenData},
+	{"ReadTokenData", CtxReadTokenData},
 	{"AdvanceSource", CtxAdvanceSource},
-	{"PointMacroArg", CtxPointMacroArg},
-	{"PointAfterCtimeUse", CtxPointAfterCtimeUse},
+	{"PointMacroArg", CtxSelectMacroArg},
+	{"PointAfterCtimeUse", CtxSelectCtimeUse},
 	{"EmplaceTokens", CtxEmplaceTokens},
 	{"EmplaceMacroArg", CtxEmplaceMacroArg,}
 };
 static_assert(CtxcallCount == 7, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxGetTokenMeta, 1},
-	{CtxGetTokenData, 3},
+	{CtxReadTokenData, 3},
 	{CtxAdvanceSource, 2},
-	{CtxPointMacroArg, 1},
-	{CtxPointAfterCtimeUse, 0},
+	{CtxSelectMacroArg, 1},
+	{CtxSelectCtimeUse, 0},
 	{CtxEmplaceTokens, 2},
 	{CtxEmplaceMacroArg, 2,}
 };
 
 // structs -------------------------------
 struct Loc {
-	int row;
-	int col;
+	int row=0;
+	int col=0;
 	string file;
 
 	Loc() {}
@@ -262,8 +262,8 @@ struct Token {
 // ctxcall - TokenMeta //
 	TokenTypes type=TokenCount;
 
-	bool firstOnLine;
-	bool continued; // continues meaning of previous token
+	bool firstOnLine=false;
+	bool continued=false; // continues meaning of previous token
 	Loc loc; // ctxcall Meta - row, col, LocFile - file //
 
 // ctxcall - TokenData //
@@ -595,7 +595,7 @@ struct VM {
 	// eat pointer sysarg
 	bool sysargEatPtr(void** res, bool nullable=false) {
 		*res = (void*)sysargEatInt();
-		if (nullable && *res == 0) return true;
+		if (nullable && *res == nullptr) return true;
 		return *res >= &mem && *res <= &mem[CELLS];
 	}
 	void ctxcallReturn(int64_t retval) {
@@ -961,8 +961,8 @@ public:
 		vm.currTlist = nullptr;
 		// open last ctime argument
 		uint64_t retval;
-		vm.addSysarg(0);
-		Instr ctxCallInstr(CtxPointMacroArg);
+		vm.addSysarg(-1);
+		Instr ctxCallInstr(CtxSelectMacroArg);
 		interpCtxcall(vm, ctxCallInstr, retval); // NOTE also clears sysargs
 		if (retval != 1) {
 			// TODO open after ctime body
@@ -1894,47 +1894,52 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 	Macro& macro = *vm.ctimeMac;
 	static_assert(CtxcallCount == 7, "Exhaustive interpCtxcall definition");
 	// valid currToken not needed
-	if (ctxName == CtxPointMacroArg) {
-		// CtxPointMacArg(ushort macro_arg_idx) -> bool sucess
-		uint64_t idx = vm.sysargEatInt();
-		returnOnFalse(idx < macro.argList.size());
+	if (ctxName == CtxSelectMacroArg) {
+		// SelectMacroArg(ushort macro_arg_idx) -> bool sucess
+		// set context input to start of n-th macro argument, negative indexes from end
+		short idx = vm.sysargEatShort();
+		if (idx < 0) idx += macro.argList.size(); // backwards
+		returnOnFalse(0 <= idx && idx < macro.argList.size());
 		vm.currTlist = &macro.argList[idx].value.top();
 		vm.currToken = vm.currTlist->begin();
 		checkValidCurrToken();
 		retval = 1;
 		return true;
-	} else if (ctxName == CtxPointAfterCtimeUse) {
-		// CtxPointAfterCtimeUse() -> bool available
+	} else if (ctxName == CtxSelectCtimeUse) {
+		// SelectCtimeUse() -> bool available
+		// select ctime expansion token (mainly for metadata)
+		// token eating then eats tokens after expansion
 		vm.currTlist = &scope.currList();
 		vm.currToken = scope.currTokenItr();
 		checkValidCurrToken();
+		assert(vm.currToken->type == TIctime);
 		retval = 1;
 		return true;
 	} else if (ctxName == CtxEmplaceTokens) {
-		// CtxEmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
-		// emplace tokens from string after ctime call directive, first inherits Meta from first_meta
+		// EmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
+		// emplace tokens from string after ctime call directive, first inserted inherits Meta from first_meta
 		// TODO nullify meta - default - tokenize -> ignores type
 		eatPtrArg(data_cstr);
-		eatPtrArg(first_meta);
+		eatPtrArg(meta_arg);
 		
-		short meta_data[TOKEN_META_DATA_SIZE_W];
-		uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
+		short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
+		uint64_t meta_bytes_read = vmExchangeBytes(vm, meta_arg, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
+		returnOnFalse(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W);
 
 		Token ctx;
 		ctx.type = static_cast<TokenTypes>(meta_data[0]);
-		// TODO check
+		// TODO ignore -> tokenize
 		ctx.firstOnLine = !!meta_data[1];
 		ctx.continued = !!meta_data[2];
 		ctx.loc.row = meta_data[3];
 		ctx.loc.col = meta_data[4];
-		ctx.loc.file = macro.loc.file + "/ctxcall";
+		ctx.loc.file = macro.loc.file + "/ctxcall"; // TODO
 
 		string data(data_cstr);
-		// TODO add null termination after memory
 		ctx.data = data;
-
-		// tokenize();
 		scope.insertToken(move(ctx));
+		retval = 1;
+		return true;
 	}
 
 	// unpack currToken
@@ -1955,17 +1960,18 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 		
 		uint64_t bytes_written = vmExchangeBytes(vm, (char*)meta_data, sizeof(meta_data), meta_dest, sizeof(meta_data));
 		retval = bytes_written == 2 * TOKEN_META_DATA_SIZE_W ? 1 : 0;
-	} else if (ctxName == CtxGetTokenData) {
-		// GetTokenData(char* buff, ushort buff_size) -> ushort bytes_written
-		// read curr token's text into buffer
-		uint64_t idx = vm.sysargEatInt();
+	} else if (ctxName == CtxReadTokenData) {
+		// ReadTokenData(char* buff, ushort buff_size, bool recurse) -> ushort bytes_written
+		// read token text (.data) into buffer
+		// recurse gives text of whole token subtree
 		eatPtrArg(mxBuff);
 		uint64_t mxBuffSize = vm.sysargEatInt();
+		bool recurse = vm.sysargEatInt();
 		
 		string arg = currToken.data;
 		retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
 	} else if (ctxName == CtxAdvanceSource) {
-		// CtxAdvanceSource(nop, nop) -> bool success
+		// AdvanceSource(nop, nop) -> bool success
 		vm.sysargEatInt();
 		vm.sysargEatInt();
 		++ vm.currToken;
@@ -1973,12 +1979,31 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 		retval = 1;
 	} else if (ctxName == CtxEmplaceMacroArg) {
 		// EmplaceMacroArg(bool unwrap, TokenMeta*? meta) -> bool success
-		// emplace rest of pointed macro argument, with optional meta (see CtxEmplaceTokens)
-		// TODO remove Ctx from descriptions
+		// emplace rest of pointed macro argument, with optional meta (see EmplaceTokens)
 		bool unwrap = vm.sysargEatInt();
 		eatPtrArgNullable(first_meta);
-
+		
 		returnOnFalse(vm.currTlist != &scope.currList()); // check macro arg is actually pointed
+
+		// Token& first;
+		Token ctx;
+		if (first_meta != nullptr) {
+			short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
+			uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
+			returnOnFalse(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W);
+	
+			ctx.type = static_cast<TokenTypes>(meta_data[0]);
+			// TODO check type
+			ctx.firstOnLine = !!meta_data[1];
+			ctx.continued = !!meta_data[2];
+			ctx.loc.row = meta_data[3];
+			ctx.loc.col = meta_data[4];
+		} else {
+			ctx.type = Talpha;
+			ctx.loc = macro.loc;
+		}
+		ctx.loc.file = macro.loc.file + "/ctxcall";
+
 		// TODO not unwrap
 		scope.insertList(*vm.currTlist, ctx, true);
 		retval = 1;
