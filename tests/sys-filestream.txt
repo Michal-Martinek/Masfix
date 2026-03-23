@@ -1,0 +1,241 @@
+:returncode 0
+
+:testmode runonly
+
+:stdout 442
+Path; "tests/sys-filestream.mx"
+OPEN: 0
+" ; #! ; Hello?? Do you see me? xoxo @!	"
+INC: %memory %procedures %control %io %structs %array %strings %system %filesystem %debug 
+LENS: 18, 45, 1, 11, 20, 29, 31, 15, 20, 1, 
+BTs:
+8: 9019 9249 2573 2573
+"%macro outpIncludes() {
+	outc 'I'
+	outc 'N'
+	outc 'C'
+	outc ':'
+	outc ' '
+	%while { ; not empty line
+; ABCDEFGHIJKLMN"
+ ABCDEFGHIJKLMNOPQRSTUVW
+";#BUFF-READ-POINT		%seg:p"
+SIZE: 3970
+GOOD 0 IN 0
+
+
+:stderr 4086
+%memory,%procedures,%control,%io,%structs,%array,%strings,%system,%filesystem,%debug,
+#COMMENTS:
+; set to auto input
+; path: out string, stdinstream: filestream ->
+; '
+; open stdin
+; construct file path
+; YES, this test reads itself!
+; emplace single char to err ;
+; TestIn -> Line
+; ; output first line
+; 
+
+
+
+		%seg:push(%local, %locTail)
+		%call(clear)
+	}
+	outc '\n'
+}
+
+%define locStdIn 0
+%define locTestIn 1
+%define locStdErr 2
+%define locPath 3
+%define locLine 4
+%define locTail 5
+%define locCstrPath 6
+
+%void_func{ main, 0, 8,
+	; locals: 3 * filestream, 3 * string, cstr
+	%seg:local(%locStdIn,  %filestream:construct_here())
+	%seg:local(%locTestIn, %filestream:construct_here())
+	%seg:local(%locStdErr, %filestream:construct_here())
+	%seg:local(%locPath,   %string:construct_here())
+	%seg:local(%locLine,   %string:construct_here())
+	%seg:local(%locTail,   %string:construct_here())
+	%seg:local(%locCstrPath, str 0)
+
+	; open STDERR
+	%seg:push(%local, %locStdErr)
+	%stack:push(%filestream:STDERR)
+	%call(filestream_open_std_filestream)
+
+	; testPath = get_file_arg()
+	%seg:push(%local, %locPath)
+	%seg:push(%local, %locStdIn)
+	%call(get_file_arg)
+	
+	; cstr = from_string(path)
+	%seg:push(%local, %locPath)
+	%call(cstr_from_string)
+	%seg:pop(%local, %locCstrPath)
+
+	; TestIn.open(cstrPath)
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locCstrPath)
+	%stack:push(%filestream:WIN_DesiredAccess:GENERIC_READ)
+	%stack:push(%filestream:WIN_CreationDisposition:OPEN_EXISTING)
+	%call(filestream_open_file)
+
+	%print_endl {
+		outc 'O'
+		outc 'P'
+		outc 'E'
+		outc 'N'
+		outc ':'
+		outc ' '
+		%sys:SeeLastError()
+	}
+
+	%seeFirstLine()
+	
+	%outpIncludes()
+
+	%emitComments()
+
+	outc 'B'
+	outc 'T'
+	outc 's'
+	outc ':'
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(%temp_addr)
+	%stack:push(8)
+	%call(filestream_eat_bytes)
+	%stack:push(%temp_addr)
+	%stack:push(4)
+	%print_endl {
+		%call(memdump)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
+	
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(0)   ; OK - no output
+	%stack:push(109) ; drop odd number of bytes
+	%call(filestream_eat_bytes)
+
+	%while {
+		%seg:push(%local, %locTestIn)
+		%call(filestream_peek_char)
+		lne 'X'
+	,
+		%stack:drop()
+
+		%seg:push(%local, %locTestIn)
+		%call(filestream_eat_char)
+		%stack:pop()
+		outcr
+	}
+	outc '\n'
+
+	%while { ; drop lines upto #BUFF-READ-POINT
+		%eatLine()
+		%seg:movptr(%local, %locLine)
+		movma 1 ; data[1]
+		lmne '#'
+	,
+		%seg:push(%local, %locLine)
+		%call(clear)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
+
+	; eat_upto multiple times over buffer end
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%stack:push(0) ; stop at EOF
+	%call(filestream_eat_upto)
+
+	outc 'S'
+	outc 'I'
+	outc 'Z'
+	outc 'E'
+	outc ':'
+	outc ' '
+	%print_endl {
+		%seg:movptr(%local, %locLine)
+		%array:at(size)
+		outum
+	}
+	
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+
+	; emplace huge string to test buffer boundary
+	%seg:push(%local, %locStdErr)
+	%seg:push(%local, %locLine)
+	%call(filestream_emplace_string)
+
+
+	; close streams
+	%seg:push(%local, %locTestIn)
+	%call(filestream_close)
+	; %seg:push(%local, %locStdIn) ; test the destructor
+	; %call(filestream_close)
+	%seg:push(%local, %locStdErr)
+	%call(filestream_close)
+
+	; see if STDIN will be closed by destructor
+	%seg:push(%local, %locStdIn)
+
+	%seg:local(%locStdIn,  %filestream:destructor())
+	%seg:local(%locTestIn, %filestream:destructor())
+	%seg:local(%locStdErr, %filestream:destructor())
+	%seg:local(%locPath,   %string:destructor())
+	%seg:local(%locLine,   %string:destructor())
+
+	outc 'G'
+	outc 'O'
+	outc 'O'
+	outc 'D'
+	outc ' '
+	%sys:SeeLastError()
+	outc ' '
+	outc 'I'
+	outc 'N'
+	outc ' '
+	%stack:pop()
+	movra %filestream:handle
+	outum
+	outc '\n'
+	
+}
+%call(main)
+
+;END
+
+:stdin 23
+tests/sys-filestream.mx
+

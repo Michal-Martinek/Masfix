@@ -193,6 +193,11 @@
 		%load(%idx_seg, %idx)
 		%storer(%dest_seq)
 	}
+	; advance segment pointer by step
+	%macro advance(name, step) {
+		mov %name
+		stra %step
+	}
 	; move to segment
 	%macro move(name, idx) {
 		mov %name

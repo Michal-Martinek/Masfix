@@ -1,3 +1,4 @@
+from enum import StrEnum
 import subprocess
 from subprocess import Popen, PIPE, TimeoutExpired
 import os, sys
@@ -14,6 +15,30 @@ TestDescRedirections = {
 	'examples\\project_euler': 'UNREACHABLE, inherited from above',
 	'examples\\AdventOfCode2025': 'UNREACHABLE',
 }
+
+DescriptionFields = {
+	'returncode': int,   # inline number
+	'testmode': StrEnum, # inline string option from StrEnumOptions
+	'stdout': bytes, # bytes blob
+	'stderr': bytes,
+	'stdin':  bytes,
+}
+StrEnumOptions = { # first is considered default, StrEnum w/o assigned value means "unset"
+	'testmode': ['both', 'runonly', 'interponly']
+}
+
+MarkRunOnly = []
+
+def defaultTestcaseDesc():
+	d = dict()
+	for fieldName, fieldType in DescriptionFields.items():
+		if fieldType == int:
+			d[fieldName] = 0
+		elif fieldType == bytes:
+			d[fieldName] = ''
+		elif fieldType == StrEnum: # unset - don't force the default
+			pass
+	return d
 
 def quoted(s):
 	return "'" + str(s) + "'"
@@ -44,27 +69,33 @@ def runCommand(command, stdin: str, timeout=None) -> dict:
 	stderr = stderr.decode().replace('\r', '')
 	return {'returncode': process.returncode, 'stdout': stdout, 'stderr': stderr}
 def parseTestcaseDesc(desc: str):
-	expected = {'stdout': '', 'stderr': '', 'stdin': ''}
+	parsed = defaultTestcaseDesc()
 	while ':' in desc:
 		desc = desc[desc.find(':')+1:]
 		line = desc.split('\n', maxsplit=1)[0]
 		desc = desc[len(line):]
-		for fieldType, fieldName in [(int, 'returncode'), (str, 'stdout'), (str, 'stderr'), (str, 'stdin')]:
+		for fieldName, fieldType in DescriptionFields.items():
+			if not line.startswith(fieldName): continue
+			if fieldType == StrEnum:
+				value = line.removeprefix(fieldName).strip()
+				check(value in StrEnumOptions[fieldName], 'Unknown', fieldName, 'value:', value)
+				parsed[fieldName] = value
+				break
 			if not re.match(f'{fieldName} \\d+', line): continue
 			num = int(line.split(' ')[1])
 			if fieldType == int:
-				expected[fieldName] = num
-			elif fieldType == str:
+				parsed[fieldName] = num
+			elif fieldType == bytes:
 				check('\n' in desc, 'Testcase blob must start at a new line')
 				s = desc[desc.find('\n')+1:]
 				check(len(s) >= num, 'Insufficent character count in description')
-				expected[fieldName] = s[:num]
+				parsed[fieldName] = s[:num]
 				desc = desc[num:]
 			break
 		else:
 			check(False, 'Unknown field in description', quoted(line))
-	check('returncode' in expected, 'Testcase description missing :returncode')
-	return expected
+	check('returncode' in parsed, 'Testcase description missing :returncode')
+	return parsed
 def _getTestcasePath(test: Path, createFolders=False):
 	path = test.with_suffix('.txt')
 	if path.parts[0] in TestDescRedirections:
@@ -94,10 +125,10 @@ def askWhetherToDo(doWhat: str) -> bool:
 	answer = input(f'\nWould you like to {doWhat}? (y / n): ')
 	print()
 	return answer and answer[0].lower() == 'y'
-def updateFileOutput(file: Path, verbose=True):
+def updateFileOutput(file: Path, verbose=True, overwriteTestmode=None):
 	print('[UPDATING]', file)
 	original = getTestcaseDesc(file, update=True)
-	ran = runFile(file, original['stdin'], False)
+	ran = runFile(file, original['stdin'], original.get('testmode', 'both') == 'interponly')
 	if verbose:
 		print()
 		print('[NOTE] returncode:', ran['returncode'])
@@ -105,8 +136,10 @@ def updateFileOutput(file: Path, verbose=True):
 		print(ran['stdout'])
 		print('[NOTE] stderr:')
 		print(ran['stderr'], end='')
-	ran['stdin'] = original['stdin']
-	saveDesc(file, ran)
+	original.update(ran)
+	if overwriteTestmode in StrEnumOptions['testmode']:
+		original['testmode'] = overwriteTestmode
+	saveDesc(file, original)
 def updateInput(file: Path):
 	print('[INPUT]', file)
 	print('Type your input here, type Ctrl-Z on blank line to end')
@@ -138,13 +171,14 @@ def checkTestResult(expected: dict, ran: dict, keyName: str):
 		print(f'[ERROR] {keyName.upper()} is not as expected, diff / actual:')
 		print(*['\t' + line for line in ran[keyName].split('\n') if line + '\n' not in expected[keyName]], sep='\n')
 	return False
-def runTest(path: Path, interpret: bool) -> bool:
-	expected = getTestcaseDesc(path)
-	ran = runFile(path, expected['stdin'], interpret)
-	res = checkTestResult(expected, ran, 'stdout')
-	if not interpret or 'jmp destination out of bounds' not in expected['stderr']:
-		res &= checkTestResult(expected, ran, 'returncode')
-		res &= checkTestResult(expected, ran, 'stderr')
+def runTest(path: Path, interpret: bool, desc: dict) -> bool:
+	ran = runFile(path, desc['stdin'], interpret)
+	res = checkTestResult(desc, ran, 'stdout')
+	if interpret and 'testmode' not in desc and 'System instruction not available in interpret mode' in ran['stderr']:
+		MarkRunOnly.append(path)
+	if not interpret or 'jmp destination out of bounds' not in desc['stderr']:
+		res &= checkTestResult(desc, ran, 'returncode')
+		res &= checkTestResult(desc, ran, 'stderr')
 	return res
 def _handleTestResult(failedTests: list[Path]):
 	print()
@@ -159,7 +193,7 @@ def _handleTestResult(failedTests: list[Path]):
 def updateFileOutputs(files: list[Path], verbose=False):
 	for file in files:
 		try:
-			updateFileOutput(file, verbose)
+			updateFileOutput(file, verbose, 'runonly' if file in MarkRunOnly else None)
 		except ExecutionException:
 			print()
 def iterTestsInDirectory(dir):
@@ -179,8 +213,13 @@ def runTests(dir: Path, quick: bool):
 		try:
 			check(os.path.exists(path), 'Testcase not found', quoted(path))
 			print('[TESTING]', path)
-			passed = runTest(path, True)
-			if (not quick): passed = passed and runTest(path, False)
+			desc = getTestcaseDesc(path)
+			passed = True
+			skippedInterp = desc.get('testmode', 'both') == 'runonly'
+			if not skippedInterp:
+				passed = runTest(path, True, desc)
+			if (not quick or skippedInterp) and desc.get('testmode', 'both') != 'interponly':
+				passed = passed and runTest(path, False, desc)
 		except TestcaseException:
 			passed = False
 			print()
@@ -188,15 +227,17 @@ def runTests(dir: Path, quick: bool):
 			failedTests.append(path)
 	_handleTestResult(failedTests)
 def saveDesc(file: Path, desc):
-	code = desc['returncode']
-	stdout = desc['stdout']
-	stderr = desc['stderr']
-	stdin = desc['stdin']
+	assert 'returncode' in desc
 	with open(_getTestcasePath(file, createFolders=True), 'w') as f:
-		f.write(f':returncode {code}\n\n')
-		if stdout: f.write(f':stdout {len(stdout)}\n{stdout}\n\n')
-		if stderr: f.write(f':stderr {len(stderr)}\n{stderr}\n\n')
-		if stdin: f.write(f':stdin {len(stdin)}\n{stdin}\n\n')
+		for fieldName, fieldType in DescriptionFields.items():
+			if fieldName not in desc: continue
+			value = desc[fieldName]
+			if fieldType == int:
+				f.write(f':{fieldName} {value}\n\n')
+			elif fieldType == bytes:
+				if value: f.write(f':{fieldName} {len(value)}\n{value}\n\n')
+			elif fieldType == StrEnum:
+				f.write(f':{fieldName} {value}\n\n')
 
 # modes --------------------------------------
 def processFileArg(arg) -> Path:

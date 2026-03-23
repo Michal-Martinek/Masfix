@@ -1,0 +1,88 @@
+
+%include "memory"
+%include "procedures"
+%include "exceptions"
+
+
+;; generic utility for system calls
+%namespace sys {
+;; arguments
+	%macro argimm(value) {
+		sysargw %value
+	}
+	%macro nullptr() {
+		%argimm(0)
+	}
+	; push r as sysarg
+	%macro argr() {
+		sysargw(r)
+	}
+	; push value in seg as sysarg
+	%macro argw(seg_name, idx) {
+		%seg:load(%seg_name, %idx)
+		%argr()
+	}
+	; push qword value from seg as sysarg
+	%macro argq(seg_name, idx) {
+		%seg:load_addr(%seg_name, %idx)
+		sysargq(r)
+	}
+	; push address of segment as sysarg
+	%macro addr(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysaddr(h)
+	}
+	; push address of segment + offset from r
+	%macro addr_offset(seg_name) {
+		%sys:addr(%dest, 0)
+		%offsetr()
+	}
+	; push memory pointer in segment as sysarg
+	%macro ptr(seg_name, idx) {
+		%seg:load(%seg_name, %idx)
+		sysaddr(r)
+	}
+	; offset last system argument by r
+	%macro offsetr() {
+		sysoffset(r)
+	}
+	
+	; push address to temp segment
+	%macro tempaddr() {
+		sysaddr %temp_addr
+	}
+	; push qword from temp segment
+	%macro tempq() {
+		sysargq %temp_addr
+	}
+
+;; syscall & retval
+	%macro call(syscall_name) {
+		syscall %syscall_name
+	}
+	; save last syscall return value to seg
+	%macro retto(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysretq(h)
+	}
+	; save last syscall return value to addr pointer by seg
+	%macro retptr(seg_name, idx) {
+		%seg:move(%seg_name, %idx)
+		sysretq(m)
+	}
+	; save last retval to temp
+	%macro rettemp() {
+		mov %temp_addr
+		sysretq(h)
+	}
+	; assert syscall success
+	%macro assert_success(cond) {
+		; TODO proper description, GetLastError on fail
+		%assert(%cond)
+	}
+
+	%macro SeeLastError() {
+		syscall GetLastError
+		outur
+	}
+}

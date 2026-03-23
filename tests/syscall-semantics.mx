@@ -1,0 +1,237 @@
+
+; test basic syscall instruction semantics
+%macro dword_negative(x) {
+	mov 8
+	str 0
+	strs %x
+	mova 1
+	str 0
+	strs 1
+	mova 1
+	str 0
+	mova 1
+	str 0
+	sysargq 8
+}
+%define WRITE_BUFF 77
+%define num_written 16
+%macro syscall_fileAPI(handle, bytes, cstr_instrs) {
+	%dword_negative(%handle) ; stdout
+	syscall GetStdHandle
+
+	sysretq 0 ; handle
+	sysargq 0
+	mov %WRITE_BUFF ; "buff"
+	sysaddr(h)
+	%cstr_instrs
+	sysargw %bytes ; num bytes
+	sysaddr %num_written
+	sysargw 0 ; overlapped
+	syscall WriteFile
+}
+
+; test system only writes DWORD to num_written
+mov %num_written
+movs 1
+strh| 1280 ; bits: 101|h
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+mova 1
+strh| 1280
+
+%syscall_fileAPI(11, 4,
+	str '>'
+	ld ' '
+	str|r< 8
+	mova 1
+	str '$'
+	ld ' '
+	str|r< 8
+)
+mov 100 ; retval
+strr
+
+outc '\n'
+mov %num_written
+outc 'D'
+outc 'W'
+outc ' '
+movs 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc ','
+mova 1
+outum
+outc '\n'
+
+; report retvalue + numwritten (from "> ")
+%syscall_fileAPI(12, 4,
+	str '('
+	mov 100
+	ldma '0' ; (int)retval
+	mov %WRITE_BUFF
+	str|r< 8
+
+	mov %num_written ; num written (2)
+	ldma '0'
+	mov %WRITE_BUFF
+	mova 1
+	strr
+	
+	ld ')'
+	str|r< 8
+)
+
+
+; handle
+%dword_negative(10) ; stdin
+syscall GetStdHandle
+sysretq 0 ; handle
+sysargq 0
+
+; buffer
+sysaddr 10000
+
+; bytes to read
+sysargw 8
+
+sysaddr 8 ; res - read
+sysargw 0 ; overlapped
+
+ld 67
+syscall ReadFile
+
+outur
+outc ','
+outc ' '
+mov 8
+outum
+outc ':'
+outc 10
+
+mov 10000
+outum& 255
+outc '\n'
+outcm
+mova 1
+outcm
+mova 1
+outcm
+mova 1
+outum
+mova 1
+outum
+mova 1
+outum
+outc '\n'
+
+; test QWORD operations memory safety
+%macro test_std_handle(handle, print) {
+	%handle
+	syscall GetStdHandle
+	sysretq 3
+	; hide value if != -1
+	mov 100
+	str %print
+	bmne print_def_(%print)
+	mov 3
+	strsr
+	bmne end
+	str 'h'
+	ld 11111
+:print_def_(%print)
+	outur
+	outc ';'
+	outc ' '
+
+	mov 0
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '|'
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '|'
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc ','
+	mova 1
+	outum
+	outc '\n'
+	mova 1
+}
+
+; memset 0: ABCD
+mov 0
+str 65
+mova 1
+str 66
+mova 1
+str 67
+mova 1
+str 68
+
+; after
+mova 3
+str 55
+mova 1
+str 66
+mova 1
+str 77
+mova 1
+str 88
+
+%test_std_handle(
+	sysargw 33 ; bad arg -> (QWORD)-1
+	, 1
+)
+%test_std_handle(
+	%dword_negative(11) ; 104
+	, 0 ; hide volatile handle value
+)
+
+mov 0
+outcm
+mova 1
+outcm
+mova 1
+outcm
+mova 1
+outcm
+outc '\n'
+
+sysargw 1234
+syscall ExitProcess
+
+outu 5

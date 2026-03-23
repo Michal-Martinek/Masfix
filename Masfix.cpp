@@ -156,9 +156,17 @@ enum InstrNames {
 	Iipc,
 	Iinu,
 	Iinl,
+
+	Isysargw,
+	Isysargq,
+	Isysaddr,
+	Isysoffset,
+	Isyscall,
+	Isysretq,
+
 	InstructionCount
 };
-static_assert(InstructionCount == 14, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 20, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -176,6 +184,13 @@ map<string, InstrNames> StrToInstr {
 {"ipc", Iipc},
 {"inu", Iinu},
 {"inl", Iinl},
+
+{"sysargw", Isysargw},
+{"sysargq", Isysargq},
+{"sysaddr", Isysaddr},
+{"sysoffset", Isysoffset},
+{"syscall", Isyscall},
+{"sysretq", Isysretq},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -481,12 +496,20 @@ struct VM {
 	unsigned short ip;
 	unsigned short mem[CELLS];
 
+	int64_t sysargs[16] = { 0 };
+	unsigned int sysargCount = 0;
+	int64_t sysretval = 0;
+
 	VM() {};
 	void start(unsigned short startIdx) {
  		ip = startIdx;
 	}
 	unsigned short& cell() {
 		return mem[head];
+	}
+	void addSysarg(int64_t value) {
+		sysargs[sysargCount] = value;
+		sysargCount ++;
 	}
 };
 VM globalVm;
@@ -1554,9 +1577,9 @@ bool parseSuffixes(Instr& instr, string s, bool condExpected=false) {
 	return true;
 }
 bool parseInstrOpcode(Instr& instr) {
-	static_assert(InstructionCount == 14, "Exhaustive parseInstrOpcode definition");
-	for (int checkedLen = min(4, (int)instr.opcodeStr.size()); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
+	for (int checkedLen = instr.opcodeStr.size(); checkedLen > 0; checkedLen --) { // avoid parsing 'ld' as Il, 'str' as Is, 'swap' as Is and so on
 		string substr = instr.opcodeStr.substr(0, checkedLen);
+		if (substr == "sys") break; // unrecognized sys instr -> avoid "Unknown condition" error
 		if (StrToInstr.count(substr) == 1) {
 			instr.instr = StrToInstr[substr];
 			string suffix = instr.opcodeStr.substr(checkedLen);
@@ -1588,6 +1611,12 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 bool parseInstrImmediate(Instr& instr) {
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
+	if (instr.instr == Isyscall) {
+		checkReturnOnFail(imm.type == Talpha || imm.type == Tstring, "Expected syscall identifier", instr);
+		// NOTE available syscall identifiers are known only at link time
+		// return check(SyscallIdentToType.count(imm.data), "Unknown syscall identifier", instr);
+		return true;
+	}
 	if (imm.type == Talpha) {
 		if (!parseCtx.strToLabel.count(imm.data)) {
 			checkReturnOnFail(_validIdentChar(imm.data.at(0)), "Invalid instruction immediate", instr);
@@ -1618,6 +1647,9 @@ bool checkSuffixCombination(Instr& instr) {
 		if (instr.suffixes.reg == Rno) {
 			instr.suffixes.reg = Rr; // default
 		} else checkReturnOnFail(instr.suffixes.reg == Rr || instr.suffixes.reg == Rm, "Input destination can be only r/m", instr);
+	} else if (instr.instr == Isyscall) {
+		checkReturnOnFail(!instr.hasReg() && !instr.hasOp(), "Unexpected syscall suffix", instr);
+		checkReturnOnFail(instr.hasImm(), "Expected syscall identifier", instr);
 	} else {
 		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
 		if (instr.hasOp()) {
@@ -1630,8 +1662,8 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 14 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
-	assert(instr.instr != InstructionCount);
+	static_assert(InstructionCount == 20 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
 		raiseWarning("No-OP instruction", instr);
@@ -1708,7 +1740,7 @@ bool interpCond(VM& vm, Instr& instr, signed short target) {
 	unreachable();
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 14, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 20, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -1747,8 +1779,22 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Iinl) {
 		char c = 0;
 		while (c != '\n') cin >> c;
+	} else if (instr.instr == Isysargw) {
+		vm.addSysarg(target);
+	} else if (instr.instr == Isysargq) {
+		vm.addSysarg(*(int64_t*)(&vm.mem[target]));
+	} else if (instr.instr == Isysaddr) {
+		vm.addSysarg((int64_t)& vm.mem[target]);
+	} else if (instr.instr == Isysoffset) {
+		vm.sysargs[vm.sysargCount-1] += target;
+	} else if (instr.instr == Isyscall) {
+		raiseError("Syscall instruction not available in interpret mode", instr, "", true);
+	} else if (instr.instr == Isysretq) {
+		int64_t* dest = (int64_t*)&vm.mem[target];
+		*dest = vm.sysretval;
+	} else {
+		unreachable();
 	}
-	else unreachable();
 }
 void interpInstr(VM& vm, Instr& instr, bool& ipChanged) {
 	static_assert(RegisterCount == 5 && OperationCount == 10 && sizeof(Suffix) == 4 * 5, "Exhaustive interpInstr definition");
@@ -1878,7 +1924,7 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 	}
 }
 void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 14, "Exhaustive genInstrBody definition");
+	static_assert(InstructionCount == 20, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr == Imov) {
@@ -1921,11 +1967,28 @@ void genInstrBody(ofstream& outFile, InstrNames instr, int instrNum, bool inputT
 		outFile << "	call get_next_char\n"
 			"	cmp rdx, 10\n"
 			"	jne instr_" << instrNum << "\n";
+	} else if (instr == Isysargw) {
+		outFile << "	call sysargs_push\n";
+	} else if (instr == Isysargq) {
+		outFile << "	mov rcx, [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
+	} else if (instr == Isysaddr) {
+		outFile << "	lea rcx, [r13 + 2*rcx]\n"
+			"	call sysargs_push\n";
+	} else if (instr == Isysoffset) {
+		outFile << "	lea rbx, [rip + sys_args] # sys_args[count-1] += rcx\n"
+			"	mov rax, [rip + sys_args_count]\n"
+			"	add [rbx + 8*rax - 8], rcx\n";
+	} else if (instr == Isyscall) {
+		outFile << "	call call_syscall\n";
+	} else if (instr == Isysretq) {
+		outFile << "	mov rax, [rip + sys_retval]\n"
+			"	mov QWORD PTR [r13 + 2*rcx], rax\n";
 	} else {
 		unreachable();
 	}
 }
-void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
+void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	// head pos - r14, internal r reg - r15
 	// operands - first - rbx, second - rcx (also result of operation)
 	// addr of cells[0] - r13
@@ -1937,7 +2000,11 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 		genRegisterFetch(outFile, instr.suffixes.reg, instrNum, !instr.hasOp());
 	}
 	if (instr.hasImm()) {
-		outFile << "	mov rcx, " << instr.immediate << '\n';
+		if (instr.instr == Isyscall) {
+			outFile << "	lea rax, [rip + " << instr.immediates.front().data << "]\n";
+		} else {
+			outFile << "	mov rcx, " << instr.immediate << '\n';
+		}
 	}
 	if (instr.hasOp()) {
 		genOperation(outFile, instr.suffixes.op);
@@ -1955,11 +2022,6 @@ void genAssembly(ofstream& outFile, Instr instr, int instrNum) {
 void generate(ofstream& outFile, vector<Instr>& instrs) {
 	outFile <<
 		".intel_syntax noprefix\n"
-		"\n"
-		".extern ExitProcess\n"
-		".extern GetStdHandle\n"
-		".extern WriteFile\n"
-		".extern ReadFile\n"
 		"\n"
 		".text\n"
 		"exit: # exits the program with code in rax\n"
@@ -2112,12 +2174,67 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	pop rax\n"
 		"	ret\n"
 		"\n"
+		"# syscalls ----------------------------\n"
+		"\n"
+		"# qword: rcx - pushed to sys_args\n"
+		"sysargs_push:\n"
+		"	lea rbx, [rip + sys_args] # sys_args[count] = rcx\n"
+		"	mov rax, [rip + sys_args_count]\n"
+		"	mov [rbx + 8*rax], rcx\n"
+		"	inc QWORD PTR [rip + sys_args_count]\n"
+		"	ret\n"
+		"\n"
+		"# rax: winapi func addr\n"
+		"call_syscall:\n"
+		"	# align stack\n"
+		"	mov rbp, rsp\n"
+		"	and rsp, -16 # force 16-byte alignment\n"
+		"	# padd odd number of arguments\n"
+		"	mov rbx, [rip + sys_args_count]\n"
+		"	cmp rbx, 4   # count <= 4 - no stack args\n"
+		"	jle call_syscall_stack_args\n"
+		"	test rbx, 1  # even stack args\n"
+		"	je call_syscall_stack_args\n"
+		"	push 0\n"
+		"\n"
+		"	# args to stack\n"
+		"	call_syscall_stack_args: # while arg count > 4: pop args -> push call stack\n"
+		"		mov rbx, [rip + sys_args_count]\n"
+		"		cmp rbx, 4\n"
+		"		jbe call_syscall_reg_args\n"
+		"		lea rcx, [rip + sys_args]\n"
+		"		mov rcx, [rcx + 8*rbx - 8]\n"
+		"		push rcx\n"
+		"\n"
+		"		dec QWORD PTR [rip + sys_args_count]\n"
+		"		jmp call_syscall_stack_args\n"
+		"	call_syscall_reg_args:\n"
+		"\n"
+		"	# pop args -> regs\n"
+		"	mov rcx, [rip + sys_args + 0]\n"
+		"	mov rdx, [rip + sys_args + 8]\n"
+		"	mov r8, [rip + sys_args + 16]\n"
+		"	mov r9, [rip + sys_args + 24]\n"
+		"	mov QWORD PTR [rip + sys_args_count], 0\n"
+		"	# syscall\n"
+		"	sub rsp, 32 # reserve shadow space\n"
+		"	call rax\n"
+		"	# retvalue\n"
+		"	mov [rip + sys_retval], rax\n"
+		"	mov r15w, ax\n"
+		"	# restore regs\n"
+		"	mov rsp, rbp\n"
+		"	ret\n"
+		"\n"
+		"\n"
 		".global _start\n"
 		"_start:\n"
 		"	# initialization\n"
 		"	call get_std_fds\n"
 		"	mov QWORD PTR [rip + stdin_buff_char_count], 0\n"
 		"	mov QWORD PTR [rip + stdin_buff_chars_read], 0\n"
+		"\n"
+		"	mov QWORD PTR [rip + sys_args_count], 0\n"
 		"\n"
 		"	lea r13, QWORD PTR [rip + cells]\n"
 		"	xor r14, r14\n"
@@ -2129,7 +2246,7 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		instr = instrs[i];
 		outFile << "instr_" << i << ":\n";
 		outFile << "	# " << instr.toStr() << '\n';
-		genAssembly(outFile, instr, i);
+		genInstr(outFile, instr, i);
 	}
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
@@ -2157,6 +2274,10 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	stdin_buff:  .skip STDIN_BUFF_SIZE  # resb\n"
 		"	stdin_buff_chars_read: .skip 8\n"
 		"	stdin_buff_char_count: .skip 8\n"
+		"\n"
+		"	sys_args_count: .skip 8\n"
+		"	sys_retval: .skip 8\n"
+		"	sys_args: .skip 8 * 8\n"
 		"\n"
 		".data\n"
 		"	.equ STDOUT_BUFF_SIZE, " << STDOUT_BUFF_SIZE << "\n"
@@ -2237,6 +2358,7 @@ void populateIncludePaths(Flags& flags) {
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"core");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"ds");
+	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder/"std"/"system");
 	flags.includeFolders.insert(flags.includeFolders.end(), _masfixFolder);
 }
 Flags processLineArgs(int argc, char *argv[]) {

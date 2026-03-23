@@ -1,0 +1,8 @@
+:returncode 1
+
+:testmode interponly
+
+:stderr 111
+tests\interp-sysinstrs.mx:2:1 ERROR: Syscall instruction not available in interpret mode 'syscall ExitProcess'
+
+

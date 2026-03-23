@@ -1,0 +1,408 @@
+ ; #! ; Hello?? Do you see me? xoxo @!	
+%include "memory"
+%include "procedures"
+%include "control"
+%include "io"
+%include "structs"
+%include "array"
+%include "strings"
+%include "system"
+%include "filesystem"
+%include "debug"
+
+;#COMMENTS:
+%define MANUAL_TEST 1 ; set to auto input
+
+%macro path_add_char(c) {
+	%seg:push(%arg, 0)
+	%stack:push(%c)
+	%call(push_back)
+}
+; path: out string, stdinstream: filestream ->
+%void_func{ get_file_arg, 2, 0,
+	outc 'P'
+	outc 'a'
+	outc 't'
+	outc 'h'
+	outc ';'
+	outc ' '
+	; open stdin
+	%seg:push(%arg, 1)
+	%stack:push(%filestream:STDIN)
+	%call(filestream_open_std_filestream)
+	; construct file path
+	%if_else { ld %MANUAL_TEST,
+	; YES, this test reads itself!
+		%path_add_char('t')
+		%path_add_char('e')
+		%path_add_char('s')
+		%path_add_char('t')
+		%path_add_char('s')
+		%path_add_char('/')
+		%path_add_char('s')
+		%path_add_char('y')
+		%path_add_char('s')
+		%path_add_char('-')
+		%path_add_char('f')
+		%path_add_char('i')
+		%path_add_char('l')
+		%path_add_char('e')
+		%path_add_char('s')
+		%path_add_char('t')
+		%path_add_char('r')
+		%path_add_char('e')
+		%path_add_char('a')
+		%path_add_char('m')
+		%path_add_char('.')
+		%path_add_char('m')
+		%path_add_char('x')
+	,
+		%seg:push(%arg, 1)
+		%seg:push(%arg, 0)
+		%stack:push('\n')
+		%call(filestream_eat_upto)
+	}
+	%seg:push(%arg, 0)
+	%print_endl {
+		%string:repr()
+	}
+}
+; emplace single char to err ;  
+%macro errEmplaceChar(c) {
+	%seg:push(%local, %locStdErr)
+	%stack:push(%c)
+	%call(filestream_emplace_char)
+}
+%macro eatLine() { ; TestIn -> Line
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%stack:push('\n')
+	%call(filestream_eat_upto)
+}
+	;; output first line 
+%macro seeFirstLine() {
+
+	%eatLine()
+	%seg:push(%local, %locLine)
+	%string:repr()
+	outc '\n'
+
+	%seg:push(%local, %locLine)
+	%call(clear)
+}
+;
+;	
+;#END-COMMENTS
+;#!$
+
+%macro outpIncludes() {
+	outc 'I'
+	outc 'N'
+	outc 'C'
+	outc ':'
+	outc ' '
+	%while { ; not empty line
+; ABCDEFGHIJKLMNOPQRSTUVWXYZ
+		%eatLine()
+		%seg:push(%local, %locLine)
+		%call(strip)
+		%seg:load(%this, %array:size)
+	,
+		%seg:push(%local, %locLine) ; Line[0]
+		%stack:push(0)
+		%call(index)
+		outcr
+
+		%seg:push(%local, %locStdErr)
+		%seg:push(%dest, 0)
+		%call(filestream_emplace_char)
+
+		%seg:push(%local, %locLine) ; Line.split(Tail, '"')
+		%seg:push(%local, %locTail)
+		%stack:push('"')
+		%call(split)
+
+
+		%seg:push(%local, %locTail) ; Tail.pop() last '"'
+		%call(pop_back)
+
+		%print_spaced {
+			%seg:push(%local, %locTail)
+			%call(string_print)
+		}
+
+		%seg:push(%local, %locStdErr)
+		%seg:push(%local, %locTail)
+		%call(filestream_emplace_string)
+
+		%errEmplaceChar(',')
+
+		%seg:push(%local, %locLine)
+		%call(clear)
+		%seg:push(%local, %locTail)
+		%call(clear)
+	}
+	%errEmplaceChar('\n')
+	outc '\n'
+}
+
+%macro emitComments() {
+	%eatLine() ; #COMMENTS
+	%seg:push(%local, %locLine)
+	%stack:push(0)
+	%call(pop_index)
+	%seg:push(%local, %locStdErr)
+	%seg:push(%local, %locLine)
+	%call(filestream_emplace_string)
+
+	outc 'L'
+	outc 'E'
+	outc 'N'
+	outc 'S'
+	outc ':'
+	outc ' '
+
+	%errEmplaceChar('\n')
+	%seg:push(%local, %locLine)
+	%call(clear)
+
+	%while {
+		%eatLine()
+
+		%seg:push(%local, %locLine) ; Line.split(Tail, ';')
+		%seg:push(%local, %locTail)
+		%stack:push(';')
+		%call(split)
+		%seg:movptr(%local, %locTail) ; anything there
+		%array:at(size)
+		%stack:pushm()
+
+		; # ENDING COMMENT?
+		%if_else { lmab 0,
+			%seg:push(%local, %locTail)
+			%stack:push(0)
+			%call(index)
+
+			%stack:pop()
+			lne '#'
+		,
+			ld 1 ; continue loop
+		}
+	,
+		%if { ; skip line if no comment
+			%stack:pop()
+			leq 0
+		,
+			%loop_continue_offset(1)
+		}
+		outum
+		%print_separator()
+
+		%seg:push(%local, %locTail)
+		%call(strip)
+
+		%errEmplaceChar(';')
+		%errEmplaceChar(' ')
+		
+		%seg:push(%local, %locStdErr)
+		%seg:push(%local, %locTail)
+		%call(filestream_emplace_string)
+		%errEmplaceChar('\n')
+		%seg:push(%local, %locLine)
+		%call(clear)
+;#BUFF-READ-POINT
+		%seg:push(%local, %locTail)
+		%call(clear)
+	}
+	outc '\n'
+}
+
+%define locStdIn 0
+%define locTestIn 1
+%define locStdErr 2
+%define locPath 3
+%define locLine 4
+%define locTail 5
+%define locCstrPath 6
+
+%void_func{ main, 0, 8,
+	; locals: 3 * filestream, 3 * string, cstr
+	%seg:local(%locStdIn,  %filestream:construct_here())
+	%seg:local(%locTestIn, %filestream:construct_here())
+	%seg:local(%locStdErr, %filestream:construct_here())
+	%seg:local(%locPath,   %string:construct_here())
+	%seg:local(%locLine,   %string:construct_here())
+	%seg:local(%locTail,   %string:construct_here())
+	%seg:local(%locCstrPath, str 0)
+
+	; open STDERR
+	%seg:push(%local, %locStdErr)
+	%stack:push(%filestream:STDERR)
+	%call(filestream_open_std_filestream)
+
+	; testPath = get_file_arg()
+	%seg:push(%local, %locPath)
+	%seg:push(%local, %locStdIn)
+	%call(get_file_arg)
+	
+	; cstr = from_string(path)
+	%seg:push(%local, %locPath)
+	%call(cstr_from_string)
+	%seg:pop(%local, %locCstrPath)
+
+	; TestIn.open(cstrPath)
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locCstrPath)
+	%stack:push(%filestream:WIN_DesiredAccess:GENERIC_READ)
+	%stack:push(%filestream:WIN_CreationDisposition:OPEN_EXISTING)
+	%call(filestream_open_file)
+
+	%print_endl {
+		outc 'O'
+		outc 'P'
+		outc 'E'
+		outc 'N'
+		outc ':'
+		outc ' '
+		%sys:SeeLastError()
+	}
+
+	%seeFirstLine()
+	
+	%outpIncludes()
+
+	%emitComments()
+
+	outc 'B'
+	outc 'T'
+	outc 's'
+	outc ':'
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(%temp_addr)
+	%stack:push(8)
+	%call(filestream_eat_bytes)
+	%stack:push(%temp_addr)
+	%stack:push(4)
+	%print_endl {
+		%call(memdump)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
+	
+
+	%seg:push(%local, %locTestIn)
+	%stack:push(0)   ; OK - no output
+	%stack:push(109) ; drop odd number of bytes
+	%call(filestream_eat_bytes)
+
+	%while {
+		%seg:push(%local, %locTestIn)
+		%call(filestream_peek_char)
+		lne 'X'
+	,
+		%stack:drop()
+
+		%seg:push(%local, %locTestIn)
+		%call(filestream_eat_char)
+		%stack:pop()
+		outcr
+	}
+	outc '\n'
+
+	%while { ; drop lines upto #BUFF-READ-POINT
+		%eatLine()
+		%seg:movptr(%local, %locLine)
+		movma 1 ; data[1]
+		lmne '#'
+	,
+		%seg:push(%local, %locLine)
+		%call(clear)
+	}
+
+	; see buff contents
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%call(filestream_copy_to_string)
+
+	%seg:push(%local, %locLine)
+	%print_endl {
+		%string:repr()
+	}
+	%seg:push(%local, %locLine)
+	%call(clear)
+
+	; eat_upto multiple times over buffer end
+	%seg:push(%local, %locTestIn)
+	%seg:push(%local, %locLine)
+	%stack:push(0) ; stop at EOF
+	%call(filestream_eat_upto)
+
+	outc 'S'
+	outc 'I'
+	outc 'Z'
+	outc 'E'
+	outc ':'
+	outc ' '
+	%print_endl {
+		%seg:movptr(%local, %locLine)
+		%array:at(size)
+		outum
+	}
+	
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+	%errEmplaceChar('\n')
+
+	; emplace huge string to test buffer boundary
+	%seg:push(%local, %locStdErr)
+	%seg:push(%local, %locLine)
+	%call(filestream_emplace_string)
+
+
+	; close streams
+	%seg:push(%local, %locTestIn)
+	%call(filestream_close)
+	; %seg:push(%local, %locStdIn) ; test the destructor
+	; %call(filestream_close)
+	%seg:push(%local, %locStdErr)
+	%call(filestream_close)
+
+	; see if STDIN will be closed by destructor
+	%seg:push(%local, %locStdIn)
+
+	%seg:local(%locStdIn,  %filestream:destructor())
+	%seg:local(%locTestIn, %filestream:destructor())
+	%seg:local(%locStdErr, %filestream:destructor())
+	%seg:local(%locPath,   %string:destructor())
+	%seg:local(%locLine,   %string:destructor())
+
+	outc 'G'
+	outc 'O'
+	outc 'O'
+	outc 'D'
+	outc ' '
+	%sys:SeeLastError()
+	outc ' '
+	outc 'I'
+	outc 'N'
+	outc ' '
+	%stack:pop()
+	movra %filestream:handle
+	outum
+	outc '\n'
+	
+}
+%call(main)
+
+;END

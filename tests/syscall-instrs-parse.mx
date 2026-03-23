@@ -1,0 +1,70 @@
+
+; test syntax of syscall instructions
+sysaddr
+sysaddrr
+sysaddrh
+sysaddrp
+sysaddra
+sysaddrt 7
+sysaddr label
+sysaddrmar
+sysaddrmat
+sysaddrma 2
+
+:label
+
+sy
+sys
+sysp
+sysarg
+sysargh
+sysargb
+
+sysargq
+sysargqr
+sysargqh
+sysargqp
+sysargqa
+sysargqt 7
+sysargq label
+sysargqmar
+sysargqmat
+sysargqma 2
+
+sysargw
+sysargwa 8
+sysargwra 8
+sysargw label
+
+sysret
+sysretq
+sysretq 8
+sysretq< 8
+sysretqm
+sysretqmt label
+
+syscal
+syscall
+syscallq
+syscallr
+syscallra
+syscalla
+syscall 0
+syscall 65535
+syscall label
+syscall 'c'
+syscall "name"
+syscall "ExitProcess"
+syscall "exitProcess"
+syscall "\n"
+syscall .
+
+syso
+sysoff
+sysoffset
+sysoffset 0
+sysoffset 1
+sysoffset(.r)
+sysoffset(r)
+sysoffset(h&)
+sysoffset(h&) 1

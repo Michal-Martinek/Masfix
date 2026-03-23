@@ -38,13 +38,14 @@
 	%clearString(0)
 }
 
-%void_func { main, 0, 3,
-;; locals: 3x *string
+%void_func { main, 0, 4,
+;; locals: 3x *string, cstr
 	; construct 3 strings
-	%stack:dropN(3)
+	%stack:dropN(4)
 	%string:constructor()
 	%string:constructor()
 	%string:constructor()
+	%stack:push(0)
 
 	%testStrip( ) ; empty string
 	%testStrip{
@@ -101,6 +102,21 @@
 	%reprString(0)
 	%seeFuncFrame()
 
+	; convert to cstr
+	%stack:drop()
+	%seg:push(%local, 0)
+	%call(cstr_from_string)
+
+	; memdump cstr contents
+	outc '&'
+	outc 'C'
+	%stack:pushr()
+	; str& !op(s, 0, 8) ; align for memdump
+	%stack:push(7)
+	%print_endl {
+		%call(memdump)
+	}
+
 	%seg:push(%local, 0) ; split(0, 1, ' ') -> AB, DEFG
 	%seg:push(%local, 1)
 	%stack:push(' ')
@@ -144,15 +160,15 @@
 
 	;; replace ---------------
 	%clearString(0)
-	%if_else {ld %MANUAL_TEST,
+	%if_else { ld %MANUAL_TEST,
 		%addChar(0, '$')
 		%addChar(0, '6')
 		%addChar(0, '7')
 		%addChar(0, '$')
-		%addChar(0, '{')
+		%addChar(0, 123) ; '{'
 		%addChar(0, '$')
 		%addChar(0, 'Z')
-		%addChar(0, '}')
+		%addChar(0, 125) ; '}'
 		%addChar(0, '$')
 	,
 		%seg:push(%local, 0)
@@ -162,6 +178,27 @@
 	%stack:push('$')
 	%stack:push('#')
 	%call(replace)
+
+	%reprString(0)
+	outc '\n'
+
+	%seg:push(%local, 3) ; cstr
+	%seg:push(%local, 0)
+	%call(cstr_unpack_to_string)
+
+	; empty cstr
+	%seg:push(%local, 3)
+	movm
+	str 0
+	%seg:push(%local, 0)
+	%call(cstr_unpack_to_string)
+
+	; single char
+	%seg:push(%local, 3)
+	movm
+	str '!'
+	%seg:push(%local, 0)
+	%call(cstr_unpack_to_string)
 
 	%reprString(0)
 }
