@@ -48,18 +48,38 @@
 	}
 
 	; this ->
-	; clears array
+	; clear array contents (data array stays allocated)
 	%void_method{ clear, 1, 0,
-		%seg:this(0, %deinit())
-		%seg:this(0, %init())
+		%seg:this(%size, str 0)
 	}
 
-	; this ->
-	; duplicates value array after repositioning (call after struct:move)
-	%void_method{ array_repositioned, 1, 0,
-		%seg:this(%capacity, str 0) ; force copy: this.capacity = 0
-		%seg:push(%this, %size)     ; this.reserve(this.size)
-		%call(at_least_capacity)
+	; this, keep_arr -> this
+	; duplicates value array (call after struct:shallow_copy)
+	; keep_arr - keep or free original value array
+	; can be used as shrink_to_fit()
+	%method{ array_deepcopy, 2, 1,
+		%if_else { %seg:this(0, %empty()), ; if size == 0 set to 0,0,0
+			%if { ; not keep_arr
+				%seg:load(%arg, 1)
+				leq 0
+			,
+				%seg:this(0, %deinit())
+			}
+			%seg:this(0, %init())
+		,
+			%seg:this(%capacity, str 0) ; force copy: this.capacity = 0
+			%seg:load(%this, %data_ptr) ; save original data ptr
+			%seg:store(%local, 0)
+			%seg:push(%this, %size)     ; this.reserve(this.size)
+			%call(at_least_capacity) ; frees original
+			%if { %seg:load(%arg, 1),
+				%seg:move(%local, 0) ; mark original data as occupied
+				movms 1
+				%assert( lmeq %chunk:FLAG_FREE )
+				str %chunk:FLAG_OCCUPIED
+			}
+		}
+		%load(%this)
 	}
 
 	; this, index -> item (G_DEST)
@@ -159,7 +179,7 @@
 	}
 
 	; this, other: *array ->
-	; extends end of this arr with values from other
+	; extends end of this arr with copies of values from other
 	%void_method{ extend, 2, 0,
 		%seg:arg(1, %storem(%src))
 		%seg:load(%this, %size)
@@ -179,8 +199,6 @@
 		%seg:push_addr(%dest, 0)   ; to = this[size]
 		%seg:push(%src, %size)     ; count = src.size
 		%call(memcopy)
-		%seg:push_addr(%src, 0)    ; src.clear()
-		%call(clear) ; WARNING destroys THIS_PTR
 	}
 
 	; array @G_THIS_PTR

@@ -112,7 +112,7 @@
 	outc 'C'
 	%stack:pushr()
 	; str& !op(s, 0, 8) ; align for memdump
-	%stack:push(7)
+	%stack:push(4)
 	%print_endl {
 		%call(memdump)
 	}

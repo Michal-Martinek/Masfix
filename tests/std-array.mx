@@ -148,8 +148,8 @@
 	; copying
 	%seg:push_addr(%local, 0)
 	%array:shallow_copy()
-	%stack:dup()
-	%call(array_repositioned)
+	%stack:push(1)
+	%call(array_deepcopy)
 	%stack:top() ; copy stays at stack:top
 	movm
 	%print_endl(
@@ -222,6 +222,10 @@
 		%stack:pop()
 		outur
 	)
+
+	; empty second
+	%seg:push_addr(%local, %array:sizeof)
+	%call(clear)
 
 	; test empty[0]
 	outc 'E'
