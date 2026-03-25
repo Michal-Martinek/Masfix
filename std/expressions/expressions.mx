@@ -1,0 +1,26 @@
+
+
+%struct variable {
+	%string name
+	%segment - this, loc, arg
+	%seg_idx
+}
+
+; func-scope map
+; initializes that
+		; !func:args(this, delim: char)
+		; !func:locals(found: bool, line="")
+; func end clears this
+
+; name >>> variable location
+%macro var_loc(name) {
+	%read_arg ; name mac arg -> string
+	%map_get()
+	%emit(found.segment,found.idx)
+}
+
+; usage
+
+%seg:load(!var_loc(line))
+; >>>
+%seg:load(%local, 1)
