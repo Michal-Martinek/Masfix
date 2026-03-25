@@ -1,0 +1,84 @@
+
+%include "memory"
+%include "procedures"
+%include "strings"
+%include "map"
+%include "io"
+%include "debug"
+
+%macro mapPrint() {
+	%seg:push(%local, 0)
+	%stack:push(proc_string_repr)
+	%stack:push(0)
+	%call(map_print)
+}
+%macro mapSet(value) {
+	%seg:push(%local, 0)
+	; copy key string
+	%seg:push(%local, 1)
+	%string:shallow_copy()
+	%stack:push(1)
+	%call(array_deepcopy)
+	%stack:push(%value)
+	%call(map_set)
+}
+
+%void_func { main, 0, 4,
+	; locals: map, keyStr: string
+	%seg:local(0, %map:construct_here())
+	%seg:local(1, %string:construct_here())
+
+	%seg:movptr(%local, 0)
+	%map:set_key_eq(string_eq)
+
+	%mapSet(1)
+
+	%seg:push(%local, 1)
+	%stack:push('A')
+	%call(push_back)
+	%mapSet(6)
+
+	%mapSet(7)
+
+	%seg:push(%local, 1)
+	%stack:push('C')
+	%call(push_back)
+	%mapSet(4)
+
+	%print_endl{ %mapPrint() }
+
+; getting
+	%seg:push(%local, 1)
+	%call(clear)
+
+	%seg:push(%local, 0)
+	%seg:push(%local, 1)
+	%call(map_get)
+	%print_endl {
+		%stack:pop()
+		outum
+	}
+
+	%seg:push(%local, 0) ; delete("")
+	%seg:push(%local, 1)
+	%call(map_delete)
+	%print_endl{ %mapPrint() }
+
+	%seg:push(%local, 1) ; map["A"] = 3
+	%stack:push('A')
+	%call(push_back)
+
+	%seg:push(%local, 0)
+	%seg:push(%local, 1)
+	%stack:push(3)
+	%call(map_set) ; don't copy key - already inside
+	%print_endl{ %mapPrint() }
+
+	
+	%seg:push(%local, 0)
+	%call(map_clear)
+	%print_endl{ %mapPrint() }
+
+}
+
+%call(main)

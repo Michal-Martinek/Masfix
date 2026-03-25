@@ -1,0 +1,168 @@
+%include "memory"
+%include "math"
+%include "structs"
+%include "procedures"
+%include "pair"
+%include "array"
+%include "exceptions"
+%include "control"
+
+
+;; basic associative map
+;; maps arbitrary keys to values
+;; keys equality checked with key_eq(k1, k2)
+%namespace map {
+	%struct:begin()
+	%struct:field(item_pairs, %array:sizeof)
+	%struct:field(key_eq, 1) ; func(k1, k2) -> bool, default int_eq
+
+	%macro init() {
+		%set(key_eq, 0)
+		%array:init()
+	}
+	%macro deinit() {
+		%array:deinit()
+	}
+	%macro set_key_eq(key_eq_func) {
+		%at(key_eq)
+		str proc_(%key_eq_func)
+	}
+
+	; this ->
+	; clear map contents
+	%void_method{ map_clear, 1, 0,
+		%array:foreach {
+			%stack:pushm()
+			%call(free)
+		}
+		%seg:this(%array:size, str 0)
+	}
+
+	; this, key -> value (DEST)
+	; get value for key
+	%method{ map_get, 2, 0,
+		%seg:push(%arg, 0)
+		%seg:push(%arg, 1)
+		%call(map__find_key)
+		%assert {
+			%stack:pop()
+			lrbl %minus1
+		}
+		%seg:load(%dest, %pair:second)
+	}
+
+	; this, key, value ->
+	; insert new key:value pair
+	%void_method{ map_insert, 3, 0,
+		%seg:push(%arg, 0)
+		%pair:new() ; init new pair
+			%storer(%dest)
+			%seg:load(%arg, 1)
+			%seg:store(%dest, %pair:first)
+			%seg:load(%arg, 2)
+			%seg:store(%dest, %pair:second)
+		%call(push_back)
+	}
+
+	; this, key, value ->
+	; set value for key (overwrite / insert new)
+	%void_method{ map_set, 3, 0,
+		%if_else {
+			%seg:push(%arg, 0)
+			%seg:push(%arg, 1)
+			%call(map__find_key)
+			%stack:pop()
+			lrbl %minus1
+		,
+			%seg:load(%arg, 2)
+			%seg:store(%dest, %pair:second)
+		,
+			%seg:push(%arg, 0)
+			%seg:push(%arg, 1)
+			%seg:push(%arg, 2)
+			%call(map_insert)
+		}
+	}
+
+	; this, key ->
+	; delete existing key
+	%void_method{ map_delete, 2, 0,
+		%seg:push(%arg, 0)
+		%seg:push(%arg, 1)
+		%call(map__find_key)
+		%assert {
+			%stack:top()
+			lrbl %minus1
+		}
+		%seg:push(%arg, 0)
+		%stack:swap2()
+		%call(map__delete_key_at_idx)
+	}
+
+	; this, key_print()?, value_print()? ->
+	; print map contents (default: uint)
+	%void_method{ map_print, 3, 0,
+		outc '{'
+		%array:foreach {
+			%storem(%dest)
+			%if { %stack:top(),
+				outc ','
+				outc ' '
+			}
+
+			%seg:push(%dest, %pair:second)
+			%seg:push(%dest, %pair:first)
+			%seg:load(%arg, 1)
+			%call_ptr_with_default(%arg, 1,
+				%stack:pop()
+				outum
+			)
+			outc ':'
+			outc ' '
+			%call_ptr_with_default(%arg, 2,
+				%stack:pop()
+				outum
+			)
+			%seg:pointptr(%this, %arg, 0)
+		}
+		outc '}'
+	}
+
+;; impl ------------------------------------------
+
+	; this, key -> idx (or -1) (found pair in DEST)
+	; look for key in map, key_eq must preserve DEST
+	%method{ map__find_key, 2, 0,
+		%array:foreach {
+			%assert( lmne 0 ) ; has valid pair
+			movm
+			%stack:pushm()
+			%seg:pointptr(%dest, %dest, 0)
+			%seg:push(%arg, 1)
+			%call_ptr_with_default(%this, %key_eq, %stack:compare(eq))
+			%seg:pointptr(%this, %arg, 0)
+			%if { %stack:pop(),
+				%stack:top()
+				%returnr(map__find_key)
+			}
+		}
+		ld %minus1
+	}
+
+	; this, idx -> value
+	; delete key stored at idx (from find_key)
+	%method{ map__delete_key_at_idx, 2, 0,
+		%seg:push(%arg, 0)
+		%seg:push(%arg, 1)
+		%call(pop_index)
+		%stack:top() ; pair addr
+		movm
+		%pair:at(second)
+		ldm
+		%save_retval()
+		%call(free)
+		%returnFunc(map__delete_key_at_idx)
+	}
+
+	%struct:end()
+}
