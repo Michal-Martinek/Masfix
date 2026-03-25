@@ -1,0 +1,89 @@
+
+%include "memory"
+%include "heap"
+%include "control"
+%include "math"
+%include "procedures"
+%include "structs"
+%include "exceptions"
+
+; binary tree, with one-word value (int / ptr)
+; construct by allocating root node
+%namespace tree {
+	%struct:begin()
+	%struct:field(value, 1)
+	%struct:field(left, 1) ; *tree
+	%struct:field(right, 1) ; *tree
+	%struct:end() ; for sizeof
+
+
+	%macro init() {
+		%set(value, 0)
+		%set(left, 0)
+		%set(right, 0)
+	}
+	%macro deinit() {
+		%init()
+	}
+	; ; @tree -> bool
+	; %macro has_next() {
+	; 	lmne 0
+	; }
+	; %macro mov_next() {
+	; 	movm
+	; }
+
+
+	; (THIS)
+	; 
+	%macro iter_children() {
+
+	}
+
+	; (THIS)
+	; moves itrs: THIS - curr node, SRC - previous node
+	; performs %instrs on each element
+	;   - value @h, current tree at THIS
+	;   - element index at stack:top (readonly)
+	;   - after iteration: index in m (-1 if empty)
+	%macro foreach(instrs) {
+		%stack:push(%minus1)
+		%while { %this_has_next(), ; THIS.next != null
+			%seg:point(%src, %this, 0) ; SRC = THIS
+			%advance_this() ; THIS = THIS.next
+			%stack:top() ; index ++
+			stra 1
+			%seg:move(%this, %tree:value)
+			%instrs
+		}
+		%stack:drop()
+	}
+
+
+	; this, child_idx, value -> (DEST)
+	; add child into this subtree
+	%void_method{ tree_add_child, 3, 0,
+		%seg:load(%arg, 1)
+		%seg:movptr(%arg, %tree:left)
+		movar
+		%assert( lmeq 0 )
+		%tree:construct_here() ; new node in r
+		%storer(%dest)
+		%seg:load(%arg, 2) ; new.value = value
+		%seg:store(%dest, %tree:value)
+	}
+
+
+	; ; this ->
+	; %void_method{ tree_print, 1, 0,
+	; 	outc '['
+	; 	%foreach {
+	; 		outum
+	; 		; %if { %this_has_next(),
+	; 			outc ','
+	; 			outc ' '
+	; 		; }
+	; 	}
+	; 	outc ']'
+	; }
+}
