@@ -9,7 +9,7 @@
 	%call(read_line)
 
 	%seg:push_addr(%local, 0)
-	%string:repr()
+	%call(string_repr)
 	outc '\n'
 
 	%seg:local(%string:sizeof, %string:init())

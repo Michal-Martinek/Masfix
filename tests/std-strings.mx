@@ -15,7 +15,7 @@
 }
 %macro reprString(localIdx) {
 	%seg:push(%local, %localIdx)
-	%string:repr()
+	%call(string_repr)
 }
 %macro stripString(localIdx) {
 	%seg:push(%local, %localIdx)

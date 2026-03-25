@@ -22,6 +22,41 @@
 		%array:deinit()
 	}
 
+	; this, other -> bool
+	; compare two strings
+	%method{ string_eq, 2, 1,
+		%stack:drop() ; save DEST
+		%seg:push_addr(%dest, 0)
+		%if { ; same size
+			%seg:load(%this, %array:size)
+			%seg:movptr(%arg, 1)
+			%array:at(size)
+			lmner
+		,
+			%return_imm(string_eq, 0)
+		}
+		%array:foreach {
+			%stack:pushm()
+			%seg:push(%arg, 1)
+			%stack:dup_over(2) ; idx
+			%call(index)
+			%seg:pointptr(%this, %arg, 0)
+			%if {
+				%stack:compare(ne)
+				%stack:pop()
+			,
+				jmp string_neq
+			}
+		}
+	
+		%seg:pointptr(%dest, %local, 0)
+		%return_imm(string_eq, 1)
+	:string_neq
+		%seg:pointptr(%dest, %local, 0)
+		ld 0
+	}
+	
+
 	; this ->
 	; strip leading & trailing whitespace
 	%void_method{ strip, 1, 0,
@@ -113,11 +148,20 @@
 	}
 	; this -> (stdout)
 	; prints string contents with quotes
+	%void_method{ string_repr, 1, 0,
+		outc '"'
+		%array:foreach {
+			outcm
+		}
+		outc '"'
+	}
+	; for compatibility
 	%macro repr() {
 		outc '"'
 		%call(string_print)
 		outc '"'
 	}
+
 
 	%struct:end()
 }
