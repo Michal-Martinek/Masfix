@@ -550,10 +550,9 @@ ParseCtx parseCtx;
 struct VM {
 // context call references //
 	bool isCtimeVM; // compile-time execution - compiler context available
-	void* ctxScope; // Scope& for ctxcall in ctime
 	Macro* ctimeMac=nullptr;
-	list<Token>* currTlist = nullptr;
-	list<Token>::iterator currToken;
+	void* inScope=nullptr; // Scope& for ctxcall input reading
+	void* outScope=nullptr; // Scope& for ctxcall output
 
 // context call data //
 	int64_t sysargs[16] = { 0 };
@@ -561,7 +560,7 @@ struct VM {
 	unsigned int sysargEaten = 0;
 	int64_t sysretval = 0;
 
-	bool ctimeReturnR; // don't return r at ctime end when any ctxcall used
+	bool ctimeReturnR=true; // don't return r at ctime end when any ctxcall used
 
 // VM runtime data & API //
 	unsigned short head;
@@ -938,6 +937,8 @@ public:
 		openList(currModule->contents);
 	}
 
+// parsing & ctimes ----------------------------------------
+
 	bool forceParseImpl();
 	/// Scope wrapper for parsing, returns Scope to same state afterwards
 	/// - used for parsing either whole TImodule or only ctime body
@@ -954,12 +955,20 @@ public:
 		return safeToRun;
 	}
 
+	// construct new scope copy for context calls
+	Scope* ctxCopy() {
+		Scope* s = new Scope();
+		s->tlists = this->tlists; // stack copy (references same Tokens)
+		s->itrs = this->itrs;
+		return s;
+	}
+	// init VM ctx for ctxcalls
 	void initVmCtx(VM& vm) {
 		assert(vm.isCtimeVM);
-		vm.ctxScope = this;
 		vm.ctimeMac = &currMacro();
-		vm.currTlist = nullptr;
+		vm.outScope = ctxCopy(); // tlist = currList(), currToken = ctimeToken
 		// open last ctime argument
+		vm.inScope = ctxCopy();
 		uint64_t retval;
 		vm.addSysarg(-1);
 		Instr ctxCallInstr(CtxSelectMacroArg);
@@ -970,6 +979,14 @@ public:
 		vm.ctxcallReturn(vm.reg); // preserve r
 		vm.ctimeReturnR = true; // set back
 	}
+	void closeVmCtx(VM& vm) {
+		vm.ctimeMac = nullptr;
+		delete (Scope*)vm.inScope;
+		vm.inScope = nullptr;
+		delete (Scope*)vm.outScope;
+		vm.outScope = nullptr;
+		vm.ctimeReturnR = true;
+	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
 	void parseInterpretCtime(Token& ctimeExp, VM& vm) {
@@ -979,7 +996,7 @@ public:
 		if (safeToRun) {
 			initVmCtx(vm);
 			interpret(parseCtx.parseStartIdx);
-			vm.currTlist = nullptr;
+			closeVmCtx(vm);
 			assert(vm.mem_safety_padding == 0);
 			retval = vm.reg;
 		}
@@ -1877,15 +1894,12 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 #define eatPtrArgNullable(buff_name) \
 		char* buff_name; \
 		returnOnFalse(vm.sysargEatPtr((void**)&buff_name, true));
-#define checkValidCurrToken(); \
-		if (vm.currTlist == nullptr || vm.currToken == vm.currTlist->end()) { \
-			vm.currTlist = nullptr; \
-			return false; \
-		}
+#define ctxValidInputToken() returnOnFalse(inScope.hasNext());
 
 bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
-	assert(vm.isCtimeVM && vm.ctxScope != nullptr);
-	Scope& scope = *(Scope*)vm.ctxScope; // JOKE: it could be named scopeCtx in alternate universe
+	assert(vm.isCtimeVM && vm.inScope != nullptr && vm.outScope != nullptr);
+	Scope& inScope = *(Scope*)vm.inScope;
+	Scope& outScope = *(Scope*)vm.outScope;
 	vm.ctimeReturnR = false;
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
@@ -1937,14 +1951,14 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 
 		string data(data_cstr);
 		ctx.data = data;
-		scope.insertToken(move(ctx));
+		outScope.insertToken(move(ctx));
 		retval = 1;
 		return true;
 	}
 
 	// unpack currToken
-	returnOnFalse(vm.currTlist != nullptr);
-	Token& currToken = *vm.currToken;
+	returnOnFalse(inScope.hasNext());
+	Token& currToken = inScope.currToken();
 	if (ctxName == CtxGetTokenMeta) {
 		// GetTokenMeta(TokenMeta* meta) -> bool success
 		// get current token metadata
@@ -1971,11 +1985,14 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 		string arg = currToken.data;
 		retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
 	} else if (ctxName == CtxAdvanceSource) {
-		// AdvanceSource(nop, nop) -> bool success
+		bool eat = vm.sysargEatInt();
 		vm.sysargEatInt();
-		vm.sysargEatInt();
-		++ vm.currToken;
-		checkValidCurrToken();
+		if (eat) {
+			inScope.eatenToken();
+		} else {
+			inScope.next();
+		}
+		ctxValidInputToken();
 		retval = 1;
 	} else if (ctxName == CtxEmplaceMacroArg) {
 		// EmplaceMacroArg(bool unwrap, TokenMeta*? meta) -> bool success
@@ -1983,7 +2000,7 @@ bool interpCtxcall(VM& vm, Instr& ctxInstr, uint64_t& retval) {
 		bool unwrap = vm.sysargEatInt();
 		eatPtrArgNullable(first_meta);
 		
-		returnOnFalse(vm.currTlist != &scope.currList()); // check macro arg is actually pointed
+		// returnOnFalse(inScope.currListItr().type == TIarglist); // check macro arg is actually pointed
 
 		// Token& first;
 		Token ctx;
