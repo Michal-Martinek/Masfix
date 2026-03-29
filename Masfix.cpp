@@ -34,6 +34,8 @@ using namespace std;
 #define CELLS WORD_MAX_VAL+1
 // enums --------------------------------
 enum TokenTypes {
+	Tnone=0, // token not available in this context (for VM compiler IPC)
+
 	Tnumeric,
 	Talpha,
 	Tstring,
@@ -51,6 +53,7 @@ enum TokenTypes {
 	TIctime,     // macro expansion expanded as compile time
 	TInamespace, // wraps tokens inside a namespace
 	TIarglist,   // macro argument list
+	TImacArg,    // selected macro argument (never inserted, only scope itr opening)
 
 	TokenCount
 };
@@ -732,7 +735,7 @@ private:
 	/// handles the ending of a single token list
 	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 13, "Exhaustive closeList definition");
+		static_assert(TokenCount == 15, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -790,7 +793,7 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
-		static_assert(TokenCount == 13, "Exhaustive Scope::next definition");
+		static_assert(TokenCount == 15, "Exhaustive Scope::next definition");
 		++itrs.top();
 		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
@@ -985,7 +988,6 @@ public:
 		vm.inScope = nullptr;
 		delete (Scope*)vm.outScope;
 		vm.outScope = nullptr;
-		vm.ctimeReturnR = true;
 	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
@@ -1092,7 +1094,7 @@ bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 void tokenize(ifstream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 13, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 15, "Exhaustive tokenize definition");
 	string line;
 	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
@@ -1195,7 +1197,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 		+ " token type, got", outToken);
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
-	static_assert(TokenCount == 13, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 15, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -1374,7 +1376,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, string identPurpose="directive") {
-	static_assert(TokenCount == 13, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 15, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1540,7 +1542,7 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 	return true;
 }
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 13, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 15, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
 	returnOnFalse(complexDirectiveName(scope, directiveName, prefixes, locs, loc));
 	if (DefiningDirectivesSet.count(directiveName)) {
