@@ -1,0 +1,29 @@
+; compile time interfacing with compiler
+
+%include "structs"
+%include "system"
+%include "filesystem"
+
+%namespace TokenTypes {
+%struct:begin()
+	%struct:field(Tnumeric, 1)
+	%struct:field(Talpha, 1)
+	%struct:field(Tstring, 1)
+	%struct:field(Tchar, 1)
+	%struct:field(Tspecial, 1)
+	%struct:field(Tcolon, 1)
+	%struct:field(Tseparator, 1)
+	%struct:field(Tlist, 1)
+%struct:end()
+}
+
+%namespace TokenMeta {
+	%struct:begin()
+	%struct:field(type, 1)
+	%struct:field(firstOnLine, 1)
+	%struct:field(continued, 1)
+	%struct:field(row, 1)
+	%struct:field(col, 1)
+
+	%struct:end()
+}

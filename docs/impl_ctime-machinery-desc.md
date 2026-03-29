@@ -17,13 +17,16 @@
 			- inserts macro expansion to TS, opens itr
 		- preprocessing ctime body
 		- closeList closes ctime's iteration in scope after preprocessing
-		- forceParse reopens itr
-			- forceParse: parse ctime body, remember asm instr start
-		- forceParse closes parsing itr
 		- parseInterpretCtime
+			- forceParse:
+				- reopens it's private itr
+				- parse ctime body, remember asm instr start
+					- parseTS keeps ctime exp open
+				- closes it's own parsing itr
 			- interprets ctime
 			- removes ctime expansion from TS!
 			- inserts retval to TS
+			- ends macro expansion
 			- removes ctime's asm instrs from parseCtx
 
 	- HARD version:
