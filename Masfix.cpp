@@ -219,10 +219,12 @@ enum CtxcallNames {
 
 	CtxEmplaceTokens,
 	CtxEmplaceMacroArg,
+
+	CtxGetLastError,
 	
 	CtxcallCount,
 };
-static_assert(CtxcallCount == 7, "Exhaustive StrToCtxcallName definition");
+static_assert(CtxcallCount == 8, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
 	{"GetTokenMeta", CtxGetTokenMeta},
 	{"ReadTokenData", CtxReadTokenData},
@@ -231,8 +233,9 @@ map<string, CtxcallNames> StrToCtxcallName = {
 	{"SelectCtimeUse", CtxSelectCtimeUse},
 	{"EmplaceTokens", CtxEmplaceTokens},
 	{"EmplaceMacroArg", CtxEmplaceMacroArg},
+	{"GetLastError", CtxGetLastError},
 };
-static_assert(CtxcallCount == 7, "Exhaustive CtxcallToNumArgs definition");
+static_assert(CtxcallCount == 8, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxGetTokenMeta, 1},
 	{CtxReadTokenData, 3},
@@ -240,7 +243,8 @@ map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxSelectMacroArg, 1},
 	{CtxSelectCtimeUse, 0},
 	{CtxEmplaceTokens, 2},
-	{CtxEmplaceMacroArg, 2,}
+	{CtxEmplaceMacroArg, 2},
+	{CtxGetLastError, 2},
 };
 
 // structs -------------------------------
@@ -562,6 +566,7 @@ struct VM {
 	unsigned int sysargCount = 0;
 	unsigned int sysargEaten = 0;
 	int64_t sysretval = 0;
+	string errorMessage;
 
 	bool ctimeReturnR=true; // don't return r at ctime end when any ctxcall used
 
@@ -982,7 +987,7 @@ public:
 		vm.addSysarg(-1);
 		Instr ctxCallInstr(CtxSelectMacroArg);
 		interpCtxcall(vm, ctxCallInstr, false); // NOTE also clears sysargs
-		if (vm.sysretval != 1) {
+		if (vm.sysretval == -1) { // mac without args / arg empty
 			Instr instr(CtxSelectCtimeUse);
 			interpCtxcall(vm, instr, false);
 		}
@@ -1898,38 +1903,41 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 	}
 	return bytes_to_write;
 }
+#define ctxCheck(cond, errMsg) \
+	if (!(cond)) { \
+		vm.errorMessage = errMsg; \
+		return false; \
+};
 #define eatPtrArg(buff_name) \
 		char* buff_name; \
-		returnOnFalse(vm.sysargEatPtr((void**)&buff_name));
+		ctxCheck(vm.sysargEatPtr((void**)&buff_name), "Pointer argument out of bounds");
 #define eatPtrArgNullable(buff_name) \
 		char* buff_name; \
-		returnOnFalse(vm.sysargEatPtr((void**)&buff_name, true));
-#define ctxValidInputToken() returnOnFalse(inScope.hasNext());
+		ctxCheck(vm.sysargEatPtr((void**)&buff_name, true), "Pointer argument out of bounds");
+#define ctxCurrTokenType() (inScope.hasNext() ? inScope.currToken().type : Tnone)
 
-bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope, Macro& macro, uint64_t& retval) {
+bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope, Macro& macro, int64_t& retval) {
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
 		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount)
 	);
-	static_assert(CtxcallCount == 7, "Exhaustive interpCtxcallBody definition");
+	static_assert(CtxcallCount == 8, "Exhaustive interpCtxcallBody definition");
 	// valid currToken not needed
 	if (ctxName == CtxSelectMacroArg) {
-		// SelectMacroArg(ushort macro_arg_idx) -> bool sucess
+		// SelectMacroArg(ushort macro_arg_idx) -> TokenTypes currType
 		// set context input to start of n-th macro argument, negative indexes from end
 		short idx = vm.sysargEatShort();
 		if (idx < 0) idx += macro.argList.size(); // backwards
-		returnOnFalse(0 <= idx && idx < macro.argList.size());
+		ctxCheck(0 <= idx && idx < macro.argList.size(), "Macro index out of bounds");
 		inScope.openMacroArgument(macro.name, macro.loc, macro.argList[idx].value.top());
-		ctxValidInputToken();
-		retval = 1;
+		retval = ctxCurrTokenType();
 	} else if (ctxName == CtxSelectCtimeUse) {
-		// SelectCtimeUse() -> bool available
+		// SelectCtimeUse() -> TokenTypes currType
 		// select ctime expansion token (mainly for metadata)
 		// token eating then eats tokens after expansion
 		Scope* copied = outScope.ctxCopy();
 		vm.inScope = copied; // TODO free?
-		ctxValidInputToken();
-		retval = 1;
+		retval = ctxCurrTokenType();
 	} else if (ctxName == CtxEmplaceTokens) {
 		// EmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
 		// emplace tokens from string after ctime call directive, first inserted inherits Meta from first_meta
@@ -1939,7 +1947,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		
 		short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
 		uint64_t meta_bytes_read = vmExchangeBytes(vm, meta_arg, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
-		returnOnFalse(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W);
+		ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading first_meta");
 
 		Token ctx;
 		ctx.type = static_cast<TokenTypes>(meta_data[0]);
@@ -1954,9 +1962,16 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		ctx.data = data;
 		outScope.insertToken(move(ctx));
 		retval = 1;
+	} else if (ctxName == CtxGetLastError) {
+		// GetLastError(char* buff, ushort buff_size) -> ushort bytes_written
+		// read last error message to buffer
+		eatPtrArg(mxBuff);
+		uint64_t mxBuffSize = vm.sysargEatInt();
+		string arg = vm.errorMessage;
+		retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
 	} else {
 	// ctxcalls expecting valid currToken ----------------------
-		returnOnFalse(inScope.hasNext());
+		ctxCheck(inScope.hasNext(), "Valid current input token expected");
 		Token& currToken = inScope.currToken();
 		if (ctxName == CtxGetTokenMeta) {
 			// GetTokenMeta(TokenMeta* meta) -> bool success
@@ -1984,23 +1999,22 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			string arg = currToken.data;
 			retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
 		} else if (ctxName == CtxAdvanceSource) {
-			// AdvanceSource(bool eat, bool step_inside) -> bool success
+			// AdvanceSource(bool eat, bool step_inside) -> TokenTypes currType
 			// advance read iterator, eat / skip curr token, step_inside tlist
 			bool eat = vm.sysargEatInt();
 			bool step_inside = vm.sysargEatInt();
 			if (eat) {
-				returnOnFalse(step_inside == false);
+				ctxCheck(step_inside == false, "Cannot step_inside eaten token");
 				inScope.eatenToken();
 			} else {
 				if (step_inside) {
-					returnOnFalse(inScope.currToken().type >= Tlist);
+					// ctxCheck(inScope.currToken().type <= Tlist, );
 					inScope.next(inScope.currToken());
 				} else {
 					inScope.next();
 				}
 			}
-			ctxValidInputToken();
-			retval = 1;
+			retval = ctxCurrTokenType();
 		} else if (ctxName == CtxEmplaceMacroArg) {
 			// EmplaceMacroArg(bool unwrap, TokenMeta*? meta) -> bool success
 			// emplace rest of pointed macro argument, with optional meta (see EmplaceTokens)
@@ -2014,7 +2028,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			if (first_meta != nullptr) {
 				short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
 				uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
-				returnOnFalse(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W);
+				ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading meta");
 		
 				ctx.type = static_cast<TokenTypes>(meta_data[0]);
 				// TODO check type
@@ -2044,7 +2058,7 @@ void interpCtxcall(VM& vm, Instr& ctxInstr, bool trueCtxcall) {
 	}
 	assert(vm.isCtimeVM && vm.inScope != nullptr && vm.outScope != nullptr);
 	vm.ctimeReturnR = false;
-	uint64_t retvalue = 0;
+	int64_t retvalue = -1;
 	interpCtxcallBody(vm, ctxInstr, *(Scope*)vm.inScope, *(Scope*)vm.outScope, *vm.ctimeMac, retvalue);
 	vm.ctxcallReturn(retvalue, trueCtxcall);
 }
