@@ -1,5 +1,6 @@
 ; compile time interfacing with compiler
 
+%include "math"
 %include "structs"
 %include "system"
 %include "filesystem"
@@ -14,6 +15,15 @@
 	%struct:field(Tcolon, 1)
 	%struct:field(Tseparator, 1)
 	%struct:field(Tlist, 1)
+; readonly
+	%struct:field(TImodule, 1)
+	%struct:field(TIexpansion, 1)
+	%struct:field(TIctime, 1)
+	%struct:field(TInamespace, 1)
+	%struct:field(TIarglist, 1)
+	%struct:field(TImacArg, 1)
+
+	%define Tnone (%minus1)
 %struct:end()
 }
 
