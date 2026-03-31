@@ -1,13 +1,13 @@
 
 ; test semantics of context calls
 
-%include "memory"
+%include "memory" ; avoid including as much STD as possible
 %include "control"
+
+; macro arg selection -----------------------------------------
 %macro printWchar() {
-	ldm& 255
-	outcr
-	ldm> 8
-	outcr
+	outcm& 255
+	outcm> 8
 	mova 1
 }
 
@@ -20,7 +20,7 @@
 		lne %NOIDX
 	,
 		sysargw %which
-		ctxcall PointMacroArg
+		ctxcall SelectMacroArg
 		outur
 		outc ','
 	}
@@ -47,3 +47,82 @@
 !readArg(36 A, 78 B, 9 C,          ||, 256, %NOIDX, %NO_RECURSE) ; default arg idxing
 !readArg("(7,)".., 78, 9,         ||, 256,      0, %RECURSE   ) ; TODO recurse
 !readArg(Sweet, Home, Alabama... , ||, 65534,    2, %NO_RECURSE) ; test memory overrun
+
+; iteration manipulation --------------------------------------
+
+%macro myCtxcall(ident, name) {
+	outc %ident
+	outc ' '
+	outc '-'
+	outc '>'
+	outc ' '
+	ctxcall %name
+	; %sys:assert_success {
+		outur
+		; lreq 1
+		outc '\n'
+	; }
+}
+%macro seeCurrTokenData() {
+	mov 128
+	str '-'
+	ld '-'
+	str|r< 8
+	sysaddr(h)
+	sysargw 1024 ; buff size
+	sysargw 0
+	%myCtxcall('D', ReadTokenData)
+	%printWchar()
+	outc '\n'
+}
+%macro seeCurrTokenMeta() {
+	mov 2048
+	sysaddr(h)
+	%myCtxcall('M', GetTokenMeta)
+	outc 'T'
+	outum
+	mova 1
+	
+	outc 'F'
+	outum
+	mova 1
+	outc 'C'
+	outum
+	mova 1
+
+	outc 'R'
+	outum
+	mova 1
+	outc 'C'
+	outum
+	mova 1
+
+	outc '\n'
+}
+%macro advanceSource(eat) {
+	sysargw %eat
+	sysargw 0
+	%myCtxcall('A', AdvanceSource)
+	%seeCurrTokenData()
+}
+%macro seeAfter() {
+	outc '\n'
+	%myCtxcall('S', SelectCtimeUse)
+	%seeCurrTokenData()
+	%seeCurrTokenMeta()
+	%advanceSource(0) ; past %
+	%advanceSource(0)
+	%advanceSource(0) ; skip ()
+	%advanceSource(1) ; eat 'uf'
+}
+
+%macro Mac() { outu 1234 }
+
+; testing here
+outc 'R'
+outc '\n'
+%namespace first {
+	!seeAfter()
+	%Mac()
+	uf
+}
