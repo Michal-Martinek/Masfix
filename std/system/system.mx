@@ -1,5 +1,6 @@
 
 %include "memory"
+%include "math"
 %include "procedures"
 %include "control"
 %include "exceptions"
@@ -75,14 +76,14 @@
 	}
 
 ;; calling
-	%macro _call_checked(callInstr, instrs_check_retval) {
+	%macro _call_checked(callInstr, inCtxcall, instrs_check_retval) {
 		%callInstr
 		%storer(%temp_addr)
 		%if {
 			%instrs_check_retval
 			leq 0
 		,
-			%stack:push(0)
+			%stack:push(%inCtxcall)
 			ld proc_seeLastError ; NOTE call() is overloaded
 			; TODOO if filesystem is included -> undefined label
 			%call_ptr()
@@ -90,51 +91,16 @@
 		%load(%temp_addr) ; -> returncode
 	}
 	%macro call(syscall_name, instrs_check_retval) {
-		%_call_checked( syscall %syscall_name, %instrs_check_retval )
+		%_call_checked( syscall %syscall_name, 0, %instrs_check_retval )
 	}
-	%macro ctx(ctxcall_name) {
-		; TODO check result toggle?
-		%_call_checked( ctxcall %ctxcall_name, ld 1 ) ; lne %minus1 )
+	%macro ctx(ctxcall_name, ignore_retval) {
+		%_call_checked( ctxcall %ctxcall_name, 1,
+			lne %minus1
+			ld| %ignore_retval
+		)
 	}
 }
 
 
-; bool syscall/ctxcall -> (stdout: error)
-%void_func{ seeLastError, 1, 0,
-	outc 'E'
-	outc 'R'
-	outc 'R'
-	outc 'O'
-	outc 'R'
-	outc ' '
-	%if_else { %seg:load(%arg, 0),
-		outc 'C'
-		outc 'T'
-		outc 'X'
-	,
-		outc 'S'
-		outc 'Y'
-		outc 'S'
-	}
-	outc 'C'
-	outc 'A'
-	outc 'L'
-	outc 'L'
-	outc ':'
-	outc ' '
-
-	; output errorcode
-	%sys:rettemp()
-	outum
-	outc ' '
-
-	%if_else { %seg:load(%arg, 0),
-	; NOTE avoid error checking in calls
-
-		; ctxcall GetLastError TODO
-	,
-		syscall GetLastError
-		outur
-	}
-	outc '\n'
-}
+; seeLastError() for error reporting
+%include "filesystem"
