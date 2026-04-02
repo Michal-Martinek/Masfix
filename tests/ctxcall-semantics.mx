@@ -31,7 +31,7 @@
 	mov %to_addr
 	sysaddr(h)
 	sysargw 1024
-	sysargw 0
+	sysargw %recurse
 	ctxcall ReadTokenData
 	outur
 	outc '>'
@@ -47,7 +47,7 @@
 	outc '\n'
 }
 !readArg(36 A, 78 B, 9 C,          ||, 256, %NOIDX, %NO_RECURSE) ; default arg idxing
-!readArg("(7,)".., 78, 9,          ||, 256,      0, %RECURSE   ) ; TODO recurse
+!readArg((67,($) Boo?).., 78, 9,   ||, 256,      0, %RECURSE   ) ; recurse
 !readArg(Sweet, Home, Alabama... , ||, 65534,    2, %NO_RECURSE) ; test memory overrun
 
 ; iteration manipulation --------------------------------------

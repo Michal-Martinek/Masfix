@@ -218,7 +218,7 @@ enum CtxcallNames {
 	CtxSelectCtimeUse,
 
 	CtxEmplaceTokens,
-	CtxEmplaceMacroArg,
+	CtxEmplaceSelectedTlist,
 
 	CtxGetLastError,
 	
@@ -232,7 +232,7 @@ map<string, CtxcallNames> StrToCtxcallName = {
 	{"SelectMacroArg", CtxSelectMacroArg},
 	{"SelectCtimeUse", CtxSelectCtimeUse},
 	{"EmplaceTokens", CtxEmplaceTokens},
-	{"EmplaceMacroArg", CtxEmplaceMacroArg},
+	{"EmplaceSelectedTlist", CtxEmplaceSelectedTlist},
 	{"GetLastError", CtxGetLastError},
 };
 static_assert(CtxcallCount == 8, "Exhaustive CtxcallToNumArgs definition");
@@ -243,7 +243,7 @@ map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxSelectMacroArg, 1},
 	{CtxSelectCtimeUse, 0},
 	{CtxEmplaceTokens, 2},
-	{CtxEmplaceMacroArg, 2},
+	{CtxEmplaceSelectedTlist, 2},
 	{CtxGetLastError, 2},
 };
 
@@ -1935,12 +1935,18 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		// SelectCtimeUse() -> TokenTypes currType
 		// select ctime expansion token (mainly for metadata)
 		// token eating then eats tokens after expansion
+
+		// TODO FOR now selects after use - rename? + add new ctxcall for ctime use itself
+		// returning from multiple levels of ctimes - emplace[]
+		// TODO available only on start
+
 		Scope* copied = outScope.ctxCopy();
-		vm.inScope = copied; // TODO free?
+		delete (Scope*)vm.inScope;
+		vm.inScope = copied;
 		retval = ctxCurrTokenType();
 	} else if (ctxName == CtxEmplaceTokens) {
 		// EmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
-		// emplace tokens from string after ctime call directive, first inserted inherits Meta from first_meta
+		// emplace tokens from string after ctime call directive, first inserted inherits context from first_meta
 		// TODO nullify meta - default - tokenize -> ignores type
 		eatPtrArg(data_cstr);
 		eatPtrArg(meta_arg);
@@ -1960,6 +1966,8 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 
 		string data(data_cstr);
 		ctx.data = data;
+
+		outScope.next(); // insert after curr
 		outScope.insertToken(move(ctx));
 		retval = 1;
 	} else if (ctxName == CtxGetLastError) {
@@ -1995,8 +2003,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			eatPtrArg(mxBuff);
 			uint64_t mxBuffSize = vm.sysargEatInt();
 			bool recurse = vm.sysargEatInt();
-			
-			string arg = currToken.data;
+			string arg = currToken.toStr(true, recurse);
 			retval = vmExchangeBytes(vm, arg.c_str(), arg.size(), mxBuff, mxBuffSize);
 		} else if (ctxName == CtxAdvanceSource) {
 			// AdvanceSource(bool eat, bool step_inside) -> TokenTypes currType
@@ -2015,9 +2022,9 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 				}
 			}
 			retval = ctxCurrTokenType();
-		} else if (ctxName == CtxEmplaceMacroArg) {
-			// EmplaceMacroArg(bool unwrap, TokenMeta*? meta) -> bool success
-			// emplace rest of pointed macro argument, with optional meta (see EmplaceTokens)
+		} else if (ctxName == CtxEmplaceSelectedTlist) {
+			// EmplaceSelectedTlist(bool unwrap, TokenMeta*? meta) -> bool success
+			// emplace rest current selected token list, with context from meta (see EmplaceTokens)
 			bool unwrap = vm.sysargEatInt();
 			eatPtrArgNullable(first_meta);
 			
@@ -2030,19 +2037,24 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 				uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
 				ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading meta");
 		
-				ctx.type = static_cast<TokenTypes>(meta_data[0]);
-				// TODO check type
+				// IGNORED ctx.type = static_cast<TokenTypes>(meta_data[0]);
 				ctx.firstOnLine = !!meta_data[1];
 				ctx.continued = !!meta_data[2];
 				ctx.loc.row = meta_data[3];
 				ctx.loc.col = meta_data[4];
 			} else {
-				ctx.type = Talpha;
 				ctx.loc = macro.loc;
 			}
 			ctx.loc.file = macro.loc.file + "/ctxcall";
 
-			outScope.insertList(inScope.currList(), ctx, true);
+			outScope.next(); // insert after curr
+			Token tlist(Tlist, "(", ctx.loc, ctx.continued, ctx.firstOnLine);
+			tlist.tlist = list(inScope.currTokenItr(), inScope.currList().end()); // copy
+			if (unwrap) {
+				outScope.insertList(tlist.tlist, ctx, false);
+			} else {
+				outScope.insertToken(move(tlist));
+			}
 			retval = 1;
 		} else {
 			unreachable();
