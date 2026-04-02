@@ -395,6 +395,7 @@
 
 ; bool syscall/ctxcall -> (stdout: error)
 %void_func{ seeLastError, 1, 2,
+	outc '\n'
 	outc 'E'
 	outc 'R'
 	outc 'R'

@@ -1,0 +1,55 @@
+
+; testing ctxcall error & return values and error messages
+
+%include "memory"
+%include "math"
+%include "io"
+%include "control"
+%include "procedures"
+%include "strings"
+%include "filesystem"
+%include "system"
+%include "context"
+
+%macro callCtxcall(desc, name) {
+	outc %desc
+	%sys:ctx(%name, 0)
+	outc ' '
+	outc '-'
+	outc '>'
+	outc ' '
+	%outir()
+}
+%macro testRetval(desc, ctxName, args) {
+	%args
+	%callCtxcall(%desc, %ctxName)
+
+	outc '\n'
+}
+
+; ctxcall number of args
+%nop(!testRetval('E', SelectMacroArg, )) ; 1 - empty - bad number
+%nop(!testRetval(65, SelectMacroArg, sysargw 0)) ; 1 - good
+%nop(!testRetval('F', SelectMacroArg, ; 2 - bad
+	sysargw 0
+	sysargw 0
+))
+
+; SelectMacroArg - index
+%nop(!testRetval('2', SelectMacroArg, sysargw 2)) ; last - good
+%nop(!testRetval('3', SelectMacroArg, sysargw 3)) ; not existent idx - bad
+%nop(!testRetval('1', SelectMacroArg, ; minus 1
+	ld %minus1
+	sysargw(r)
+))
+%nop(!testRetval('3', SelectMacroArg, ; minus 3 == 0
+	ld 0
+	lds 3
+	sysargw(r)
+))
+%nop(!testRetval('4', SelectMacroArg, ; minus 4 - error
+	ld 0
+	lds 4
+	sysargw(r)
+))
+
