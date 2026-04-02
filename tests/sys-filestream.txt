@@ -2,9 +2,9 @@
 
 :testmode runonly
 
-:stdout 442
+:stdout 440
 Path; "tests/sys-filestream.mx"
-OPEN: 0
+OPEN: 
 " ; #! ; Hello?? Do you see me? xoxo @!	"
 INC: %memory %procedures %control %io %structs %array %strings %system %filesystem %debug 
 LENS: 18, 45, 1, 11, 20, 29, 31, 15, 20, 1, 
@@ -21,7 +21,7 @@ BTs:
  ABCDEFGHIJKLMNOPQRSTUVW
 ";#BUFF-READ-POINT		%seg:p"
 SIZE: 3970
-GOOD 0 IN 0
+GOOD  IN 0
 
 
 :stderr 4086
@@ -93,7 +93,7 @@ GOOD 0 IN 0
 		outc 'N'
 		outc ':'
 		outc ' '
-		%sys:SeeLastError()
+		; %sys:SeeLastError
 	}
 
 	%seeFirstLine()
@@ -221,7 +221,7 @@ GOOD 0 IN 0
 	outc 'O'
 	outc 'D'
 	outc ' '
-	%sys:SeeLastError()
+	; %sys:SeeLastError
 	outc ' '
 	outc 'I'
 	outc 'N'

@@ -2,11 +2,10 @@
 
 %include "math"
 %include "structs"
-%include "system"
-%include "filesystem"
 
 %namespace TokenTypes {
 %struct:begin()
+	%define Tnone (%minus1)
 	%struct:field(Tnumeric, 1)
 	%struct:field(Talpha, 1)
 	%struct:field(Tstring, 1)
@@ -23,7 +22,6 @@
 	%struct:field(TIarglist, 1)
 	%struct:field(TImacArg, 1)
 
-	%define Tnone (%minus1)
 %struct:end()
 }
 

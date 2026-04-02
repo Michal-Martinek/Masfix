@@ -264,7 +264,7 @@
 		outc 'N'
 		outc ':'
 		outc ' '
-		%sys:SeeLastError()
+		; %sys:SeeLastError
 	}
 
 	%seeFirstLine()
@@ -392,7 +392,7 @@
 	outc 'O'
 	outc 'D'
 	outc ' '
-	%sys:SeeLastError()
+	; %sys:SeeLastError
 	outc ' '
 	outc 'I'
 	outc 'N'

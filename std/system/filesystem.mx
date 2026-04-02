@@ -94,7 +94,7 @@
 			%int64:initMinusR(%temp_addr)
 			%sys:tempq()
 		)
-		%sys:call(GetStdHandle)
+		%sys:call(GetStdHandle, lrne %minus1) ; HANDLE GetStdHandle(DWORD nStdHandle)
 		%sys:retto(%this, %handle)
 	}
 
@@ -127,7 +127,7 @@
 		%sys:argw(%arg, 3)     ; [in] DWORD dwCreationDisposition
 		%sys:argimm(128)       ; [in] DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL
 		%sys:nullptr()         ; [in, optional] HANDLE hTemplateFile = NULL
-		%sys:call(CreateFileA) ; HANDLE CreateFileA()
+		%sys:call(CreateFileA, lrne %minus1) ; HANDLE CreateFileA()
 		%sys:retto(%this, %handle)
 	}
 
@@ -139,13 +139,12 @@
 			%sys:argq(%this, %handle)        ; [in] HANDLE hFile
 			%sys:ptr(%this, %buffer)         ; [in] LPCVOID lpBuffer
 			%sys:argw(%this, %bytes_written) ; [in] DWORD nNumberOfBytesToWrite
-			%sys:tempaddr()                 ; [out, optional] LPDWORD lpNumberOfBytesWritten
+			; %sys:tempaddr() TODO avoid overlap with syscall retval
+			sysaddr !op(a,%temp_addr,4)      ; [out, optional] LPDWORD lpNumberOfBytesWritten
 			%sys:nullptr()                   ; [in, out, optional] LPOVERLAPPED lpOverlapped
-			%sys:call(WriteFile)             ; BOOL WriteFile()
-			%sys:assert_success { ; ret == true && written all
-				lrne 0
-				mov %temp_addr
-				ldtm
+			%sys:call(WriteFile, lreq 1)     ; BOOL WriteFile()
+			%assert { ; written all
+				%load(!op(a,%temp_addr,4))
 				%seg:this(%bytes_written, lreqm)
 			}
 		}
@@ -165,7 +164,7 @@
 			%call(filestream_flush)
 		}
 		%sys:argq(%this, %handle) ; [in] HANDLE hObject
-		%sys:call(CloseHandle)    ; BOOL CloseHandle()
+		%sys:call(CloseHandle, lreq 1)    ; BOOL CloseHandle()
 		%seg:this(%handle, %int64:init()) ; nullify handle
 	}
 
@@ -182,10 +181,12 @@
 		ldt %BYTES_PER_WORD
 		%seg:this(%bytes_written, ldsm)
 		%sys:argr()
-		%sys:tempaddr()    ; [out, optional] LPDWORD lpNumberOfBytesRead
+		; %sys:tempaddr()     ; [out, optional] LPDWORD lpNumberOfBytesRead
+		; TODO avoid overlap with syscall retval
+		sysaddr !op(a,%temp_addr,4)     ; [out, optional] LPDWORD lpNumberOfBytesRead
 		%sys:nullptr()      ; [in, out, optional] LPOVERLAPPED lpOverlapped
-		%sys:call(ReadFile) ; BOOL ReadFile()
-		%load(%temp_addr)
+		%sys:call(ReadFile, lreq 1) ; BOOL ReadFile()
+		%load(!op(a,%temp_addr,4))
 		%seg:this(%bytes_written, strar)
 		%impl:null_terminate()
 	}
