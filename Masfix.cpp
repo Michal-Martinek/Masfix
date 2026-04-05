@@ -926,6 +926,7 @@ public:
 	}
 // modules -------------------------------------------------
 	Module* getCurrModule() {
+		assert(!modules.empty());
 		return &*currModule;
 	}
 	bool newModuleIncluded(fs::path abspath) {
@@ -1101,12 +1102,13 @@ bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 	return check(false, "Expected string or character termination", loc);
 }
 #define addToken(type) scope.insertToken(Token(type, run, loc, continued, firstOnLine)); \
-					scope.next(scope.currToken());
+					scope.next(scope.currToken()); tokenCount++;
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
-void tokenize(ifstream& ifs, string relPath, Scope& scope) {
+int tokenize(istream& ifs, string relPath, Scope& scope) {
 	static_assert(TokenCount == 14, "Exhaustive tokenize definition");
 	string line;
+	int tokenCount = 0;
 	bool continued, firstOnLine, keepContinued, errorLess;
 	for (int lineNum = 1; getline(ifs, line); ++lineNum) {
 		continued = false; firstOnLine = true;
@@ -1163,6 +1165,7 @@ void tokenize(ifstream& ifs, string relPath, Scope& scope) {
 		}
 	}
 	scope.tokenizeEnd();
+	return tokenCount;
 }
 // preprocess helpers -------------------------------------------------------------------------
 bool lookupNamespaceAbove(string directiveName, int& namespaceId, Loc& loc, bool supressErrors);
@@ -1914,8 +1917,24 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 #define eatPtrArgNullable(buff_name) \
 		char* buff_name; \
 		ctxCheck(vm.sysargEatPtr((void**)&buff_name, true), "Pointer argument out of bounds");
-#define ctxCurrTokenType() (inScope.hasNext() ? inScope.currToken().type : Tnone)
+#define ctxCurrTokenType() (((Scope*)vm.inScope)->hasNext() ? ((Scope*)vm.inScope)->currToken().type : Tnone) // NOTE always use the current vm.inScope
 
+bool vmParseTokenMeta(VM& vm, Macro& macro, char* in_meta, Token& out_ctx) {
+	out_ctx.loc = macro.loc;
+	// out_ctx.loc.file = macro.loc.file + "/ctxcall"; // TODO
+	if (in_meta == nullptr) return true;
+	
+	short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
+	uint64_t meta_bytes_read = vmExchangeBytes(vm, in_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
+	ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading meta");
+
+	out_ctx.type = static_cast<TokenTypes>(meta_data[0]); // IGNORED
+	out_ctx.firstOnLine = !!meta_data[1];
+	out_ctx.continued = !!meta_data[2];
+	out_ctx.loc.row = meta_data[3];
+	out_ctx.loc.col = meta_data[4];
+	return true;
+}
 bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope, Macro& macro, int64_t& retval) {
 	CtxcallNames ctxName = static_cast<CtxcallNames>(ctxInstr.immediate);
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
@@ -1945,24 +1964,12 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		vm.inScope = copied;
 		retval = ctxCurrTokenType();
 	} else if (ctxName == CtxEmplaceTokens) {
-		// EmplaceTokens(cstr* data, TokenMeta* first_meta) -> ushort tokens emplaced
+		// EmplaceTokens(cstr* data, TokenMeta*? first_meta) -> ushort tokens emplaced
 		// emplace tokens from string after ctime call directive, first inserted inherits context from first_meta
-		// TODO nullify meta - default - tokenize -> ignores type
 		eatPtrArg(data_cstr);
-		eatPtrArg(meta_arg);
-		
-		short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
-		uint64_t meta_bytes_read = vmExchangeBytes(vm, meta_arg, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
-		ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading first_meta");
-
+		eatPtrArgNullable(first_meta);
 		Token ctx;
-		ctx.type = static_cast<TokenTypes>(meta_data[0]);
-		// TODO ignore -> tokenize
-		ctx.firstOnLine = !!meta_data[1];
-		ctx.continued = !!meta_data[2];
-		ctx.loc.row = meta_data[3];
-		ctx.loc.col = meta_data[4];
-		ctx.loc.file = macro.loc.file + "/ctxcall"; // TODO
+		returnOnFalse(vmParseTokenMeta(vm, macro, first_meta, ctx));
 
 		string data(data_cstr);
 		ctx.data = data;
@@ -2023,29 +2030,12 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			}
 			retval = ctxCurrTokenType();
 		} else if (ctxName == CtxEmplaceSelectedTlist) {
-			// EmplaceSelectedTlist(bool unwrap, TokenMeta*? meta) -> bool success
+			// EmplaceSelectedTlist(bool unwrap, TokenMeta*? first_meta) -> bool success
 			// emplace rest current selected token list, with context from meta (see EmplaceTokens)
 			bool unwrap = vm.sysargEatInt();
 			eatPtrArgNullable(first_meta);
-			
-			// returnOnFalse(inScope.currListItr().type == TIarglist); // check macro arg is actually pointed
-
-			// Token& first;
 			Token ctx;
-			if (first_meta != nullptr) {
-				short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
-				uint64_t meta_bytes_read = vmExchangeBytes(vm, first_meta, sizeof(meta_data), (char*)meta_data, sizeof(meta_data));
-				ctxCheck(meta_bytes_read == 2 * TOKEN_META_DATA_SIZE_W, "Error reading meta");
-		
-				// IGNORED ctx.type = static_cast<TokenTypes>(meta_data[0]);
-				ctx.firstOnLine = !!meta_data[1];
-				ctx.continued = !!meta_data[2];
-				ctx.loc.row = meta_data[3];
-				ctx.loc.col = meta_data[4];
-			} else {
-				ctx.loc = macro.loc;
-			}
-			ctx.loc.file = macro.loc.file + "/ctxcall";
+			returnOnFalse(vmParseTokenMeta(vm, macro, first_meta, ctx));
 
 			outScope.next(); // insert after curr
 			Token tlist(Tlist, "(", ctx.loc, ctx.continued, ctx.firstOnLine);
