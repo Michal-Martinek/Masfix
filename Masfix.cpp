@@ -54,6 +54,7 @@ enum TokenTypes {
 	TInamespace, // wraps tokens inside a namespace
 	TIarglist,   // macro argument list
 	TImacArg,    // selected macro argument (never inserted, only scope itr opening)
+	TItokenizer, // "module" token for ctxcall token emplacing 
 
 	TokenCount
 };
@@ -558,6 +559,7 @@ struct VM {
 // context call references //
 	bool isCtimeVM; // compile-time execution - compiler context available
 	Macro* ctimeMac=nullptr;
+	list<Token>::iterator ctimeToken;
 	void* inScope=nullptr; // Scope& for ctxcall input reading
 	void* outScope=nullptr; // Scope& for ctxcall output
 
@@ -740,7 +742,7 @@ private:
 	/// handles the ending of a single token list
 	/// forces parsing if apropriate
 	void closeList() {
-		static_assert(TokenCount == 14, "Exhaustive closeList definition");
+		static_assert(TokenCount == 15, "Exhaustive closeList definition");
 		Token& closedList = tlists.top().get();
 		tlists.pop(); itrs.pop();
 		if (!isPreprocessing) return;
@@ -798,7 +800,7 @@ public:
 	}
 	/// advances iteration, opens new nested list if provided
 	list<Token>::iterator& next(Token& tlist) {
-		static_assert(TokenCount == 14, "Exhaustive Scope::next definition");
+		static_assert(TokenCount == 15, "Exhaustive Scope::next definition");
 		++itrs.top();
 		if (tlist.type == Tlist || tlist.type == TIexpansion || tlist.type == TInamespace || tlist.type == TIctime) {
 			openList(tlist);
@@ -921,7 +923,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() && insideTlistOfType(TImodule));
+		assert(tlists.size() && (insideTlistOfType(TImodule) || insideTlistOfType(TItokenizer))); // for ctxcall EmplaceTokens
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
@@ -946,7 +948,7 @@ public:
 		openList(currModule->contents);
 	}
 
-// parsing & ctimes ----------------------------------------
+// parsing & ctimes & context calls ----------------------------------------
 
 	bool forceParseImpl();
 	/// Scope wrapper for parsing, returns Scope to same state afterwards
@@ -967,8 +969,11 @@ public:
 	// construct new scope copy for context calls
 	Scope* ctxCopy() {
 		Scope* s = new Scope();
+		s->namespaces = this->namespaces;
+		s->macros = this->macros;
 		s->tlists = this->tlists; // stack copy (references same Tokens)
 		s->itrs = this->itrs;
+		s->isPreprocessing = false;
 		return s;
 	}
 	// open new token holding contents ctime mac arg
@@ -979,10 +984,13 @@ public:
 		openList(*arg);
 	}
 	// init VM ctx for ctxcalls
-	void initVmCtx(VM& vm) {
+	void initVmCtx(VM& vm, Token& closed) {
 		assert(vm.isCtimeVM);
 		vm.ctimeMac = &currMacro();
-		vm.outScope = ctxCopy(); // tlist = currList(), currToken = ctimeToken
+		vm.outScope = ctxCopy(); // tlist = currList(), out.itr - ctime return position
+		vm.ctimeToken = --itrs.top(); // this.itr stays at closed ctime expansion (before retvals)
+		assert(&*vm.ctimeToken == &closed);
+
 		// open last ctime argument
 		vm.inScope = ctxCopy();
 		vm.addSysarg(-1);
@@ -996,35 +1004,44 @@ public:
 	}
 	void closeVmCtx(VM& vm) {
 		vm.ctimeMac = nullptr;
+		vm.ctimeToken = currList().end();
 		delete (Scope*)vm.inScope;
 		vm.inScope = nullptr;
 		delete (Scope*)vm.outScope;
 		vm.outScope = nullptr;
 	}
+	void ctxEmplaceList(list<Token>& tlist, Token& ctx, bool skipInserted=true) {
+		list<Token>::iterator after = itrs.top();
+		insertList(tlist, ctx, false);
+		if (skipInserted) {
+			itrs.top() = after;
+		}
+	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
-	void parseInterpretCtime(Token& ctimeExp, VM& vm) {
+	void parseInterpretCtime(Token& closed, VM& vm) {
 		vm.ctimeReturnR = true; // still return on err in parsing
-		bool safeToRun = forceParse(ctimeExp);
+		bool safeToRun = forceParse(closed);
+
+		initVmCtx(vm, closed);
 		int retval = 0;
 		if (safeToRun) {
-			initVmCtx(vm);
 			interpret(parseCtx.parseStartIdx);
-			closeVmCtx(vm);
 			assert(vm.mem_safety_padding == 0);
 			retval = vm.reg;
 		}
-		_updateTSafterCtime(ctimeExp, vm.ctimeReturnR, retval);
+		closeVmCtx(vm);
+		_updateTSafterCtime(closed, vm.ctimeReturnR, retval);
 		endMacroExpansion();
 		parseCtx.removeCtimeInstrs();
 	}
 	/// removes ctime from token stream, inserts return value if no ctxcall already did
-	void _updateTSafterCtime(Token& ctimeExp, bool returnR, optional<int> retval) {
-		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval.value_or(0)), ctimeExp);
-		// return itr to ctime expansion to remove it
-		assert(&*--itrs.top() == &ctimeExp);	
-		eatenToken();
+	void _updateTSafterCtime(Token& closed, bool returnR, optional<int> retval) {
+		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval.value_or(0)), closed);
+		assert(&currToken() == &closed);
+		eatenToken(); // remove ctime expansion
 		if (returnR) insertToken(move(retValToken));
+		// NOTE itr - start of emplaced tokens
 	}
 
 // helpers -------------------------------------------------
@@ -1106,7 +1123,7 @@ bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 /// reads file, performs lexical analysis, builds token stream
 /// prepares Scope for preprocessing
 int tokenize(istream& ifs, string relPath, Scope& scope) {
-	static_assert(TokenCount == 14, "Exhaustive tokenize definition");
+	static_assert(TokenCount == 15, "Exhaustive tokenize definition");
 	string line;
 	int tokenCount = 0;
 	bool continued, firstOnLine, keepContinued, errorLess;
@@ -1211,7 +1228,7 @@ bool eatToken(Scope& scope, Loc& loc, Token& outToken, TokenTypes type, string e
 		+ " token type, got", outToken);
 }
 void eatTokenRun(Scope& scope, string& name, Loc& loc, bool canStartLine=true, int eatAnything=0, bool allowQuotes=false) {
-	static_assert(TokenCount == 14, "Exhaustive eatTokenRun definition");
+	static_assert(TokenCount == 15, "Exhaustive eatTokenRun definition");
 	if (scope.hasNext()) loc = scope->loc;
 	bool first = true; name = "";
 
@@ -1390,7 +1407,7 @@ bool expandMacroUse(Scope& scope, int namespaceId, string macroName, Token& perc
 	return true;
 }
 bool getDirectivePrefixes(string& firstName, list<string>& prefixes, list<Loc>& locs, Loc& loc, Scope& scope, string identPurpose="directive") {
-	static_assert(TokenCount == 14, "Exhaustive getDirectivePrefixes definition");
+	static_assert(TokenCount == 15, "Exhaustive getDirectivePrefixes definition");
 	string name; bool first = true;
 	while (true) {
 		directiveEatIdentifier(identPurpose, false, 0);
@@ -1556,7 +1573,7 @@ bool checkDirectiveContext(Scope& scope, string dirType, string directiveName, l
 	return true;
 }
 bool processDirective(Token percentToken, Scope& scope) {
-	static_assert(TokenCount == 14, "Exhaustive processDirective definition");
+	static_assert(TokenCount == 15, "Exhaustive processDirective definition");
 	string directiveName; list<string> prefixes; list<Loc> locs; Loc loc = percentToken.loc;
 	returnOnFalse(complexDirectiveName(scope, directiveName, prefixes, locs, loc));
 	if (DefiningDirectivesSet.count(directiveName)) {
@@ -2041,7 +2058,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			Token tlist(Tlist, "(", ctx.loc, ctx.continued, ctx.firstOnLine);
 			tlist.tlist = list(inScope.currTokenItr(), inScope.currList().end()); // copy
 			if (unwrap) {
-				outScope.insertList(tlist.tlist, ctx, false);
+				outScope.ctxEmplaceList(tlist.tlist, ctx);
 			} else {
 				outScope.insertToken(move(tlist));
 			}
@@ -2772,7 +2789,7 @@ int compileAndRun(Flags& flags) {
 		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
 	}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("s") << ":183:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("s") << ":220:1\n";
 	} else {
 		removeFile(flags.filePath("s"));
 	}
