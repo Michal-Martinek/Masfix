@@ -558,6 +558,7 @@ struct VM {
 // context call references //
 	bool isCtimeVM; // compile-time execution - compiler context available
 	Macro* ctimeMac=nullptr;
+	list<Token>::iterator ctimeToken;
 	void* inScope=nullptr; // Scope& for ctxcall input reading
 	void* outScope=nullptr; // Scope& for ctxcall output
 
@@ -967,8 +968,11 @@ public:
 	// construct new scope copy for context calls
 	Scope* ctxCopy() {
 		Scope* s = new Scope();
+		s->namespaces = this->namespaces;
+		s->macros = this->macros;
 		s->tlists = this->tlists; // stack copy (references same Tokens)
 		s->itrs = this->itrs;
+		s->isPreprocessing = false;
 		return s;
 	}
 	// open new token holding contents ctime mac arg
@@ -979,10 +983,13 @@ public:
 		openList(*arg);
 	}
 	// init VM ctx for ctxcalls
-	void initVmCtx(VM& vm) {
+	void initVmCtx(VM& vm, Token& closed) {
 		assert(vm.isCtimeVM);
 		vm.ctimeMac = &currMacro();
-		vm.outScope = ctxCopy(); // tlist = currList(), currToken = ctimeToken
+		vm.outScope = ctxCopy(); // tlist = currList(), out.itr - ctime return position
+		vm.ctimeToken = --itrs.top(); // this.itr stays at closed ctime expansion (before retvals)
+		assert(&*vm.ctimeToken == &closed);
+
 		// open last ctime argument
 		vm.inScope = ctxCopy();
 		vm.addSysarg(-1);
@@ -996,6 +1003,7 @@ public:
 	}
 	void closeVmCtx(VM& vm) {
 		vm.ctimeMac = nullptr;
+		vm.ctimeToken = currList().end();
 		delete (Scope*)vm.inScope;
 		vm.inScope = nullptr;
 		delete (Scope*)vm.outScope;
@@ -1003,28 +1011,29 @@ public:
 	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
-	void parseInterpretCtime(Token& ctimeExp, VM& vm) {
+	void parseInterpretCtime(Token& closed, VM& vm) {
 		vm.ctimeReturnR = true; // still return on err in parsing
-		bool safeToRun = forceParse(ctimeExp);
+		bool safeToRun = forceParse(closed);
+
+		initVmCtx(vm, closed);
 		int retval = 0;
 		if (safeToRun) {
-			initVmCtx(vm);
 			interpret(parseCtx.parseStartIdx);
-			closeVmCtx(vm);
 			assert(vm.mem_safety_padding == 0);
 			retval = vm.reg;
 		}
-		_updateTSafterCtime(ctimeExp, vm.ctimeReturnR, retval);
+		closeVmCtx(vm);
+		_updateTSafterCtime(closed, vm.ctimeReturnR, retval);
 		endMacroExpansion();
 		parseCtx.removeCtimeInstrs();
 	}
 	/// removes ctime from token stream, inserts return value if no ctxcall already did
-	void _updateTSafterCtime(Token& ctimeExp, bool returnR, optional<int> retval) {
-		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval.value_or(0)), ctimeExp);
-		// return itr to ctime expansion to remove it
-		assert(&*--itrs.top() == &ctimeExp);	
-		eatenToken();
+	void _updateTSafterCtime(Token& closed, bool returnR, optional<int> retval) {
+		Token retValToken = Token::fromCtx(Tnumeric, to_string(retval.value_or(0)), closed);
+		assert(&currToken() == &closed);
+		eatenToken(); // remove ctime expansion
 		if (returnR) insertToken(move(retValToken));
+		// NOTE itr - start of emplaced tokens
 	}
 
 // helpers -------------------------------------------------
