@@ -245,7 +245,7 @@ map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxAdvanceSource, 2},
 	{CtxCloseSource, 0},
 	{CtxSelectMacroArg, 1},
-	{CtxSelectCtimeUse, 0},
+	{CtxSelectCtimeUse, 1},
 	{CtxEmplaceTokens, 2},
 	{CtxEmplaceSelectedTlist, 2},
 	{CtxGetLastError, 2},
@@ -569,6 +569,7 @@ struct VM {
 	list<Token>::iterator ctimeToken;
 	void* inScope=nullptr; // Scope& for ctxcall input reading
 	void* outScope=nullptr; // Scope& for ctxcall output
+	void* origScope=nullptr; // original preprocessing scope
 
 // context call data //
 	int64_t sysargs[16] = { 0 };
@@ -989,11 +990,11 @@ public:
 	// attempt to close input scope list
 	string closeCtxList() {
 		if (tlists.size() <= 1) return "Cannot close last open list";
+		if (insideTlistOfType(TImacArg)) return "Cannot close macro argument";
 		tlists.pop(); itrs.pop();
 		itrs.top()--; // TODO recover closed tlist?
 		assert(hasNext() && currToken().type >= Tlist);
 		return "";
-
 	}
 	// open new token holding contents ctime mac arg
 	// doesn't insert, only open
@@ -1001,6 +1002,16 @@ public:
 		Token* arg = new Token(TImacArg, macName, loc, false, true);
 		arg->tlist = argValue; // deepcopy
 		openList(*arg);
+	}
+	void openCtimeCtxInput(VM& vm) {
+		vm.addSysarg(-1); // open last ctime argument
+		Instr ctxCallInstr(CtxSelectMacroArg);
+		interpCtxcall(vm, ctxCallInstr, false); // NOTE also clears sysargs
+		if (vm.sysretval == -1) { // mac without args / arg empty
+			Instr instr(CtxSelectCtimeUse);
+			vm.addSysarg(1); // select after ctime - tlist input
+			interpCtxcall(vm, instr, false);
+		}
 	}
 	// init VM ctx for ctxcalls
 	void initVmCtx(VM& vm, Token& closed) {
@@ -1010,15 +1021,9 @@ public:
 		vm.ctimeToken = --itrs.top(); // this.itr stays at closed ctime expansion (before retvals)
 		assert(&*vm.ctimeToken == &closed);
 
-		// open last ctime argument
+		vm.origScope = this;
 		vm.inScope = ctxCopy();
-		vm.addSysarg(-1);
-		Instr ctxCallInstr(CtxSelectMacroArg);
-		interpCtxcall(vm, ctxCallInstr, false); // NOTE also clears sysargs
-		if (vm.sysretval == -1) { // mac without args / arg empty
-			Instr instr(CtxSelectCtimeUse);
-			interpCtxcall(vm, instr, false);
-		}
+		openCtimeCtxInput(vm);
 		vm.ctimeReturnR = true; // set back
 	}
 	void closeVmCtx(VM& vm) {
@@ -1985,15 +1990,10 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		inScope.openMacroArgument(macro.name, macro.loc, macro.argList[idx].value.top());
 		retval = ctxCurrTokenType();
 	} else if (ctxName == CtxSelectCtimeUse) {
-		// SelectCtimeUse() -> TokenTypes currType
-		// select ctime expansion token (mainly for metadata)
-		// token eating then eats tokens after expansion
-
-		// TODO FOR now selects after use - rename? + add new ctxcall for ctime use itself
-		// returning from multiple levels of ctimes - emplace[]
-		// TODO available only on start
-
-		Scope* copied = outScope.ctxCopy();
+		// SelectCtimeUse(bool after) -> TokenTypes currType
+		// select ctime expansion token (mainly for metadata) or after returned tokens for input
+		bool after = vm.sysargEatShort();
+		Scope* copied = after ? outScope.ctxCopy() : ((Scope*)vm.origScope)->ctxCopy();
 		delete (Scope*)vm.inScope;
 		vm.inScope = copied;
 		retval = ctxCurrTokenType();

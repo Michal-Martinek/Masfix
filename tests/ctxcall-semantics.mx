@@ -106,6 +106,7 @@
 }
 %macro seeAfter() {
 	outc '\n'
+	sysargw 1 ; after
 	%myCtxcall('S', SelectCtimeUse)
 	%seeCurrTokenData()
 	%seeCurrTokenMeta()
