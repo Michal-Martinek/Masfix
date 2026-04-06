@@ -732,7 +732,7 @@ private:
 	list<Module> modules;
 	list<Module>::iterator currModule = modules.begin();
 	bool isPreprocessing = true;
-	
+public:
 	/// opens new tlist for iteration
 	void openList(Token& tlist) {
 		tlists.push(tlist);
@@ -922,7 +922,7 @@ public:
 			raiseError("Unclosed token list", tlists.top().get());
 			closeList();
 		}
-		assert(tlists.size() && insideTlistOfType(TImodule));
+		assert(tlists.size() && (insideTlistOfType(TImodule) || insideTlistOfType(TIctime))); // for ctxcall EmplaceTokens
 		itrs.top() = currList().begin();
 	}
 // modules -------------------------------------------------
@@ -1008,6 +1008,13 @@ public:
 		vm.inScope = nullptr;
 		delete (Scope*)vm.outScope;
 		vm.outScope = nullptr;
+	}
+	void ctxEmplaceList(list<Token>& tlist, Token& ctx, bool skipInserted=true) {
+		list<Token>::iterator after = itrs.top();
+		insertList(tlist, ctx, false);
+		if (skipInserted) {
+			itrs.top() = after;
+		}
 	}
 	/// processes ctime after it's body has been preprocessed
 	/// parses ctime body, runs the VM, handles ctime's return value(s) 
@@ -1981,11 +1988,21 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		returnOnFalse(vmParseTokenMeta(vm, macro, first_meta, ctx));
 
 		string data(data_cstr);
-		ctx.data = data;
+		std::istringstream iss(data); // we going space!!
+		// TODO make it inplace?! DEBUGGING ^^
+		Scope tokenizer;
+		// TODO tokenize errors? -> vm.errorMsgs
+		Token dest(TIctime, "__ctxcall-emplacing", macro.loc, false, true);
+		// Token dest(TIctime, inScope.getCurrModule()->abspath.string() + "__ctxcall-emplacing", macro.loc, false, true);
+		tokenizer.openList(dest);
+		// tokenizer.addNewModule(inScope.getCurrModule()->abspath / "__ctxcall-emplacing", macro.loc.file, "__ctxcall");
 
-		outScope.next(); // insert after curr
-		outScope.insertToken(move(ctx));
-		retval = 1;
+		int tokensEmplaced = tokenize(iss, "", tokenizer);
+		assert(tokenizer.insideTlistOfType(TIctime)); // TODO change type
+
+		outScope.ctxEmplaceList(tokenizer.currList(), ctx);
+
+		retval = tokensEmplaced;
 	} else if (ctxName == CtxGetLastError) {
 		// GetLastError(char* buff, ushort buff_size) -> ushort bytes_written
 		// read last error message to buffer
@@ -2050,7 +2067,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			Token tlist(Tlist, "(", ctx.loc, ctx.continued, ctx.firstOnLine);
 			tlist.tlist = list(inScope.currTokenItr(), inScope.currList().end()); // copy
 			if (unwrap) {
-				outScope.insertList(tlist.tlist, ctx, false);
+				outScope.ctxEmplaceList(tlist.tlist, ctx);
 			} else {
 				outScope.insertToken(move(tlist));
 			}
@@ -2781,7 +2798,7 @@ int compileAndRun(Flags& flags) {
 		"-o", flags.filePathStr("exe"), "-g", flags.filePathStr("obj")
 	}, flags);
 	if (flags.keepAsm) {
-		cout << "[NOTE] asm file: " << flags.filePath("s") << ":183:1\n";
+		cout << "[NOTE] asm file: " << flags.filePath("s") << ":220:1\n";
 	} else {
 		removeFile(flags.filePath("s"));
 	}
