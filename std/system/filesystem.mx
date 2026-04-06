@@ -243,6 +243,7 @@
 		%seg:push_seg(%src) ; cstr to str
 		%seg:push(%arg, 1)
 		%call(cstr_unpack_to_string)
+		%seg:point(%this, %arg, 0)
 	}
 
 	; this, string ->
@@ -463,13 +464,14 @@
 	%if_else { %seg:load(%arg, 0),
 		%seg:move(%local, 0)
 		%filestream:construct_here()
-			%stack:pushm()
-		movm
+		%seg:movptr(%local, 0)
 		%filestream:overload_read(ctx_fs_GetLastError)
 		
 		%seg:move(%local, 1)
 		%string:construct_here()
-		%stack:pushm()
+		
+		%seg:push(%local, 0)
+		%seg:push(%local, 1)
 		%call(filestream_eat_nonblocking)
 
 		%seg:push(%local, 1)
