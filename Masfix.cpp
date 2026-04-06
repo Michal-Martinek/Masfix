@@ -215,6 +215,7 @@ enum CtxcallNames {
 	CtxReadTokenData,
 	
 	CtxAdvanceSource,
+	CtxCloseSource,
 	CtxSelectMacroArg,
 	CtxSelectCtimeUse,
 
@@ -225,22 +226,24 @@ enum CtxcallNames {
 	
 	CtxcallCount,
 };
-static_assert(CtxcallCount == 8, "Exhaustive StrToCtxcallName definition");
+static_assert(CtxcallCount == 9, "Exhaustive StrToCtxcallName definition");
 map<string, CtxcallNames> StrToCtxcallName = {
 	{"GetTokenMeta", CtxGetTokenMeta},
 	{"ReadTokenData", CtxReadTokenData},
 	{"AdvanceSource", CtxAdvanceSource},
+	{"CloseSource", CtxCloseSource},
 	{"SelectMacroArg", CtxSelectMacroArg},
 	{"SelectCtimeUse", CtxSelectCtimeUse},
 	{"EmplaceTokens", CtxEmplaceTokens},
 	{"EmplaceSelectedTlist", CtxEmplaceSelectedTlist},
 	{"GetLastError", CtxGetLastError},
 };
-static_assert(CtxcallCount == 8, "Exhaustive CtxcallToNumArgs definition");
+static_assert(CtxcallCount == 9, "Exhaustive CtxcallToNumArgs definition");
 map<CtxcallNames, int> CtxcallToNumArgs = {
 	{CtxGetTokenMeta, 1},
 	{CtxReadTokenData, 3},
 	{CtxAdvanceSource, 2},
+	{CtxCloseSource, 0},
 	{CtxSelectMacroArg, 1},
 	{CtxSelectCtimeUse, 0},
 	{CtxEmplaceTokens, 2},
@@ -270,7 +273,7 @@ struct Token {
 // ctxcall - TokenMeta //
 	TokenTypes type=TokenCount;
 
-	bool firstOnLine=false;
+	bool firstOnLine=true;
 	bool continued=false; // continues meaning of previous token
 	Loc loc; // ctxcall Meta - row, col, LocFile - file //
 
@@ -283,6 +286,10 @@ struct Token {
     Token() = default;
     ~Token() = default; // TODO destructor?
 
+	Token(Loc loc) {
+		this->type = Tnone;
+		this->loc = loc;
+	}
 	Token(TokenTypes type, string data, Loc loc, bool continued, bool firstOnLine) {
 		this->type = type;
 		this->data = data;
@@ -975,6 +982,18 @@ public:
 		s->itrs = this->itrs;
 		s->isPreprocessing = false;
 		return s;
+	}
+	void openTokenizerList(Token& tlist) {
+		openList(tlist);
+	}
+	// attempt to close input scope list
+	string closeCtxList() {
+		if (tlists.size() <= 1) return "Cannot close last open list";
+		tlists.pop(); itrs.pop();
+		itrs.top()--; // TODO recover closed tlist?
+		assert(hasNext() && currToken().type >= Tlist);
+		return "";
+
 	}
 	// open new token holding contents ctime mac arg
 	// doesn't insert, only open
@@ -1937,8 +1956,6 @@ uint64_t vmExchangeBytes(VM& vm, const char* fromBuff, uint64_t fromBuffSize, ch
 #define ctxCurrTokenType() (((Scope*)vm.inScope)->hasNext() ? ((Scope*)vm.inScope)->currToken().type : Tnone) // NOTE always use the current vm.inScope
 
 bool vmParseTokenMeta(VM& vm, Macro& macro, char* in_meta, Token& out_ctx) {
-	out_ctx.loc = macro.loc;
-	// out_ctx.loc.file = macro.loc.file + "/ctxcall"; // TODO
 	if (in_meta == nullptr) return true;
 	
 	short meta_data[TOKEN_META_DATA_SIZE_W] = { 0 };
@@ -1948,8 +1965,8 @@ bool vmParseTokenMeta(VM& vm, Macro& macro, char* in_meta, Token& out_ctx) {
 	out_ctx.type = static_cast<TokenTypes>(meta_data[0]); // IGNORED
 	out_ctx.firstOnLine = !!meta_data[1];
 	out_ctx.continued = !!meta_data[2];
-	out_ctx.loc.row = meta_data[3];
-	out_ctx.loc.col = meta_data[4];
+	if (meta_data[3] > 0) out_ctx.loc.row = meta_data[3];
+	if (meta_data[4] > 0) out_ctx.loc.col = meta_data[4];
 	return true;
 }
 bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope, Macro& macro, int64_t& retval) {
@@ -1957,7 +1974,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 	checkReturnOnFail(vm.sysargCount == CtxcallToNumArgs[ctxName], "Bad number of context call arguments", ctxInstr,
 		"Expected: " + to_string(CtxcallToNumArgs[ctxName]) + ", got " + to_string(vm.sysargCount)
 	);
-	static_assert(CtxcallCount == 8, "Exhaustive interpCtxcallBody definition");
+	static_assert(CtxcallCount == 9, "Exhaustive interpCtxcallBody definition");
 	// valid currToken not needed
 	if (ctxName == CtxSelectMacroArg) {
 		// SelectMacroArg(ushort macro_arg_idx) -> TokenTypes currType
@@ -1985,15 +2002,24 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 		// emplace tokens from string after ctime call directive, first inserted inherits context from first_meta
 		eatPtrArg(data_cstr);
 		eatPtrArgNullable(first_meta);
-		Token ctx;
+		Token ctx(vm.ctimeToken->loc);
+		// TODO loc overwrite in tokenize
 		returnOnFalse(vmParseTokenMeta(vm, macro, first_meta, ctx));
 
 		string data(data_cstr);
-		ctx.data = data;
+		std::istringstream iss(data); // we going space!!
+		// NOTE out-of-place - DEBUGGING
+		Scope tokenizer;
+		// TODO tokenize errors -> vm.errorMsgs
+		Token dest(TItokenizer, "__ctxcall-emplacing", Loc(), false, true);
+		tokenizer.openTokenizerList(dest);
 
-		outScope.next(); // insert after curr
-		outScope.insertToken(move(ctx));
-		retval = 1;
+		int tokensEmplaced = tokenize(iss, vm.ctimeToken->loc.file, tokenizer);
+		assert(tokenizer.insideTlistOfType(TItokenizer));
+
+		outScope.ctxEmplaceList(tokenizer.currList(), ctx);
+
+		retval = tokensEmplaced;
 	} else if (ctxName == CtxGetLastError) {
 		// GetLastError(char* buff, ushort buff_size) -> ushort bytes_written
 		// read last error message to buffer
@@ -2046,15 +2072,22 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 				}
 			}
 			retval = ctxCurrTokenType();
+		} else if (ctxName == CtxCloseSource) {
+			// CloseSource() -> TokenTypes closed
+			// close current input tlist and set itr to it
+			vm.errorMessage = inScope.closeCtxList();
+			if (vm.errorMessage == "") {
+				retval = ctxCurrTokenType();
+			}
 		} else if (ctxName == CtxEmplaceSelectedTlist) {
 			// EmplaceSelectedTlist(bool unwrap, TokenMeta*? first_meta) -> bool success
-			// emplace rest current selected token list, with context from meta (see EmplaceTokens)
+			// emplace rest of selected token list, with context from meta (see EmplaceTokens)
 			bool unwrap = vm.sysargEatInt();
 			eatPtrArgNullable(first_meta);
-			Token ctx;
+
+			Token ctx(inScope.currToken().loc); // default: same loc, firstOnLine
 			returnOnFalse(vmParseTokenMeta(vm, macro, first_meta, ctx));
 
-			outScope.next(); // insert after curr
 			Token tlist(Tlist, "(", ctx.loc, ctx.continued, ctx.firstOnLine);
 			tlist.tlist = list(inScope.currTokenItr(), inScope.currList().end()); // copy
 			if (unwrap) {
