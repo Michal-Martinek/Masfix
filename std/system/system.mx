@@ -3,10 +3,12 @@
 %include "math"
 %include "procedures"
 %include "control"
+%include "structs"
 %include "exceptions"
 
 
-;; generic utility for system calls
+;; header file with generic utility for system & context calls
+
 %namespace sys {
 ;; arguments
 	%macro argimm(value) {
@@ -101,6 +103,58 @@
 	}
 }
 
+;; context calls -------------------------
+
+; enums
+%namespace TokenTypes {
+%struct:begin()
+	%define Tnone (%minus1)
+	%struct:field(Tnumeric, 1)
+	%struct:field(Talpha, 1)
+	%struct:field(Tstring, 1)
+	%struct:field(Tchar, 1)
+	%struct:field(Tspecial, 1)
+	%struct:field(Tcolon, 1)
+	%struct:field(Tseparator, 1)
+	%struct:field(Tlist, 1)
+; readonly
+	%struct:field(TImodule, 1)
+	%struct:field(TIexpansion, 1)
+	%struct:field(TIctime, 1)
+	%struct:field(TInamespace, 1)
+	%struct:field(TIarglist, 1)
+	%struct:field(TImacArg, 1)
+	%struct:field(TItokenizer, 1)
+
+%struct:end()
+}
+
+%namespace TokenMeta {
+	%struct:begin()
+	%struct:field(type, 1)
+	%struct:field(firstOnLine, 1)
+	%struct:field(continued, 1)
+	%struct:field(row, 1)
+	%struct:field(col, 1)
+
+	%macro init() {
+		%set(type, %TokenTypes:Tnone)
+		%set(firstOnLine, 1)
+		%set(continued, 0)
+		%set(row, %minus1)
+		%set(col, %minus1)
+	}
+	%macro deinit() {}
+
+	%struct:end()
+}
+
+
+%namespace ctx {
+	%macro call(ctxcall_name, ignore_retval) {
+		%sys:ctx(%ctxcall_name, %ignore_retval)
+	}
+}
 
 ; seeLastError() for error reporting
 %include "filesystem"
