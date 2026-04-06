@@ -135,6 +135,21 @@
 		%sys:retto(%this, %handle)
 	}
 
+	; @filestream
+	; set read function to given
+	%macro overload_read(to_func_name) {
+		%filestream:do_at { func_read,
+			str proc_(%to_func_name)
+		}
+	}
+	; @filestream
+	; set write function to given
+	%macro overload_write(to_func_name) {
+		%filestream:do_at { func_write,
+			str proc_(%to_func_name)
+		}
+	}
+
 	; this -> bytes_written
 	; call system WriteFile
 	%method{ filestream__WriteFile, 1, 0,
@@ -228,6 +243,19 @@
 		%seg:push_seg(%src) ; cstr to str
 		%seg:push(%arg, 1)
 		%call(cstr_unpack_to_string)
+	}
+
+	; this, string ->
+	; once read file & eat to string
+	%void_method{ filestream_eat_nonblocking, 2, 0,
+		%assert( %impl:buffEmpty() )
+		%seg:push(%arg, 0)
+		%call(filestream__read_file)
+
+		%seg:push(%arg, 0)
+		%seg:push(%arg, 1)
+		%call(filestream_copy_to_string)
+		%impl:eraseBuffer()
 	}
 
 	; this, output: null|buffer, count: uint ->
@@ -382,6 +410,7 @@
 }
 
 
+;; context call string IO --------------------------------
 ;; here because cross used by filestream & system.mx
 
 ; filestream, bytes_to_read -> bytes_read
@@ -390,7 +419,15 @@
 	%sys:ptr(%this, %filestream:buffer)
 	%sys:argw(%arg, 1)
 	ctxcall GetLastError ; -> bytes_read
-	lda 1 ; use null as terminator for eat_upto
+}
+
+; filestream, bytes_to_read -> bytes_read
+; call ctx ReadTokenData
+%method{ ctx_fs_ReadTokenData, 2, 0,
+	%sys:ptr(%this, %filestream:buffer)
+	%sys:argw(%arg, 1)
+	%sys:argimm(1) ; recurse
+	%ctx:call(ReadTokenData, 0) ; -> bytes_read
 }
 
 ; bool syscall/ctxcall -> (stdout: error)
@@ -428,17 +465,15 @@
 		%filestream:construct_here()
 			%stack:pushm()
 		movm
-		%filestream:at(func_read)
-		str proc_ctx_fs_GetLastError
+		%filestream:overload_read(ctx_fs_GetLastError)
 		
 		%seg:move(%local, 1)
 		%string:construct_here()
 		%stack:pushm()
-		%stack:push(0)
-		%call(filestream_eat_upto)
+		%call(filestream_eat_nonblocking)
 
 		%seg:push(%local, 1)
-		%call(string_print)
+		%string:repr()
 
 		%seg:move(%local, 0)
 		%filestream:destructor()
