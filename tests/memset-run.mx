@@ -36,3 +36,13 @@ ld 98
 mov 5000
 memset 1,2,'$',"U\tV", '\n' '\0'
 %__testMemset(5000)
+outc '\n'
+
+%testMemset{6000, 0 * 1}
+%testMemset{6100, 4 * 6}
+%testMemset{6200, 4 * 0}
+%testMemset{6300, 100 * '\t'}
+%testMemset{7000, 2 * "Hello!" '\n'}
+%testMemset{8000, 4 * '\n'}
+%testMemset{9000, 4 * 65535}
+%testMemset{9600, 8 * 65537}  ; wohoo calm down

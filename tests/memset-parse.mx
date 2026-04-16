@@ -18,3 +18,23 @@ memset 'c',
 
 memset 6 7 8 9
 memset 6 7 8, 9
+
+memset $
+memset *
+memset ,*
+memset *,
+memset 6 *
+memset 6 *,
+memset * 8
+memset * 'C'
+memset "" * 8
+memset "7" * 8
+
+memset A * 'C'
+memset '$' * 'C'
+memset 3 * 'C'
+memset 3 * 'C',
+memset 2 * ""
+memset 2 * "Hello!", ' '
+memset 2 * "World" ' ' 8
+memset 'F' 2 * "There"

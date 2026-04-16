@@ -1,6 +1,6 @@
 :returncode 1
 
-:stderr 596
+:stderr 1270
 tests\memset-parse.mx:2:1 ERROR: Unknown instruction 'memse'
 tests\memset-parse.mx:3:1 ERROR: Expected memset arguments
 tests\memset-parse.mx:4:1 ERROR: This instruction cannot have a modifier 'memsett'
@@ -10,5 +10,15 @@ tests\memset-parse.mx:9:8 ERROR: Unexpected memset immediate 'A'
 tests\memset-parse.mx:13:8 ERROR: Unexpected separator ','
 tests\memset-parse.mx:14:8 ERROR: Unexpected separator ','
 tests\memset-parse.mx:15:7 ERROR: Unexpected separator ','
+tests\memset-parse.mx:22:8 ERROR: Unexpected memset immediate '$'
+tests\memset-parse.mx:23:8 ERROR: Repeat expected after count '*'
+tests\memset-parse.mx:24:8 ERROR: Unexpected separator ','
+tests\memset-parse.mx:25:8 ERROR: Repeat expected after count '*'
+tests\memset-parse.mx:26:1 ERROR: Expected repeated immediate 'memset 6 *'
+tests\memset-parse.mx:27:1 ERROR: Expected repeated immediate 'memset 6 * ,'
+tests\memset-parse.mx:28:8 ERROR: Repeat expected after count '*'
+tests\memset-parse.mx:29:8 ERROR: Repeat expected after count '*'
+tests\memset-parse.mx:30:11 ERROR: Repeat expected after count '*'
+tests\memset-parse.mx:33:8 ERROR: Unexpected memset immediate 'A'
 
 

@@ -1822,25 +1822,40 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 }
 bool parseMemsetImms(Instr& instr) {
 	bool separatorAllowed = false;
+	int repeat = 1;
 	for (Token& imm : instr.immediates) {
 		if (imm.type == Tseparator) {
+			if (repeat != 1) break; // error
 			checkReturnOnFail(separatorAllowed, "Unexpected separator", imm);
 			separatorAllowed = false;
 			continue;
 		}
 		if (imm.type == Tnumeric || imm.type == Tchar) {
 			returnOnFalse(parseNumericalImmediate(imm, instr));
-			instr.memsetWords.push_back(instr.immediate);
+			for (int i = 0; i < repeat; ++i) {
+				instr.memsetWords.push_back(instr.immediate);
+			}
 		} else if (imm.type == Tstring) {
 			string escaped = escapeString(imm.data);
-			for (char c : escaped) {
-				instr.memsetWords.push_back(c);
+			for (int i = 0; i < repeat; ++i) {
+				for (char c : escaped) {
+					instr.memsetWords.push_back(c);
+				}
 			}
+		} else if (imm.type == Tspecial && imm.data == "*") {
+			checkReturnOnFail(repeat == 1, "Unexpected repeat", imm);
+			checkReturnOnFail(instr.memsetWords.size(), "Repeat expected after count", imm);
+			separatorAllowed = false;
+			repeat = instr.memsetWords.back();
+			instr.memsetWords.pop_back();
+			continue;
 		} else {
 			checkReturnOnFail(false, "Unexpected memset immediate", imm);
 		}
 		separatorAllowed = true;
+		repeat = 1;
 	}
+	checkReturnOnFail(repeat == 1, "Expected repeated immediate", instr);
 	return true;
 }
 bool parseInstrImmediate(Instr& instr) {

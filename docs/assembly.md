@@ -135,9 +135,6 @@ The only suffix can be a register **r** / **m** specifying the destination, the 
 * `inl` *aka* "input new line" - consumes chars untill '\n' is eaten, does not influence any registers, has no suffixes nor immediate,
 	it's main reason is to simplify handling of the '\n' or '\r\n' line breaks.
 
-#### Others  
-* `swap` - swaps the contents of **m** and **r**, has no suffixes nor immediate
-
 Examples:  
 Consider this example program when we feed it "xa065Ab\n-u \n" as stdin
 ```
@@ -155,6 +152,13 @@ outcr ; prints 'A'
 outcmt 2 ; prints ('-' * 2) = 90 = 'Z'
 outurs 30 ; prints (65 - 30) = 35
 ```
+
+#### Others  
+* `swap` - swaps the contents of **m** and **r**, has no suffixes nor immediate
+* `memset` - sets memory staring at **head** to immediate 16-bit words
+	- Example: `memset 0, 2 3, 'D' "LoL\n", 6 * 3, 2 * "\n" '\t'`
+	- writes all this to memory cells following head
+	- sets **r** to number of words written
 
 ### System call instructions
 Masfix supports making calls to [Windows API](https://learn.microsoft.com/en-us/windows/win32/apiindex/windows-api-list) system subroutines.  
