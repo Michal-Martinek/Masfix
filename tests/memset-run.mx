@@ -1,0 +1,38 @@
+%include "memory"
+%include "control"
+%include "procedures"
+%include "heap"
+
+%stack:push(2000)
+%stack:push(60000)
+%stack:push(8)
+%call(memset)
+
+
+%macro testMemset(addr, arglist) {
+	mov %addr
+	memset %arglist
+	%__testMemset(%addr)
+}
+%macro __testMemset(addr) {
+	outur
+	outc ':'
+	outc ' '
+	lda 2
+	%for {
+		movra %addr
+		movs 1
+		outum
+	}
+	outc '\n'
+}
+
+%testMemset{2048, 0}
+%testMemset{3000, 0 2}
+%testMemset{3200, ""}
+%testMemset{4000, "Hello, world!\n"} ; 7210110810811144321191111141081003310
+
+ld 98
+mov 5000
+memset 1,2,'$',"U\tV", '\n' '\0'
+%__testMemset(5000)

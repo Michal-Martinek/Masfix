@@ -172,9 +172,11 @@ enum InstrNames {
 	Isyscall,
 	Ictxcall,
 
+	Imemset,
+
 	InstructionCount
 };
-static_assert(InstructionCount == 21, "Exhaustive StrToInstr definition");
+static_assert(InstructionCount == 22, "Exhaustive StrToInstr definition");
 map<string, InstrNames> StrToInstr {
 {"mov", Imov},
 {"str", Istr},
@@ -201,6 +203,8 @@ map<string, InstrNames> StrToInstr {
 
 {"syscall", Isyscall},
 {"ctxcall", Ictxcall},
+
+{"memset", Imemset},
 };
 map<InstrNames, RegNames> InstrToModReg = {
 	{Imov, Rh},
@@ -497,6 +501,7 @@ struct Instr {
 	InstrNames instr = InstructionCount;
 	Suffix suffixes;
 	int immediate;
+	vector<short> memsetWords;
 
 	string opcodeStr;
 	Loc opcodeLoc;
@@ -1123,6 +1128,17 @@ char escapeCharToken(Token& t) {
 	assert(t.data.size() == 1 || (t.data.size() == 2 && escapeSequences.count(t.data.at(1))));
 	return t.data.size() == 2 ? escapeSequences.at(t.data.at(1)) : t.data.at(0);
 }
+string escapeString(string s) {
+	string out;
+	for (int i = 0; i < s.size(); ++i) {
+		if (s[i] == '\\') {
+			out.push_back(escapeSequences.at(s[++i]));
+		} else {
+			out.push_back(s[i]);
+		}
+	}
+	return out;
+}
 bool chopStrlit(char first, string& line, string& run, int& col, Loc loc) {
 	run = "";
 	for (size_t i = 0; i < line.size(); ++i) {
@@ -1669,6 +1685,10 @@ bool parseInstrTS(Scope& scope, Loc loc, Instr& instr) {
 	checkReturnOnFail(name.at(name.length()-1) != ':', "Label definitions BEGIN with ':'", loc);
 	instr.opcodeStr = name;
 	while (scope.hasNext() && !scope->firstOnLine) {
+		if (name == "memset") {
+			instr.immediates.push_back(scope.eatenToken());
+			continue;
+		}
 		Token immToken = Token::fromCtx(Talpha, "", scope.currToken());
 		if (scope->type == Tnumeric || scope->type == Tchar || scope->type == Tstring) immToken.type = scope->type;
 		returnOnFalse(eatComplexIdentifier(scope, loc, immToken.data, "immediate", false));
@@ -1800,7 +1820,31 @@ bool parseNumericalImmediate(Token& imm, Instr& instr) {
 	}
 	return true;
 }
+bool parseMemsetImms(Instr& instr) {
+	bool separatorAllowed = false;
+	for (Token& imm : instr.immediates) {
+		if (imm.type == Tseparator) {
+			checkReturnOnFail(separatorAllowed, "Unexpected separator", imm);
+			separatorAllowed = false;
+			continue;
+		}
+		if (imm.type == Tnumeric || imm.type == Tchar) {
+			returnOnFalse(parseNumericalImmediate(imm, instr));
+			instr.memsetWords.push_back(instr.immediate);
+		} else if (imm.type == Tstring) {
+			string escaped = escapeString(imm.data);
+			for (char c : escaped) {
+				instr.memsetWords.push_back(c);
+			}
+		} else {
+			checkReturnOnFail(false, "Unexpected memset immediate", imm);
+		}
+		separatorAllowed = true;
+	}
+	return true;
+}
 bool parseInstrImmediate(Instr& instr) {
+	if (instr.instr == Imemset) return parseMemsetImms(instr);
 	checkReturnOnFail(instr.immediates.size() == 1, "Only single immediate allowed", instr);
 	Token& imm = instr.immediates.front();
 	if (instr.instr == Isyscall || instr.instr == Ictxcall) {
@@ -1845,6 +1889,9 @@ bool checkSuffixCombination(Instr& instr) {
 	} else if (instr.instr == Isyscall || instr.instr == Ictxcall) {
 		checkReturnOnFail(!instr.hasReg() && !instr.hasOp(), "Unexpected syscall suffix", instr);
 		checkReturnOnFail(instr.hasImm(), "Expected syscall identifier", instr);
+	} else if (instr.instr == Imemset) {
+		checkReturnOnFail(!instr.hasReg() && !instr.hasOp(), "Unexpected memset suffix", instr);
+		checkReturnOnFail(instr.hasImm(), "Expected memset arguments", instr.opcodeLoc);
 	} else {
 		checkReturnOnFail(instr.hasReg() || instr.hasImm(), "Target value expected", instr);
 		if (instr.hasOp()) {
@@ -1857,7 +1904,7 @@ bool checkSuffixCombination(Instr& instr) {
 }
 // checks if the instr has correct combination of suffixes and immediates
 bool checkValidity(Instr& instr) {
-	static_assert(InstructionCount == 21 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
+	static_assert(InstructionCount == 22 && sizeof(Suffix) == 4 * 5, "Exhaustive checkValidity definition");
 	assert(instr.instr < InstructionCount);
 	returnOnFalse(checkSuffixCombination(instr));
 	if (instr.toStr() == "ldr" || instr.toStr() == "strm" || instr.toStr() == "movh") {
@@ -2050,6 +2097,7 @@ bool interpCtxcallBody(VM& vm, Instr& ctxInstr, Scope& inScope, Scope& outScope,
 			// ReadTokenData(char* buff, ushort buff_size, bool recurse) -> ushort bytes_written
 			// read token text (.data) into buffer
 			// recurse gives text of whole token subtree
+			// TODO string + char escapes
 			eatPtrArg(mxBuff);
 			uint64_t mxBuffSize = vm.sysargEatInt();
 			bool recurse = vm.sysargEatInt();
@@ -2115,7 +2163,7 @@ void interpCtxcall(VM& vm, Instr& ctxInstr, bool trueCtxcall) {
 	vm.ctxcallReturn(retvalue, trueCtxcall);
 }
 void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, bool& ipChanged) {
-	static_assert(InstructionCount == 21, "Exhaustive interpInstrBody definition");
+	static_assert(InstructionCount == 22, "Exhaustive interpInstrBody definition");
 	unsigned short& inputReg = instr.suffixes.reg == Rm ? vm.cell() : vm.reg;
 	if (instr.instr == Imov) vm.head = target;
 	else if (instr.instr == Istr) {
@@ -2169,6 +2217,13 @@ void interpInstrBody(VM& vm, Instr& instr, unsigned short target, bool cond, boo
 	} else if (instr.instr == Isysretq) {
 		int64_t* dest = (int64_t*)&vm.mem[target];
 		*dest = vm.sysretval;
+	} else if (instr.instr == Imemset) {
+		short* addr = (short*) &vm.mem[vm.head];
+		for (short val : instr.memsetWords) {
+			*addr = val;
+			if (++addr >= (short*)&vm.mem_safety_padding) break;
+		}
+		vm.reg = instr.memsetWords.size();
 	} else {
 		unreachable();
 	}
@@ -2300,8 +2355,8 @@ void genCond(ofstream& outFile, InstrNames instr, RegNames condReg, CondNames co
 		unreachable();
 	}
 }
-void genInstrBody(ofstream& outFile, Instr& instr, int instrNum, bool inputToR=true) {
-	static_assert(InstructionCount == 21, "Exhaustive genInstrBody definition");
+void genInstrBody(ofstream& outFile, Instr& instr, int instrNum, vector<short>& memsetData, bool inputToR=true) {
+	static_assert(InstructionCount == 22, "Exhaustive genInstrBody definition");
 	string inputDest = inputToR ? "r15w" : "[2*r14+r13]";
 
 	if (instr.instr == Imov) {
@@ -2368,11 +2423,22 @@ void genInstrBody(ofstream& outFile, Instr& instr, int instrNum, bool inputToR=t
 		"	lea rdx, [rip + invalid_ctxcall_error_message]\n"
 		"	mov r8, OFFSET FLAT:invalid_ctxcall_error_len\n"
 		"	call error\n";
+	} else if (instr.instr == Imemset) {
+		outFile << 
+		"	# copy n words from memset .data segment @ offset to cells[h]\n"
+		"	lea rsi, [rip + memset_data + 2 * " << memsetData.size() << "] # source = memset_data[offset]\n"
+		"	lea rdi, [r13 + r14*2] # dest = cells[h]\n"
+		"	mov r15, " << instr.memsetWords.size() << " # word count -> r\n"
+		"	mov rcx, r15\n"
+		"	rep movsw # copy rcx words (16-bit)\n";
+		for (short word : instr.memsetWords) {
+			memsetData.push_back(word);
+		}
 	} else {
 		unreachable();
 	}
 }
-void genInstr(ofstream& outFile, Instr instr, int instrNum) {
+void genInstr(ofstream& outFile, Instr instr, int instrNum, vector<short>& memsetData) {
 	// head pos - r14, internal r reg - r15
 	// operands - first - rbx, second - rcx (also result of operation)
 	// addr of cells[0] - r13
@@ -2386,7 +2452,7 @@ void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	if (instr.hasImm()) {
 		if (instr.instr == Isyscall) {
 			outFile << "	lea rax, [rip + " << instr.immediates.front().data << "]\n";
-		} else if (instr.instr == Ictxcall) {
+		} else if (instr.instr == Ictxcall || instr.instr == Imemset) {
 		} else {
 			outFile << "	mov rcx, " << instr.immediate << '\n';
 		}
@@ -2401,7 +2467,7 @@ void genInstr(ofstream& outFile, Instr instr, int instrNum) {
 	if (instr.hasCond()) {
 		genCond(outFile, instr.instr, instr.suffixes.condReg, instr.suffixes.cond, instrNum);
 	}
-	genInstrBody(outFile, instr, instrNum, instr.suffixes.reg == Rr);
+	genInstrBody(outFile, instr, instrNum, memsetData, instr.suffixes.reg == Rr);
 }
 
 void generate(ofstream& outFile, vector<Instr>& instrs) {
@@ -2626,12 +2692,13 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 		"	xor r15, r15\n"
 		"\n";
 
+	vector<short> memsetData;
 	Instr instr;
 	for (int i = 0; i < instrs.size(); ++i) {
 		instr = instrs[i];
 		outFile << "instr_" << i << ":\n";
 		outFile << "	# " << instr.toStr() << '\n';
-		genInstr(outFile, instr, i);
+		genInstr(outFile, instr, i, memsetData);
 	}
 	outFile <<
 		"instr_"<< instrs.size() << ":\n"
@@ -2687,8 +2754,15 @@ void generate(ofstream& outFile, vector<Instr>& instrs) {
 	for (int i = 1; i <= instrs.size(); ++i) {
 		outFile << ",instr_" << i;
 	}
+	outFile << "\n"
+	"\n"
+	"	memset_data: .word ";
+	
+	for (short word : memsetData) {
+		outFile << (unsigned short) word << ',';
+	}
+	outFile << "0\n"; // use last comma
 
-	outFile << "\n";
 	outFile.close();
 }
 // IO ---------------------------------------

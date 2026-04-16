@@ -1,0 +1,20 @@
+
+memse
+memset
+memsett
+memsetr
+memset>
+
+memset 0
+memset A
+memset "A"
+memset 'A'
+memset 0,
+memset ,
+memset ,4
+memset,
+memset 'c',8
+memset 'c',
+
+memset 6 7 8 9
+memset 6 7 8, 9

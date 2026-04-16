@@ -1,0 +1,14 @@
+:returncode 1
+
+:stderr 596
+tests\memset-parse.mx:2:1 ERROR: Unknown instruction 'memse'
+tests\memset-parse.mx:3:1 ERROR: Expected memset arguments
+tests\memset-parse.mx:4:1 ERROR: This instruction cannot have a modifier 'memsett'
+tests\memset-parse.mx:5:1 ERROR: Unexpected memset suffix 'memsetr'
+tests\memset-parse.mx:6:1 ERROR: This instruction cannot have a modifier 'memset>'
+tests\memset-parse.mx:9:8 ERROR: Unexpected memset immediate 'A'
+tests\memset-parse.mx:13:8 ERROR: Unexpected separator ','
+tests\memset-parse.mx:14:8 ERROR: Unexpected separator ','
+tests\memset-parse.mx:15:7 ERROR: Unexpected separator ','
+
+
