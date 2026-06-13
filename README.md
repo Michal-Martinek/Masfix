@@ -9,6 +9,8 @@ Masfix builds high‑level features from the ground up with a powerful macro sys
 	- Low level assembly: based on simple instructions 
 	- Suffix semantics: instruction meaning is specified by their suffixes.
 
+
+[TEPRVE talk I gave about Masfix (_Czech_)](https://youtu.be/1CMbS5pCAoA?si=3jm7In0iwialZLX7)
 <!-- TODO bullet point features overview -->
 
 ## Architecture Overview
